@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Ethereum clients
+  geth:
+    extends:
+      file: ./clients/geth/docker-compose.yml
+      service: geth
+    networks:
+      - jsonrpc-bench
+    
+  nethermind:
+    extends:
+      file: ./clients/nethermind/docker-compose.yml
+      service: nethermind
+    networks:
+      - jsonrpc-bench
+  
+  # Metrics infrastructure
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: jsonrpc-bench-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./metrics/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - jsonrpc-bench
+    depends_on:
+      - geth
+      - nethermind
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: jsonrpc-bench-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./metrics/dashboards:/var/lib/grafana/dashboards
+      - ./metrics/grafana-provisioning:/etc/grafana/provisioning
+    networks:
+      - jsonrpc-bench
+    depends_on:
+      - prometheus
+  
+  # Report server
+  report-server:
+    build:
+      context: .
+      dockerfile: ./web/Dockerfile
+    container_name: jsonrpc-bench-report
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./results:/app/results
+    networks:
+      - jsonrpc-bench
+
+networks:
+  jsonrpc-bench:
+    driver: bridge

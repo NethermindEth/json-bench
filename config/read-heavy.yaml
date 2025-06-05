@@ -1,0 +1,27 @@
+test_name: "Read-heavy RPC benchmark"
+description: "Benchmark focusing on read operations like eth_call and eth_getLogs"
+clients:
+  - name: "geth"
+    url: "http://localhost:8545"
+  - name: "nethermind"
+    url: "http://localhost:8545"
+duration: "5m"
+rps: 200
+endpoints:
+  - method: "eth_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"  # WETH contract on mainnet
+        data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"  # balanceOf(address)
+    frequency: 60%
+  - method: "eth_getLogs"
+    params:
+      - fromBlock: "0x1000000"
+        toBlock: "0x1000100"
+        address: ["0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"]
+    frequency: 30%
+  - method: "eth_getBlockByNumber"
+    params:
+      - "latest"
+      - true
+    frequency: 10%
+validate_responses: true

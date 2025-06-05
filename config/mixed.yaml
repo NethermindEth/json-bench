@@ -1,0 +1,34 @@
+test_name: "Mixed RPC benchmark"
+description: "Benchmark with a mix of read and state operations"
+clients:
+  - name: "geth"
+    url: "http://localhost:8545"
+  - name: "nethermind"
+    url: "http://localhost:8545"
+duration: "3m"
+rps: 150
+endpoints:
+  - method: "eth_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"
+    frequency: 40%
+  - method: "eth_getBalance"
+    params:
+      - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+      - "latest"
+    frequency: 20%
+  - method: "eth_blockNumber"
+    params: []
+    frequency: 20%
+  - method: "eth_getTransactionCount"
+    params:
+      - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+      - "latest"
+    frequency: 10%
+  - method: "eth_getBlockByNumber"
+    params:
+      - "latest"
+      - false
+    frequency: 10%
+validate_responses: true
