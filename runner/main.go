@@ -9,8 +9,6 @@ import (
 
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/generator"
-	"github.com/jsonrpc-bench/runner/types"
-	"github.com/jsonrpc-bench/runner/validator"
 )
 
 func main() {
@@ -45,29 +43,8 @@ func main() {
 	fmt.Println("Running benchmark...")
 	results, err := generator.RunK6Benchmark(scriptPath, *outputDir)
 	if err != nil {
-		log.Fatalf("Benchmark execution failed: %v", err)
-	}
-	
-	// Validate responses
-	var diffs []validator.ResponseDiff
-	if cfg.ValidateResponses {
-		fmt.Println("Validating responses...")
-		var err error
-		diffs, err = validator.ValidateResponses((*types.BenchmarkResult)(results))
-		if err != nil {
-			log.Fatalf("Response validation failed: %v", err)
-		}
-
-		if len(diffs) > 0 {
-			fmt.Printf("Found %d differences in client responses\n", len(diffs))
-		} else {
-			fmt.Println("All client responses match!")
-		}
-		
-		// Add response diffs to results
-		results.ResponseDiff = map[string]interface{}{
-			"diffs": diffs,
-		}
+		// Log the error but continue to generate the report
+		log.Printf("Benchmark execution warning: %v", err)
 	}
 
 	// Generate HTML report

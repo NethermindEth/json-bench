@@ -25,6 +25,8 @@ const rpcErrors = new Counter('rpc_errors');
 const rpcCalls = new Counter('rpc_calls');
 const methodCalls = {};
 const methodLatency = {};
+const clientMethodCalls = {};
+const clientMethodLatency = {};
 
 // Configuration
 const config = {
@@ -34,10 +36,22 @@ const config = {
   rps: {{.RPS}},
 };
 
-// Initialize metrics for each method
+// Initialize metrics for each method and client-method combination
 config.endpoints.forEach(endpoint => {
-  methodCalls[endpoint.method] = new Counter('method_calls_' + endpoint.method);
-  methodLatency[endpoint.method] = new Trend('method_latency_' + endpoint.method);
+  // Global method metrics
+  methodCalls[endpoint.Method] = new Counter('method_calls_' + endpoint.Method);
+  methodLatency[endpoint.Method] = new Trend('method_latency_' + endpoint.Method);
+  
+  // Per-client method metrics
+  config.clients.forEach(client => {
+    const clientName = client.Name;
+    if (!clientMethodCalls[clientName]) {
+      clientMethodCalls[clientName] = {};
+      clientMethodLatency[clientName] = {};
+    }
+    clientMethodCalls[clientName][endpoint.Method] = new Counter('client_' + clientName + '_method_calls_' + endpoint.Method);
+    clientMethodLatency[clientName][endpoint.Method] = new Trend('client_' + clientName + '_method_latency_' + endpoint.Method);
+  });
 });
 
 // Define test options
@@ -74,7 +88,7 @@ function selectEndpoint() {
   let cumulativeFreq = 0;
   
   for (const endpoint of config.endpoints) {
-    const freq = parseInt(endpoint.frequency);
+    const freq = parseInt(endpoint.Frequency);
     cumulativeFreq += freq;
     
     if (rand <= cumulativeFreq) {
@@ -88,15 +102,15 @@ function selectEndpoint() {
 // Main test function
 export default function() {
   const endpoint = selectEndpoint();
-  const method = endpoint.method;
-  const params = endpoint.params;
+  const method = endpoint.Method;
+  const params = endpoint.Params;
   
   const payload = createJsonRpcRequest(method, params);
   
   // Send requests to all clients
   for (const client of config.clients) {
-    const url = client.url;
-    const clientName = client.name;
+    const url = client.URL;
+    const clientName = client.Name;
     
     const headers = {
       'Content-Type': 'application/json',
@@ -107,9 +121,13 @@ export default function() {
     const endTime = new Date().getTime();
     
     // Record metrics
-    rpcCalls.add(1, { client: clientName, method });
-    methodCalls[method].add(1, { client: clientName });
-    methodLatency[method].add(endTime - startTime, { client: clientName });
+    rpcCalls.add(1, { client: String(clientName), method: String(method) });
+    methodCalls[method].add(1);
+    methodLatency[method].add(endTime - startTime);
+    
+    // Record client-specific metrics
+    clientMethodCalls[clientName][method].add(1);
+    clientMethodLatency[clientName][method].add(endTime - startTime);
     
     // Check response
     const success = check(response, {
@@ -125,14 +143,14 @@ export default function() {
     });
     
     if (!success) {
-      rpcErrors.add(1, { client: clientName, method });
+      rpcErrors.add(1, { client: String(clientName), method: String(method) });
     }
     
-    // Store response for validation
+    // Store response for validation - using console.log instead of file operations
     if (__ENV.RECORD_RESPONSES === 'true') {
-      const responseFile = open('responses/' + clientName + '_' + method + '_' + payload.id + '.json', 'w');
-      responseFile.write(response.body);
-      responseFile.close();
+      // File operations are only available in init context, so we'll log the response
+      // The runner can capture this output and save it to a file if needed
+      console.log('RESPONSE_DATA:' + String(clientName) + ':' + String(method) + ':' + payload.id + ':' + response.body);
     }
   }
   
@@ -192,11 +210,10 @@ func GenerateK6Script(cfg *config.Config, outputPath string) error {
 	return nil
 }
 
-// BenchmarkResult is an alias for types.BenchmarkResult
-type BenchmarkResult = types.BenchmarkResult
+// Use types.BenchmarkResult directly
 
 // RunK6Benchmark runs the generated k6 script and returns the results
-func RunK6Benchmark(scriptPath, outputDir string) (*BenchmarkResult, error) {
+func RunK6Benchmark(scriptPath, outputDir string) (*types.BenchmarkResult, error) {
 	// Create responses directory
 	responsesDir := filepath.Join(outputDir, "responses")
 	if err := os.MkdirAll(responsesDir, 0755); err != nil {
@@ -235,7 +252,7 @@ func RunK6Benchmark(scriptPath, outputDir string) (*BenchmarkResult, error) {
 
 	// For now, return a minimal result
 	// In a real implementation, we would process the responses and calculate diffs
-	result := &BenchmarkResult{
+	result := &types.BenchmarkResult{
 		Summary:      summary,
 		Timestamp:    fmt.Sprintf("%d", time.Now().Unix()),
 		ResponsesDir: responsesDir,

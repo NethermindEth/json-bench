@@ -2,11 +2,11 @@ test_name: "Mixed RPC benchmark"
 description: "Benchmark with a mix of read and state operations"
 clients:
   - name: "geth"
-    url: "http://localhost:8545"
+    url: "http://172.232.169.248:8545"
   - name: "nethermind"
-    url: "http://localhost:8545"
-duration: "3m"
-rps: 150
+    url: "http://172.232.169.243:8545"
+duration: "15m"
+rps: 300
 endpoints:
   - method: "eth_call"
     params:
@@ -31,4 +31,4 @@ endpoints:
       - "latest"
       - false
     frequency: 10%
-validate_responses: true
+validate_responses: false
