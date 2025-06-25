@@ -97,6 +97,12 @@ go run ./cmd/compare-openrpc/main.go -spec https://raw.githubusercontent.com/eth
 go run ./cmd/compare-openrpc/main.go -spec https://raw.githubusercontent.com/ethereum/execution-apis/main/openrpc.json -variations ./config/param_variations.yaml -clients "geth:http://localhost:8545,erigon:http://localhost:8546"
 ```
 
+Check the output:
+```bash
+open comparison-results/comparison-report.html
+```
+
+
 ### Parameter Variations
 
 You can test methods with different parameter sets using a YAML configuration file:
