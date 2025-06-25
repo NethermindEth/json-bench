@@ -1,0 +1,40 @@
+# JSON-RPC Comparison Configuration
+name: "Ethereum API Comparison"
+description: "Comparing responses across multiple Ethereum clients"
+
+# Client endpoints
+clients:
+  - name: "geth"
+    url: "http://172.232.169.248:8545"
+  - name: "nethermind"
+    url: "http://172.232.169.243:8545"
+
+# Settings
+validate_schema: false
+concurrency: 5
+timeout_seconds: 30
+output_dir: "comparison-results"
+
+# Methods to compare with their parameters
+methods:
+  - name: "eth_blockNumber"
+    params: []
+  
+  - name: "eth_chainId"
+    params: []
+  
+  - name: "eth_getBalance"
+    params:
+      - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+      - "latest"
+  
+  - name: "eth_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"
+      - "latest"
+  
+  - name: "eth_getBlockByNumber"
+    params:
+      - "latest"
+      - false

@@ -1,0 +1,32 @@
+# Example configuration for JSON-RPC comparison
+name: "Ethereum Client Comparison"
+description: "Comparing responses from different Ethereum clients"
+
+# Client endpoints
+clients:
+  - name: "Geth"
+    url: "http://localhost:8545"
+  - name: "Erigon"
+    url: "http://localhost:8546"
+  - name: "Nethermind"
+    url: "http://localhost:8547"
+
+# Methods to compare
+methods:
+  - "eth_blockNumber"
+  - "eth_chainId"
+  - "eth_getBalance"
+  - "eth_createAccessList"
+
+# Custom parameters for specific methods
+custom_parameters:
+  eth_getBalance:
+    - ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "latest"]
+  eth_createAccessList:
+    - [{}, "latest"]
+
+# Configuration options
+validate_against_schema: true
+concurrency: 5
+timeout_seconds: 30
+output_dir: "comparison-results"

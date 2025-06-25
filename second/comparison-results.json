@@ -1,0 +1,344 @@
+[
+  {
+    "method": "eth_call",
+    "params": [
+      {
+        "data": "0x70a08231000000000000000000000000000000000000000000000000000000000000000a",
+        "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+      },
+      "latest"
+    ],
+    "timestamp": "2025-06-20T11:30:53+04:00",
+    "responses": {
+      "geth": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "nethermind": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "differences": {},
+    "metadata": {
+      "clients": [
+        {
+          "name": "geth",
+          "url": "http://74.207.227.67:8545"
+        },
+        {
+          "name": "nethermind",
+          "url": "http://38.154.254.162:8545"
+        }
+      ]
+    }
+  },
+  {
+    "method": "eth_call_variant6",
+    "params": [
+      {
+        "from": "0xc4a675c5041e9687768ce154554d6cddd2540712",
+        "gas": "0xf4240",
+        "gasPrice": "0x0",
+        "input": "0x1cff79cd000000000000000000000000a4a69bd8a6c99d754566da6544438e1b5973591e000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001a48c983612000000000000000000000000cba47689202d31575bfa204efe70e2c83d29da4d0000000000000000000000002260fac5e5542a773aa44fbcfedf7c193bc2c5990000000000000000000000001f573d6fb3f13d689ff844b4ce37794d79a7ff1c00000000000000000000000056178a0d5f301baf6cf3e1cd53d9863437345bf9000000000000000000000000fee7eeaa0c2f3f7c7e6301751a8de55ce4d059ec00000000000000000000000000000000000000000000000000000000005b8d8000000000000000000000000000000000000000000000000000000000b2d05e0000000000000000000000000000000000000000000000000000004fd88ce2b8b600000000000000000000000000000166a1f7cf9ecbf2cca9726da712b7c8000000000000000000000000000000000000000000022e7b8d2ad6442e7f6a000000000000000000000000000000000000000000000000000000000000006100bcfa000000000000000000000000000000000000000000000000000000000000003f000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000",
+        "nonce": "0x607d",
+        "to": "0xa57bd00134b2850b2a1c55860c9e9ea100fdd6cf",
+        "value": "0x0"
+      },
+      "latest"
+    ],
+    "timestamp": "2025-06-20T11:30:53+04:00",
+    "responses": {
+      "geth": {
+        "error": {
+          "code": 3,
+          "data": "0x",
+          "message": "execution reverted"
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      },
+      "nethermind": {
+        "error": {
+          "code": -32000,
+          "message": "wrong transaction nonce"
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      }
+    },
+    "differences": {
+      "nethermind": {
+        "error_differences": [
+          {
+            "path": "error.code",
+            "type": "value_mismatch",
+            "value1": 3,
+            "value2": -32000
+          },
+          {
+            "path": "error.data",
+            "type": "field_extra",
+            "value1": "0x",
+            "value2": null
+          },
+          {
+            "path": "error.message",
+            "type": "value_mismatch",
+            "value1": "execution reverted",
+            "value2": "wrong transaction nonce"
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "clients": [
+        {
+          "name": "geth",
+          "url": "http://74.207.227.67:8545"
+        },
+        {
+          "name": "nethermind",
+          "url": "http://38.154.254.162:8545"
+        }
+      ]
+    }
+  },
+  {
+    "method": "eth_call_variant1",
+    "params": [
+      {
+        "data": "0x70a08231000000000000000000000000000000000000000000000000000000000000000a",
+        "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+      },
+      "latest"
+    ],
+    "timestamp": "2025-06-20T11:30:53+04:00",
+    "responses": {
+      "geth": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "nethermind": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "differences": {},
+    "metadata": {
+      "clients": [
+        {
+          "name": "geth",
+          "url": "http://74.207.227.67:8545"
+        },
+        {
+          "name": "nethermind",
+          "url": "http://38.154.254.162:8545"
+        }
+      ]
+    }
+  },
+  {
+    "method": "eth_call_variant3",
+    "params": [
+      {
+        "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+      },
+      "latest"
+    ],
+    "timestamp": "2025-06-20T11:30:53+04:00",
+    "responses": {
+      "geth": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x"
+      },
+      "nethermind": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x"
+      }
+    },
+    "differences": {},
+    "metadata": {
+      "clients": [
+        {
+          "name": "geth",
+          "url": "http://74.207.227.67:8545"
+        },
+        {
+          "name": "nethermind",
+          "url": "http://38.154.254.162:8545"
+        }
+      ]
+    }
+  },
+  {
+    "method": "eth_call_variant4",
+    "params": [
+      {
+        "data": "0x6352211e0000000000000000000000000000000000000000000000000000000000001178",
+        "to": "0xB83C3CA6e22EF50EC13dC56B6D0729Aef6b4546E"
+      },
+      "latest"
+    ],
+    "timestamp": "2025-06-20T11:30:53+04:00",
+    "responses": {
+      "geth": {
+        "error": {
+          "code": 3,
+          "data": "0xdf2d9b42",
+          "message": "execution reverted"
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      },
+      "nethermind": {
+        "error": {
+          "code": -32015,
+          "data": "0xdf2d9b42",
+          "message": "VM execution error."
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      }
+    },
+    "differences": {
+      "nethermind": {
+        "error_differences": [
+          {
+            "path": "error.code",
+            "type": "value_mismatch",
+            "value1": 3,
+            "value2": -32015
+          },
+          {
+            "path": "error.message",
+            "type": "value_mismatch",
+            "value1": "execution reverted",
+            "value2": "VM execution error."
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "clients": [
+        {
+          "name": "geth",
+          "url": "http://74.207.227.67:8545"
+        },
+        {
+          "name": "nethermind",
+          "url": "http://38.154.254.162:8545"
+        }
+      ]
+    }
+  },
+  {
+    "method": "eth_call_variant2",
+    "params": [
+      {
+        "data": "0x70a08231000000000000000000000000000000000000000000000000000000000000000a",
+        "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+      },
+      "pending"
+    ],
+    "timestamp": "2025-06-20T11:30:53+04:00",
+    "responses": {
+      "geth": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "nethermind": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "differences": {},
+    "metadata": {
+      "clients": [
+        {
+          "name": "geth",
+          "url": "http://74.207.227.67:8545"
+        },
+        {
+          "name": "nethermind",
+          "url": "http://38.154.254.162:8545"
+        }
+      ]
+    }
+  },
+  {
+    "method": "eth_call_variant5",
+    "params": [
+      {
+        "data": "0x70a08231000000000000000000000000fa94a4ef06abb15d7f1953906f953d53faf3a726",
+        "to": "0xf61E18A4f2b1A3784054393Fce90848394Fc3799"
+      },
+      "latest"
+    ],
+    "timestamp": "2025-06-20T11:30:54+04:00",
+    "responses": {
+      "geth": {
+        "error": {
+          "code": 3,
+          "data": "0x",
+          "message": "execution reverted"
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      },
+      "nethermind": {
+        "error": {
+          "code": -32015,
+          "data": "revert",
+          "message": "VM execution error."
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      }
+    },
+    "differences": {
+      "nethermind": {
+        "error_differences": [
+          {
+            "path": "error.code",
+            "type": "value_mismatch",
+            "value1": 3,
+            "value2": -32015
+          },
+          {
+            "path": "error.data",
+            "type": "value_mismatch",
+            "value1": "0x",
+            "value2": "revert"
+          },
+          {
+            "path": "error.message",
+            "type": "value_mismatch",
+            "value1": "execution reverted",
+            "value2": "VM execution error."
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "clients": [
+        {
+          "name": "geth",
+          "url": "http://74.207.227.67:8545"
+        },
+        {
+          "name": "nethermind",
+          "url": "http://38.154.254.162:8545"
+        }
+      ]
+    }
+  }
+]

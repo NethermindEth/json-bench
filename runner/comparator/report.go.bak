@@ -1,0 +1,1134 @@
+package comparator
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"text/template"
+	"time"
+
+	"github.com/jsonrpc-bench/runner/config"
+	"github.com/jsonrpc-bench/runner/types"
+)
+
+// MethodComparisonResult represents the result of a single method comparison for the report
+type MethodComparisonResult struct {
+	Method            string                 `json:"method"`
+	Params            []interface{}          `json:"params"`
+	ParamsDisplay     string                 `json:"params_display"`
+	Differences       map[string]interface{} `json:"differences"`
+	DifferencesDisplay string                `json:"differences_display"`
+	SchemaErrors      map[string][]string    `json:"schema_errors,omitempty"`
+	Responses         map[string]string      `json:"responses"`
+	Error             error                  `json:"error,omitempty"`
+}
+
+// ComparisonSummary represents summary statistics for the comparison
+type ComparisonSummary struct {
+	TotalMethods       int `json:"total_methods"`
+	TotalComparisons   int `json:"total_comparisons"`
+	MatchingResponses  int `json:"matching_responses"`
+	DifferentResponses int `json:"different_responses"`
+	SchemaErrors       int `json:"schema_errors"`
+	CallErrors         int `json:"call_errors"`
+}
+
+// ReportData represents the data for the HTML report
+type ReportData struct {
+	Title           string                                  `json:"title"`
+	Timestamp       string                                  `json:"timestamp"`
+	ComparisonID    string                                  `json:"comparison_id"`
+	Configuration   *ComparisonConfig                       `json:"configuration"`
+	MethodResults   map[string][]MethodComparisonResult     `json:"method_results"`
+	ClientEndpoints []string                                `json:"client_endpoints"`
+	ErrorMethods    map[string][]MethodComparisonResult     `json:"error_methods"`
+	DiffMethods     map[string][]MethodComparisonResult     `json:"diff_methods"`
+	MatchMethods    map[string][]MethodComparisonResult     `json:"match_methods"`
+	Summary         ComparisonSummary                       `json:"summary"`
+	Scopes          []string                                `json:"scopes"`
+	ScopedMethods   map[string]map[string][]MethodComparisonResult `json:"scoped_methods"`
+}
+
+// formatJSON formats a JSON object for display
+func formatJSON(obj interface{}) (string, error) {
+	data, err := json.MarshalIndent(obj, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// GenerateHTMLReport generates an HTML report from the comparison results
+func (c *Comparator) GenerateHTMLReport(outputPath string) error {
+	// Convert comparison results to response diffs
+	responseDiffs := make([]types.ResponseDiff, len(c.results))
+	for i, result := range c.results {
+		// Extract client names
+		clientNames := make([]string, 0, len(result.Responses))
+		for client := range result.Responses {
+			clientNames = append(clientNames, client)
+		}
+		
+		// Check if there are differences
+		hasDiff := len(result.Differences) > 0
+		
+		// Create ResponseDiff
+		responseDiffs[i] = types.ResponseDiff{
+			Method:       result.Method,
+			Params:       result.Params,
+			Clients:      clientNames,
+			ClientNames:  clientNames,
+			Responses:    result.Responses,
+			Differences:  result.Differences,
+			SchemaErrors: result.SchemaErrors,
+			HasDiff:      hasDiff,
+		}
+	}
+	
+	// Create benchmark result
+	clients := make([]config.Client, len(c.config.Clients))
+	for i, client := range c.config.Clients {
+		clients[i] = config.Client{
+			Name: client.Name,
+			URL:  client.URL,
+		}
+	}
+	
+	cfg := &config.Config{
+		Clients: clients,
+	}
+	
+	benchmarkResult := &types.BenchmarkResult{
+		Config: cfg,
+		ResponseDiff: map[string]interface{}{
+			"diffs": responseDiffs,
+		},
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+
+	// Create output directory if it doesn't exist
+	outputDir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Generate HTML report using the template
+	tmpl, err := template.New("report").Parse(htmlReportTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse HTML template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, reportData(benchmarkResult, responseDiffs, outputPath)); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write HTML report: %w", err)
+	}
+
+	return nil
+}
+
+// reportData creates the report data from benchmark result and response diffs
+func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outputPath string) ReportData {
+	// Create report data
+	reportData := ReportData{
+		Title:           "JSON-RPC Response Comparison Report",
+		Timestamp:       time.Now().Format(time.RFC1123),
+		ComparisonID:    time.Now().Format("20060102-150405"),
+		Configuration:   &ComparisonConfig{}, // Placeholder
+		MethodResults:   make(map[string][]MethodComparisonResult),
+		ClientEndpoints: make([]string, 0),
+		ErrorMethods:    make(map[string][]MethodComparisonResult),
+		DiffMethods:     make(map[string][]MethodComparisonResult),
+		MatchMethods:    make(map[string][]MethodComparisonResult),
+		ScopedMethods:   make(map[string]map[string][]MethodComparisonResult),
+		Scopes:          make([]string, 0),
+	}
+	
+	// Add client endpoints
+	if cfg, ok := result.Config.(*config.Config); ok && cfg != nil {
+		for _, client := range cfg.Clients {
+			reportData.ClientEndpoints = append(reportData.ClientEndpoints, fmt.Sprintf("%s: %s", client.Name, client.URL))
+		}
+	}
+	sort.Strings(reportData.ClientEndpoints)
+
+	// Organize results by method
+	comparator := &Comparator{}
+	for _, result := range comparator.results {
+		// Convert raw comparison result to report format
+		paramsJSON, _ := json.Marshal(result.Params)
+		
+		// Format responses for display
+		formattedResponses := make(map[string]string)
+		for client, resp := range result.Responses {
+			formatted, _ := formatJSON(resp)
+			formattedResponses[client] = formatted
+		}
+		
+		// Format differences for display
+		diffDisplay := ""
+		if len(result.Differences) > 0 {
+			diffJSON, _ := formatJSON(result.Differences)
+			diffDisplay = diffJSON
+		}
+		
+		methodResult := MethodComparisonResult{
+			Method:            result.Method,
+			Params:            result.Params,
+			ParamsDisplay:     string(paramsJSON),
+			Differences:       result.Differences,
+			DifferencesDisplay: diffDisplay,
+			SchemaErrors:      result.SchemaErrors,
+			Responses:         formattedResponses,
+		}
+		
+		// Add to method results map
+		if _, exists := reportData.MethodResults[result.Method]; !exists {
+			reportData.MethodResults[result.Method] = make([]MethodComparisonResult, 0)
+		}
+		reportData.MethodResults[result.Method] = append(reportData.MethodResults[result.Method], methodResult)
+		
+		// Add to grouped results based on status
+		hasError := false
+		hasDiff := false
+		
+		// Check for errors
+		if methodResult.Error != nil {
+			hasError = true
+		}
+		
+		// Check for schema errors
+		if len(methodResult.SchemaErrors) > 0 {
+			hasError = true
+		}
+		
+		// Check for differences
+		if len(methodResult.Differences) > 0 {
+			hasDiff = true
+		}
+		
+		// Add to appropriate group
+		if hasError {
+			if _, exists := reportData.ErrorMethods[result.Method]; !exists {
+				reportData.ErrorMethods[result.Method] = make([]MethodComparisonResult, 0)
+			}
+			reportData.ErrorMethods[result.Method] = append(reportData.ErrorMethods[result.Method], methodResult)
+		} else if hasDiff {
+			if _, exists := reportData.DiffMethods[result.Method]; !exists {
+				reportData.DiffMethods[result.Method] = make([]MethodComparisonResult, 0)
+			}
+			reportData.DiffMethods[result.Method] = append(reportData.DiffMethods[result.Method], methodResult)
+		} else {
+			if _, exists := reportData.MatchMethods[result.Method]; !exists {
+				reportData.MatchMethods[result.Method] = make([]MethodComparisonResult, 0)
+			}
+			reportData.MatchMethods[result.Method] = append(reportData.MatchMethods[result.Method], methodResult)
+		}
+		
+		// Extract method scope (namespace)
+		scope := "other"
+		parts := strings.Split(result.Method, "_")
+		if len(parts) > 1 {
+			scope = parts[0] + "_"
+		}
+		
+		// Add to scoped methods
+		if _, exists := reportData.ScopedMethods[scope]; !exists {
+			reportData.ScopedMethods[scope] = make(map[string][]MethodComparisonResult)
+			reportData.Scopes = append(reportData.Scopes, scope)
+		}
+		
+		if _, exists := reportData.ScopedMethods[scope][result.Method]; !exists {
+			reportData.ScopedMethods[scope][result.Method] = make([]MethodComparisonResult, 0)
+		}
+		
+		reportData.ScopedMethods[scope][result.Method] = append(reportData.ScopedMethods[scope][result.Method], methodResult)
+	}
+
+	// Calculate summary statistics
+	summary := ComparisonSummary{
+		TotalMethods:     len(reportData.MethodResults),
+		TotalComparisons: len(comparator.results),
+		MatchingResponses: 0,
+		DifferentResponses: 0,
+		SchemaErrors:     0,
+		CallErrors:       0,
+	}
+
+	for _, result := range comparator.results {
+		if len(result.SchemaErrors) > 0 {
+			summary.SchemaErrors++
+		}
+		
+		if len(result.Differences) > 0 {
+			summary.DifferentResponses++
+		} else {
+			summary.MatchingResponses++
+		}
+	}
+	reportData.Summary = summary
+
+	// Create output directory if it doesn't exist
+	outputDir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Generate HTML report
+	tmpl, err := template.New("report").Parse(htmlReportTemplate)
+	if err != nil {
+		// Return empty ReportData with error message
+		reportData.Title = fmt.Sprintf("Error: %v", err)
+		return reportData
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, reportData); err != nil {
+		// Return empty ReportData with error message
+		reportData.Title = fmt.Sprintf("Error: %v", err)
+		return reportData
+	}
+
+	// Write to file
+	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write HTML report: %w", err)
+	}
+
+	return nil
+}
+
+// formatJSONForDisplay formats JSON data for display in the HTML report
+func formatJSONForDisplay(data interface{}) (string, error) {
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(jsonData), nil
+}
+
+// htmlReportTemplate is the HTML template for the comparison report
+const htmlReportTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3, h4 {
+            color: #2c3e50;
+        }
+        .header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .summary {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .summary-item {
+            background-color: white;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .summary-item h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .summary-item p {
+            margin: 5px 0 0;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .config {
+            margin-bottom: 20px;
+        }
+        .method-section {
+            margin-bottom: 30px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .method-header {
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .method-content {
+            padding: 15px;
+            display: none;
+        }
+        .comparison-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        .comparison-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-match {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-diff {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status-error {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .diff-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .diff-table th, .diff-table td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .diff-table th {
+            background-color: #f8f9fa;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .code-container {
+            position: relative;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 10px;
+            background-color: #f1f1f1;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .code-title {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .code-content {
+            padding: 0;
+            margin: 0;
+            overflow-x: auto;
+        }
+        
+        .copy-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 12px;
+            margin: 2px 2px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        
+        .copy-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .copy-btn:active {
+            background-color: #3e8e41;
+        }
+        
+        .copy-success {
+            background-color: #2196F3;
+        }
+        
+        .copy-error {
+            background-color: #f44336;
+        }
+        .active {
+            display: block;
+        }
+        
+        /* Tab styles */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab-button {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+            font-weight: 500;
+        }
+        
+        .tab-button.active {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Section styles */
+        .error-section .method-header {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        
+        .diff-section .method-header {
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .match-section .method-header {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4caf50;
+        }
+        
+        /* Scope styles */
+        .scope-header {
+            background-color: #e3f2fd;
+            padding: 10px 15px;
+            margin: 10px 0 0 0;
+            border-radius: 4px;
+            cursor: pointer;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .scope-content {
+            margin-left: 20px;
+        }
+        
+        .method-count {
+            font-size: 0.8em;
+            color: #666;
+            font-weight: normal;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        
+        .status-error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        .status-diff {
+            background-color: #fff8e1;
+            color: #f57f17;
+        }
+        
+        .status-match {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .client-list {
+            margin-bottom: 20px;
+        }
+        .client-list ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .client-list li {
+            margin-bottom: 5px;
+            padding: 5px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{.Title}}</h1>
+        <p>Generated on {{.Timestamp}}</p>
+        <p>Comparison ID: {{.ComparisonID}}</p>
+    </div>
+
+    <div class="summary">
+        <h2>Summary</h2>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <h3>Total Methods</h3>
+                <p>{{.Summary.TotalMethods}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>Total Comparisons</h3>
+                <p>{{.Summary.TotalComparisons}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>Matching Responses</h3>
+                <p>{{.Summary.MatchingResponses}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>Different Responses</h3>
+                <p>{{.Summary.DifferentResponses}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>Schema Errors</h3>
+                <p>{{.Summary.SchemaErrors}}</p>
+            </div>
+            <div class="summary-item">
+                <h3>Call Errors</h3>
+                <p>{{.Summary.CallErrors}}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="config">
+        <h2>Configuration</h2>
+        
+        <h3>Clients</h3>
+        <div class="client-list">
+            <ul>
+                {{range .ClientEndpoints}}
+                <li>{{.}}</li>
+                {{end}}
+            </ul>
+        </div>
+        
+        <h3>Settings</h3>
+        <ul>
+            <li>Validate Against Schema: {{.Configuration.ValidateAgainstSchema}}</li>
+            <li>Concurrency: {{.Configuration.Concurrency}}</li>
+            <li>Timeout: {{.Configuration.TimeoutSeconds}} seconds</li>
+        </ul>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-button active" onclick="openTab('errors')">Errors ({{len .ErrorMethods}})</button>
+        <button class="tab-button" onclick="openTab('differences')">Differences ({{len .DiffMethods}})</button>
+        <button class="tab-button" onclick="openTab('matches')">Matches ({{len .MatchMethods}})</button>
+        <button class="tab-button" onclick="openTab('scopes')">By Namespace</button>
+        <button class="tab-button" onclick="openTab('all')">All Methods ({{len .MethodResults}})</button>
+    </div>
+    
+    <div id="errors" class="tab-content active">
+        <h2>Methods with Errors</h2>
+        {{if eq (len .ErrorMethods) 0}}
+            <p>No methods with errors found.</p>
+        {{else}}
+            {{range $method, $results := .ErrorMethods}}
+            <div class="method-section error-section">
+                <div class="method-header" onclick="toggleSection('error-{{$method}}')">
+                    <h3>{{$method}}</h3>
+                </div>
+                <div id="error-{{$method}}" class="method-content">
+                    {{range $index, $result := $results}}
+                    <div class="comparison-item">
+                        <div class="comparison-header">
+                            <h4>Params:</h4>
+                            <span class="status status-error">Error</span>
+                        </div>
+                        <div class="code-container">
+                            <div class="code-header">
+                                <div class="code-title">Parameters</div>
+                                <button class="copy-btn" onclick="copyToClipboard(this, '{{$result.ParamsDisplay}}')">Copy</button>
+                            </div>
+                            <pre class="code-content">{{$result.ParamsDisplay}}</pre>
+                        </div>
+                        
+                        {{if $result.Error}}
+                        <div>
+                            <h4>Error:</h4>
+                            <pre>{{$result.Error}}</pre>
+                        </div>
+                        {{end}}
+                        
+                        {{if $result.SchemaErrors}}
+                        <div>
+                            <h4>Schema Validation Errors:</h4>
+                            <table class="diff-table">
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Errors</th>
+                                </tr>
+                                {{range $client, $errors := $result.SchemaErrors}}
+                                <tr>
+                                    <td>{{$client}}</td>
+                                    <td>
+                                        <ul>
+                                        {{range $error := $errors}}
+                                            <li>{{$error}}</li>
+                                        {{end}}
+                                        </ul>
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </table>
+                        </div>
+                        {{end}}
+                        
+                        <div>
+                            <h4>Responses:</h4>
+                            <table class="diff-table">
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Response</th>
+                                </tr>
+                                {{range $client, $response := $result.Responses}}
+                                <tr>
+                                    <td>{{$client}}</td>
+                                    <td><pre>{{$response}}</pre></td>
+                                </tr>
+                                {{end}}
+                            </table>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        {{end}}
+    </div>
+    
+    <div id="differences" class="tab-content">
+        <h2>Methods with Differences</h2>
+        {{if eq (len .DiffMethods) 0}}
+            <p>No methods with differences found.</p>
+        {{else}}
+            {{range $method, $results := .DiffMethods}}
+            <div class="method-section diff-section">
+                <div class="method-header" onclick="toggleSection('diff-{{$method}}')">
+                    <h3>{{$method}}</h3>
+                </div>
+                <div id="diff-{{$method}}" class="method-content">
+                    {{range $index, $result := $results}}
+                    <div class="comparison-item">
+                        <div class="comparison-header">
+                            <h4>Params:</h4>
+                            <span class="status status-diff">Different</span>
+                        </div>
+                        <div class="code-container">
+                            <div class="code-header">
+                                <div class="code-title">Parameters</div>
+                                <button class="copy-btn" onclick="copyToClipboard(this, '{{$result.ParamsDisplay}}')">Copy</button>
+                                <button class="copy-btn" onclick="copyRequest('{{$result.Method}}', '{{$result.ParamsDisplay}}')">Copy Request</button>
+                            </div>
+                            <pre class="code-content">{{$result.ParamsDisplay}}</pre>
+                        </div>
+                        
+                        {{if $result.Differences}}
+                        <div>
+                            <h4>Response Differences:</h4>
+                            <pre>{{$result.DifferencesDisplay}}</pre>
+                        </div>
+                        {{end}}
+                        
+                        <div>
+                            <h4>Responses:</h4>
+                            <table class="diff-table">
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Response</th>
+                                </tr>
+                                {{range $client, $response := $result.Responses}}
+                                <tr>
+                                    <td>{{$client}}</td>
+                                    <td><pre>{{$response}}</pre></td>
+                                </tr>
+                                {{end}}
+                            </table>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        {{end}}
+    </div>
+    
+    <div id="matches" class="tab-content">
+        <h2>Methods with Matching Responses</h2>
+        {{if eq (len .MatchMethods) 0}}
+            <p>No methods with matching responses found.</p>
+        {{else}}
+            {{range $method, $results := .MatchMethods}}
+            <div class="method-section match-section">
+                <div class="method-header" onclick="toggleSection('match-{{$method}}')">
+                    <h3>{{$method}}</h3>
+                </div>
+                <div id="match-{{$method}}" class="method-content">
+                    {{range $index, $result := $results}}
+                    <div class="comparison-item">
+                        <div class="comparison-header">
+                            <h4>Params:</h4>
+                            <span class="status status-match">Match</span>
+                        </div>
+                        <div class="code-container">
+                            <div class="code-header">
+                                <div class="code-title">Parameters</div>
+                                <button class="copy-btn" onclick="copyToClipboard(this, '{{$result.ParamsDisplay}}')">Copy</button>
+                                <button class="copy-btn" onclick="copyRequest('{{$result.Method}}', '{{$result.ParamsDisplay}}')">Copy Request</button>
+                            </div>
+                            <pre class="code-content">{{$result.ParamsDisplay}}</pre>
+                        </div>
+                        
+                        <div>
+                            <h4>Responses:</h4>
+                            <table class="diff-table">
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Response</th>
+                                </tr>
+                                {{range $client, $response := $result.Responses}}
+                                <tr>
+                                    <td>{{$client}}</td>
+                                    <td><pre>{{$response}}</pre></td>
+                                </tr>
+                                {{end}}
+                            </table>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        {{end}}
+    </div>
+    
+    <div id="scopes" class="tab-content">
+        <h2>Methods By Namespace</h2>
+        {{range $scope, $methods := .ScopedMethods}}
+        <div class="scope-section">
+            <h3 class="scope-header">{{$scope}} <span class="method-count">({{len $methods}} methods)</span></h3>
+            <div class="scope-content">
+                {{range $method, $results := $methods}}
+                <div class="method-section">
+                    <div class="method-header" onclick="toggleSection('scope-{{$method}}')">
+                        <h4>{{$method}}</h4>
+                        {{$firstResult := index $results 0}}
+                        {{if $firstResult.Error}}
+                            <span class="status status-error">Error</span>
+                        {{else if $firstResult.SchemaErrors}}
+                            <span class="status status-error">Schema Error</span>
+                        {{else if $firstResult.Differences}}
+                            <span class="status status-diff">Different</span>
+                        {{else}}
+                            <span class="status status-match">Match</span>
+                        {{end}}
+                    </div>
+                    <div id="scope-{{$method}}" class="method-content">
+                        {{range $index, $result := $results}}
+                        <div class="comparison-item">
+                            <div class="comparison-header">
+                                <h4>Params:</h4>
+                            </div>
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <div class="code-title">Parameters</div>
+                                    <button class="copy-btn" onclick="copyToClipboard(this, '{{$result.ParamsDisplay}}')">Copy</button>
+                                    <button class="copy-btn" onclick="copyRequest('{{$result.Method}}', '{{$result.ParamsDisplay}}')">Copy Request</button>
+                                </div>
+                                <pre class="code-content">{{$result.ParamsDisplay}}</pre>
+                            </div>
+                            
+                            {{if $result.Error}}
+                            <div>
+                                <h4>Error:</h4>
+                                <pre>{{$result.Error}}</pre>
+                            </div>
+                            {{end}}
+                            
+                            {{if $result.SchemaErrors}}
+                            <div>
+                                <h4>Schema Validation Errors:</h4>
+                                <table class="diff-table">
+                                    <tr>
+                                        <th>Client</th>
+                                        <th>Errors</th>
+                                    </tr>
+                                    {{range $client, $errors := $result.SchemaErrors}}
+                                    <tr>
+                                        <td>{{$client}}</td>
+                                        <td>
+                                            <ul>
+                                            {{range $error := $errors}}
+                                                <li>{{$error}}</li>
+                                            {{end}}
+                                            </ul>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </table>
+                            </div>
+                            {{end}}
+                            
+                            {{if $result.Differences}}
+                            <div>
+                                <h4>Response Differences:</h4>
+                                <div class="code-container">
+                                    <div class="code-header">
+                                        <div class="code-title">Differences</div>
+                                        <button class="copy-btn" onclick="copyToClipboard(this, '{{$result.DifferencesDisplay}}')">Copy</button>
+                                    </div>
+                                    <pre class="code-content">{{$result.DifferencesDisplay}}</pre>
+                                </div>
+                            </div>
+                            {{end}}
+                            
+                            <div>
+                                <h4>Responses:</h4>
+                                <table class="diff-table">
+                                    <tr>
+                                        <th>Client</th>
+                                        <th>Response</th>
+                                    </tr>
+                                    {{range $client, $response := $result.Responses}}
+                                    <tr>
+                                        <td>{{$client}}</td>
+                                        <td>
+                                            <div class="code-container">
+                                                <div class="code-header">
+                                                    <div class="code-title">Response</div>
+                                                    <button class="copy-btn" onclick="copyToClipboard(this, '{{$response}}')">Copy</button>
+                                                </div>
+                                                <pre class="code-content">{{$response}}</pre>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </table>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+    
+    <div id="all" class="tab-content">
+        <h2>All Method Results</h2>
+        {{range $method, $results := .MethodResults}}
+        <div class="method-section">
+            <div class="method-header" onclick="toggleSection('all-{{$method}}')">
+                <h3>{{$method}}</h3>
+            </div>
+            <div id="all-{{$method}}" class="method-content">
+            {{range $index, $result := $results}}
+            <div class="comparison-item">
+                <div class="comparison-header">
+                    <h4>Params:</h4>
+                    {{if $result.Error}}
+                    <span class="status status-error">Error</span>
+                    {{else if $result.Differences}}
+                    <span class="status status-diff">Different</span>
+                    {{else}}
+                    <span class="status status-match">Match</span>
+                    {{end}}
+                </div>
+                <div class="code-container">
+                    <div class="code-header">
+                        <div class="code-title">Parameters</div>
+                        <button class="copy-btn" onclick="copyToClipboard(this, '{{$result.ParamsDisplay}}')">Copy</button>
+                        <button class="copy-btn" onclick="copyRequest('{{$result.Method}}', '{{$result.ParamsDisplay}}')">Copy Request</button>
+                    </div>
+                    <pre class="code-content">{{$result.ParamsDisplay}}</pre>
+                </div>
+                
+                {{if $result.Error}}
+                <div>
+                    <h4>Error:</h4>
+                    <pre>{{$result.Error}}</pre>
+                </div>
+                {{else}}
+                
+                {{if $result.SchemaErrors}}
+                <div>
+                    <h4>Schema Validation Errors:</h4>
+                    <table class="diff-table">
+                        <tr>
+                            <th>Client</th>
+                            <th>Errors</th>
+                        </tr>
+                        {{range $client, $errors := $result.SchemaErrors}}
+                        <tr>
+                            <td>{{$client}}</td>
+                            <td>
+                                <ul>
+                                {{range $error := $errors}}
+                                    <li>{{$error}}</li>
+                                {{end}}
+                                </ul>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </table>
+                </div>
+                {{end}}
+                
+                {{if $result.Differences}}
+                <div>
+                    <h4>Response Differences:</h4>
+                    <pre>{{$result.DifferencesDisplay}}</pre>
+                </div>
+                {{end}}
+                
+                <div>
+                    <h4>Responses:</h4>
+                    <table class="diff-table">
+                        <tr>
+                            <th>Client</th>
+                            <th>Response</th>
+                        </tr>
+                        {{range $client, $response := $result.Responses}}
+                        <tr>
+                            <td>{{$client}}</td>
+                            <td>
+                                <div class="code-container">
+                                    <div class="code-header">
+                                        <div class="code-title">Response</div>
+                                        <button class="copy-btn" onclick="copyToClipboard(this, '{{$response}}')">Copy</button>
+                                    </div>
+                                    <pre class="code-content">{{$response}}</pre>
+                                </div>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </table>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+
+    <script>
+        function toggleSection(id) {
+            const content = document.getElementById(id);
+            content.classList.toggle('active');
+        }
+        
+        function openTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.getElementsByClassName('tab-content');
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove('active');
+            }
+            
+            // Deactivate all tab buttons
+            const tabButtons = document.getElementsByClassName('tab-button');
+            for (let i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove('active');
+            }
+            
+            // Show the selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Activate the clicked tab button
+            const activeButton = document.querySelector(".tab-button[onclick=\"openTab('"+tabName+"')\"]");
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+        }
+        
+        function copyToClipboard(button, text) {
+            navigator.clipboard.writeText(text).then(function() {
+                // Success feedback
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copy-success');
+                
+                // Reset button after 2 seconds
+                setTimeout(function() {
+                    button.textContent = originalText;
+                    button.classList.remove('copy-success');
+                }, 2000);
+            }, function() {
+                // Error feedback
+                button.textContent = 'Failed!';
+                button.classList.add('copy-error');
+                
+                // Reset button after 2 seconds
+                setTimeout(function() {
+                    button.textContent = 'Copy';
+                    button.classList.remove('copy-error');
+                }, 2000);
+            });
+        }
+        
+        function copyRequest(method, params) {
+            const request = {
+                jsonrpc: '2.0',
+                id: 1,
+                method: method,
+                params: JSON.parse(params)
+            };
+            
+            copyToClipboard(event.target, JSON.stringify(request, null, 2));
+        }
+    </script>
+</body>
+</html>
+`

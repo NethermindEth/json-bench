@@ -2,10 +2,10 @@ test_name: "Mixed RPC benchmark"
 description: "Benchmark with a mix of read and state operations"
 clients:
   - name: "geth"
-    url: "http://172.232.169.248:8545"
+    url: "http://localhost:8545"
   - name: "nethermind"
-    url: "http://172.232.169.243:8545"
-duration: "15m"
+    url: "http://localhost:8545"
+duration: "1m"
 rps: 300
 endpoints:
   - method: "eth_call"
