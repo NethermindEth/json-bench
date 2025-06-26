@@ -159,7 +159,7 @@ const HTMLReportTemplate = `
             <tr>
                 <td>{{$method}}</td>
                 {{range $.ClientNames}}
-                <td>{{index (index $.MethodLatency .) $method}}</td>
+                <td>{{formatMetric (index (index $.MethodLatency .) $method)}}</td>
                 {{end}}
             </tr>
             {{end}}
@@ -181,7 +181,7 @@ const HTMLReportTemplate = `
             <tr>
                 <td>{{$method}}</td>
                 {{range $.ClientNames}}
-                <td>{{index (index $.MethodRate .) $method}}</td>
+                <td>{{formatMetric (index (index $.MethodRate .) $method)}}</td>
                 {{end}}
             </tr>
             {{end}}
@@ -339,20 +339,27 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 	}
 
 	// Prepare chart colors for each client
+	// Colors for: geth, nethermind, besu, erigon, reth, nimbusel, and extras
 	chartColors := []string{
-		"'rgba(54, 162, 235, 0.5)'",
-		"'rgba(255, 99, 132, 0.5)'",
-		"'rgba(75, 192, 192, 0.5)'",
-		"'rgba(255, 206, 86, 0.5)'",
-		"'rgba(153, 102, 255, 0.5)'",
+		"'rgba(54, 162, 235, 0.5)'",   // Blue - Geth
+		"'rgba(255, 99, 132, 0.5)'",   // Red - Nethermind
+		"'rgba(75, 192, 192, 0.5)'",   // Teal - Besu
+		"'rgba(255, 206, 86, 0.5)'",   // Yellow - Erigon
+		"'rgba(153, 102, 255, 0.5)'",  // Purple - Reth
+		"'rgba(255, 159, 64, 0.5)'",   // Orange - NimbusEL
+		"'rgba(46, 204, 113, 0.5)'",   // Green - Extra 1
+		"'rgba(231, 76, 60, 0.5)'",    // Dark Red - Extra 2
 	}
 
 	chartBorders := []string{
-		"'rgba(54, 162, 235, 1)'",
-		"'rgba(255, 99, 132, 1)'",
-		"'rgba(75, 192, 192, 1)'",
-		"'rgba(255, 206, 86, 1)'",
-		"'rgba(153, 102, 255, 1)'",
+		"'rgba(54, 162, 235, 1)'",   // Blue - Geth
+		"'rgba(255, 99, 132, 1)'",   // Red - Nethermind
+		"'rgba(75, 192, 192, 1)'",   // Teal - Besu
+		"'rgba(255, 206, 86, 1)'",   // Yellow - Erigon
+		"'rgba(153, 102, 255, 1)'",  // Purple - Reth
+		"'rgba(255, 159, 64, 1)'",   // Orange - NimbusEL
+		"'rgba(46, 204, 113, 1)'",   // Green - Extra 1
+		"'rgba(231, 76, 60, 1)'",    // Dark Red - Extra 2
 	}
 
 	// Extract methods from config
@@ -385,48 +392,7 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 	if result != nil && result.Summary != nil {
 		metrics, ok := result.Summary["metrics"].(map[string]interface{})
 		if ok {
-			// First, create maps to store the total rates per method and client distributions
-			totalMethodRates := make(map[string]float64)
-			clientDistribution := make(map[string]map[string]float64)
-			
-			// Initialize client distribution map
-			for _, client := range cfg.Clients {
-				clientDistribution[client.Name] = make(map[string]float64)
-			}
-			
-			// Set up the distribution percentages for each client and method
-			for _, method := range methods {
-				// Default distribution - will be used if we can't get actual metrics
-				clientDistribution["geth"][method] = 0.52
-				clientDistribution["nethermind"][method] = 0.48
-			}
-			
-			// Override with method-specific distributions
-			clientDistribution["geth"]["eth_call"] = 0.52
-			clientDistribution["nethermind"]["eth_call"] = 0.48
-			
-			clientDistribution["geth"]["eth_getBalance"] = 0.55
-			clientDistribution["nethermind"]["eth_getBalance"] = 0.45
-			
-			clientDistribution["geth"]["eth_blockNumber"] = 0.48
-			clientDistribution["nethermind"]["eth_blockNumber"] = 0.52
-			
-			clientDistribution["geth"]["eth_getTransactionCount"] = 0.53
-			clientDistribution["nethermind"]["eth_getTransactionCount"] = 0.47
-			
-			clientDistribution["geth"]["eth_getBlockByNumber"] = 0.58
-			clientDistribution["nethermind"]["eth_getBlockByNumber"] = 0.42
-			
-			// Get the total rates for each method
-			for _, method := range methods {
-				callsKey := fmt.Sprintf("method_calls_%s", method)
-				if callsMetric, ok := metrics[callsKey].(map[string]interface{}); ok {
-					if rate, ok := callsMetric["rate"]; ok {
-						rateValue, _ := rate.(float64)
-						totalMethodRates[method] = rateValue
-					}
-				}
-			}
+			// Process each client and method
 
 			// Process each client and method
 			for _, client := range cfg.Clients {
@@ -441,56 +407,19 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 							methodLatency[clientName][method] = p95Value
 							chartData[clientName][i] = p95Value
 						}
-					} else {
-						// Fallback to global metrics if client-specific ones aren't available
-						latencyKey := fmt.Sprintf("method_latency_%s", method)
-						if latencyMetric, ok := metrics[latencyKey].(map[string]interface{}); ok {
-							if p95, ok := latencyMetric["p(95)"]; ok {
-								p95Value, _ := p95.(float64)
-								// Apply different latencies to make the comparison meaningful
-								// This is temporary until we get real client-specific metrics
-								variation := 1.0
-								if clientName == "nethermind" {
-									variation = 1.15 // Make nethermind 15% slower for demonstration
-								}
-								methodLatency[clientName][method] = p95Value * variation
-								chartData[clientName][i] = p95Value * variation
-							}
-						}
 					}
+					// If no client-specific latency metric found, leave it as 0
 
 					// Get client-specific call rate metrics
 					clientCallsKey := fmt.Sprintf("client_%s_method_calls_%s", clientName, method)
 					if clientCallsMetric, ok := metrics[clientCallsKey].(map[string]interface{}); ok {
-						// Use actual client-specific metrics but apply our distribution percentages
+						// Use actual client-specific metrics
 						if rate, ok := clientCallsMetric["rate"]; ok {
 							rateValue, _ := rate.(float64)
-							
-							// Since the k6 script sends the same requests to all clients,
-							// we need to apply our distribution percentages to make the report meaningful
-							if distribution, ok := clientDistribution[clientName][method]; ok {
-								// Apply the distribution percentage to the actual rate
-								// This simulates what would happen if requests were distributed according to our percentages
-								adjustedRate := rateValue * distribution * float64(len(cfg.Clients))
-								methodRate[clientName][method] = adjustedRate
-							} else {
-								methodRate[clientName][method] = rateValue
-							}
-						}
-					} else {
-						// Use the distribution map to calculate client-specific rates
-						if totalRate, ok := totalMethodRates[method]; ok {
-							// Get this client's distribution percentage for this method
-							if distribution, ok := clientDistribution[clientName][method]; ok {
-								// Calculate this client's portion of the total rate
-								clientRate := totalRate * distribution
-								methodRate[clientName][method] = clientRate
-							} else {
-								// Default to even split if no distribution defined
-								methodRate[clientName][method] = totalRate / float64(len(cfg.Clients))
-							}
+							methodRate[clientName][method] = rateValue
 						}
 					}
+					// If no client-specific metric found, leave it empty (will show as 0 or N/A)
 
 					// Set error rate - for now we'll use the global error rate
 					// In a real implementation, we'd have client-specific error rates
@@ -523,22 +452,7 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 		}
 	}
 
-	// If no metrics were found, use placeholder data
-	for _, client := range cfg.Clients {
-		for i, method := range methods {
-			// Only set placeholder values if the metric wasn't set above
-			if _, exists := methodLatency[client.Name][method]; !exists {
-				methodLatency[client.Name][method] = float64(50 + i*10)
-				chartData[client.Name][i] = float64(50 + i*10)
-			}
-			if _, exists := methodRate[client.Name][method]; !exists {
-				methodRate[client.Name][method] = float64(cfg.RPS) * 0.9
-			}
-			if _, exists := methodErrorRate[client.Name][method]; !exists {
-				methodErrorRate[client.Name][method] = 0.0
-			}
-		}
-	}
+	// No placeholder data - missing metrics will show as N/A
 
 	// Prepare template data
 	data := HTMLReportData{
@@ -559,8 +473,18 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 		ChartBorders:    chartBorders,
 	}
 
+	// Create template with custom functions
+	funcMap := template.FuncMap{
+		"formatMetric": func(value float64) string {
+			if value == 0 {
+				return "N/A"
+			}
+			return fmt.Sprintf("%.6g", value)
+		},
+	}
+
 	// Parse template
-	tmpl, err := template.New("htmlreport").Parse(HTMLReportTemplate)
+	tmpl, err := template.New("htmlreport").Funcs(funcMap).Parse(HTMLReportTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
