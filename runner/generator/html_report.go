@@ -397,25 +397,49 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 			// Set up the distribution percentages for each client and method
 			for _, method := range methods {
 				// Default distribution - will be used if we can't get actual metrics
-				clientDistribution["geth"][method] = 0.52
-				clientDistribution["nethermind"][method] = 0.48
+				if _, exists := clientDistribution["geth"]; exists {
+					clientDistribution["geth"][method] = 0.52
+				}
+				if _, exists := clientDistribution["nethermind"]; exists {
+					clientDistribution["nethermind"][method] = 0.48
+				}
 			}
 			
 			// Override with method-specific distributions
-			clientDistribution["geth"]["eth_call"] = 0.52
-			clientDistribution["nethermind"]["eth_call"] = 0.48
+			if _, exists := clientDistribution["geth"]; exists {
+				clientDistribution["geth"]["eth_call"] = 0.52
+			}
+			if _, exists := clientDistribution["nethermind"]; exists {
+				clientDistribution["nethermind"]["eth_call"] = 0.48
+			}
 			
-			clientDistribution["geth"]["eth_getBalance"] = 0.55
-			clientDistribution["nethermind"]["eth_getBalance"] = 0.45
+			if _, exists := clientDistribution["geth"]; exists {
+				clientDistribution["geth"]["eth_getBalance"] = 0.55
+			}
+			if _, exists := clientDistribution["nethermind"]; exists {
+				clientDistribution["nethermind"]["eth_getBalance"] = 0.45
+			}
 			
-			clientDistribution["geth"]["eth_blockNumber"] = 0.48
-			clientDistribution["nethermind"]["eth_blockNumber"] = 0.52
+			if _, exists := clientDistribution["geth"]; exists {
+				clientDistribution["geth"]["eth_blockNumber"] = 0.48
+			}
+			if _, exists := clientDistribution["nethermind"]; exists {
+				clientDistribution["nethermind"]["eth_blockNumber"] = 0.52
+			}
 			
-			clientDistribution["geth"]["eth_getTransactionCount"] = 0.53
-			clientDistribution["nethermind"]["eth_getTransactionCount"] = 0.47
+			if _, exists := clientDistribution["geth"]; exists {
+				clientDistribution["geth"]["eth_getTransactionCount"] = 0.53
+			}
+			if _, exists := clientDistribution["nethermind"]; exists {
+				clientDistribution["nethermind"]["eth_getTransactionCount"] = 0.47
+			}
 			
-			clientDistribution["geth"]["eth_getBlockByNumber"] = 0.58
-			clientDistribution["nethermind"]["eth_getBlockByNumber"] = 0.42
+			if _, exists := clientDistribution["geth"]; exists {
+				clientDistribution["geth"]["eth_getBlockByNumber"] = 0.58
+			}
+			if _, exists := clientDistribution["nethermind"]; exists {
+				clientDistribution["nethermind"]["eth_getBlockByNumber"] = 0.42
+			}
 			
 			// Get the total rates for each method
 			for _, method := range methods {

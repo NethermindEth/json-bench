@@ -116,18 +116,16 @@ export default function() {
       'Content-Type': 'application/json',
     };
     
-    const startTime = new Date().getTime();
     const response = http.post(url, JSON.stringify(payload), { headers });
-    const endTime = new Date().getTime();
     
     // Record metrics
     rpcCalls.add(1, { client: String(clientName), method: String(method) });
     methodCalls[method].add(1);
-    methodLatency[method].add(endTime - startTime);
+    methodLatency[method].add(response.timings.duration);
     
     // Record client-specific metrics
     clientMethodCalls[clientName][method].add(1);
-    clientMethodLatency[clientName][method].add(endTime - startTime);
+    clientMethodLatency[clientName][method].add(response.timings.duration);
     
     // Check response
     const success = check(response, {
