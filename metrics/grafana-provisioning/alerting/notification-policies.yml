@@ -1,0 +1,47 @@
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: slack-alerts
+    group_by:
+      - alertname
+      - severity
+      - component
+    group_wait: 10s
+    group_interval: 5m
+    repeat_interval: 12h
+    routes:
+      - receiver: ci-webhook
+        object_matchers:
+          - ["severity", "=", "critical"]
+        group_wait: 0s
+        group_interval: 1m
+        repeat_interval: 1h
+        continue: true
+        
+      - receiver: github-issues
+        object_matchers:
+          - ["severity", "=", "critical"]
+          - ["component", "=", "performance"]
+        group_wait: 5m
+        group_interval: 10m
+        repeat_interval: 24h
+        continue: true
+        
+      - receiver: email-alerts
+        object_matchers:
+          - ["severity", "=~", "critical|major"]
+        group_wait: 2m
+        group_interval: 5m
+        repeat_interval: 6h
+        continue: true
+        
+      - receiver: discord-alerts
+        object_matchers:
+          - ["component", "=", "monitoring"]
+        group_wait: 1m
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+        
+    mute_time_intervals: []

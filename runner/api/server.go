@@ -17,6 +17,7 @@ import (
 
 	"github.com/jsonrpc-bench/runner/analysis"
 	"github.com/jsonrpc-bench/runner/storage"
+	"github.com/jsonrpc-bench/runner/types"
 )
 
 // Server provides HTTP API endpoints for historic data access
@@ -74,7 +75,7 @@ func (s *server) Start(ctx context.Context) error {
 
 	// Create HTTP server
 	s.httpServer = &http.Server{
-		Addr:         ":8080",
+		Addr:         ":8081",
 		Handler:      router,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -138,6 +139,7 @@ func (s *server) setupRoutes() *mux.Router {
 	// Historic runs endpoints
 	api.HandleFunc("/runs", s.handleListRuns).Methods("GET", "OPTIONS")
 	api.HandleFunc("/runs/{runId}", s.handleGetRun).Methods("GET", "OPTIONS")
+	api.HandleFunc("/runs/{runId}/methods", s.handleGetRunMethods).Methods("GET", "OPTIONS")
 	api.HandleFunc("/runs/{runId}", s.handleDeleteRun).Methods("DELETE", "OPTIONS")
 	api.HandleFunc("/runs/{runId}/compare/{compareRunId}", s.handleCompareRuns).Methods("GET", "OPTIONS")
 
@@ -166,6 +168,9 @@ func (s *server) setupRoutes() *mux.Router {
 
 	// WebSocket endpoint for real-time updates
 	api.HandleFunc("/ws", s.handleWebSocket)
+
+	// Health and status endpoints
+	api.HandleFunc("/health", s.handleHealth).Methods("GET", "OPTIONS")
 
 	// Grafana SimpleJSON Datasource API routes
 	grafana := router.PathPrefix("/grafana").Subrouter()
@@ -267,8 +272,14 @@ func (s *server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Create filter for runs
+	filter := types.RunFilter{
+		TestName: testName,
+		Limit:    limit,
+	}
+
 	// Get runs from storage
-	runs, err := s.storage.ListHistoricRuns(ctx, testName, limit)
+	runs, err := s.storage.ListHistoricRuns(ctx, filter)
 	if err != nil {
 		s.log.WithError(err).Error("Failed to list historic runs")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve runs")
@@ -304,7 +315,98 @@ func (s *server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.writeJSONResponse(w, http.StatusOK, run)
+	// Parse full_results JSON to extract client_metrics
+	response := map[string]interface{}{
+		"run": run,
+	}
+
+	// Get client metrics from benchmark_metrics table
+	clientMetrics, err := getClientMetricsForRun(s.db, runID)
+	if err != nil {
+		s.log.WithError(err).Warn("Failed to get client metrics from database")
+	} else if len(clientMetrics) > 0 {
+		response["client_metrics"] = clientMetrics
+		s.log.WithField("run_id", runID).WithField("client_count", len(clientMetrics)).Debug("Added client metrics to response")
+	}
+
+	s.writeJSONResponse(w, http.StatusOK, response)
+}
+
+// handleGetRunMethods returns method-specific metrics for a run
+func (s *server) handleGetRunMethods(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	runID := vars["runId"]
+
+	// Query method metrics directly from database
+	query := `
+		SELECT 
+			method,
+			MAX(CASE WHEN metric_name = 'latency_avg' THEN value END) as avg_latency,
+			MAX(CASE WHEN metric_name = 'latency_p50' THEN value END) as p50_latency,
+			MAX(CASE WHEN metric_name = 'latency_p95' THEN value END) as p95_latency,
+			MAX(CASE WHEN metric_name = 'latency_p99' THEN value END) as p99_latency,
+			MAX(CASE WHEN metric_name = 'latency_min' THEN value END) as min_latency,
+			MAX(CASE WHEN metric_name = 'latency_max' THEN value END) as max_latency,
+			MAX(CASE WHEN metric_name = 'success_rate' THEN value END) as success_rate,
+			MAX(CASE WHEN metric_name = 'throughput' THEN value END) as throughput
+		FROM benchmark_metrics
+		WHERE run_id = $1 AND method != 'all'
+		GROUP BY method
+		ORDER BY method`
+
+	rows, err := s.db.QueryContext(r.Context(), query, runID)
+	if err != nil {
+		s.log.WithError(err).Error("Failed to query method metrics")
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve method metrics")
+		return
+	}
+	defer rows.Close()
+
+	methods := make(map[string]interface{})
+	for rows.Next() {
+		var method string
+		var avgLatency, p50Latency, p95Latency, p99Latency, minLatency, maxLatency, successRate, throughput sql.NullFloat64
+
+		err := rows.Scan(&method, &avgLatency, &p50Latency, &p95Latency, &p99Latency,
+			&minLatency, &maxLatency, &successRate, &throughput)
+		if err != nil {
+			s.log.WithError(err).Error("Failed to scan method metrics")
+			continue
+		}
+
+		// Debug logging for p99 values
+		s.log.WithFields(logrus.Fields{
+			"method":    method,
+			"p99_valid": p99Latency.Valid,
+			"p99_value": p99Latency.Float64,
+		}).Debug("Method metrics p99 value")
+
+		// Helper function to get value or nil
+		getValue := func(nf sql.NullFloat64) interface{} {
+			if nf.Valid {
+				return nf.Float64
+			}
+			return nil
+		}
+
+		methods[method] = map[string]interface{}{
+			"avg_latency":  getValue(avgLatency),
+			"p50_latency":  getValue(p50Latency),
+			"p95_latency":  getValue(p95Latency),
+			"p99_latency":  getValue(p99Latency),
+			"min_latency":  getValue(minLatency),
+			"max_latency":  getValue(maxLatency),
+			"success_rate": getValue(successRate),
+			"throughput":   getValue(throughput),
+		}
+	}
+
+	response := map[string]interface{}{
+		"run_id":  runID,
+		"methods": methods,
+	}
+
+	s.writeJSONResponse(w, http.StatusOK, response)
 }
 
 // handleDeleteRun deletes a historic run
@@ -360,7 +462,7 @@ func (s *server) handleListTests(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Query distinct test names from database
-	query := `SELECT DISTINCT test_name FROM historic_runs ORDER BY test_name`
+	query := `SELECT DISTINCT test_name FROM benchmark_runs ORDER BY test_name`
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		s.log.WithError(err).Error("Failed to query test names")
@@ -395,7 +497,12 @@ func (s *server) handleGetTestSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	summary, err := s.storage.GetHistoricSummary(ctx, testName)
+	// Create filter for summary
+	filter := types.RunFilter{
+		TestName: testName,
+	}
+
+	summary, err := s.storage.GetHistoricSummary(ctx, filter)
 	if err != nil {
 		s.log.WithError(err).Error("Failed to get test summary")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve test summary")
@@ -565,14 +672,6 @@ func (s *server) handleCompareToBaseline(w http.ResponseWriter, r *http.Request)
 
 // Regression Detection API Handlers
 
-// RegressionDetectionRequest represents a request to detect regressions
-type RegressionDetectionRequest struct {
-	ComparisonMode string `json:"comparison_mode"`
-	BaselineName   string `json:"baseline_name,omitempty"`
-	LookbackCount  int    `json:"lookback_count,omitempty"`
-	WindowSize     int    `json:"window_size,omitempty"`
-}
-
 // handleDetectRegressions detects regressions for a run
 func (s *server) handleDetectRegressions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -643,11 +742,6 @@ func (s *server) handleGetRegressions(w http.ResponseWriter, r *http.Request) {
 		"regressions": regressions,
 		"count":       len(regressions),
 	})
-}
-
-// AcknowledgeRegressionRequest represents a request to acknowledge a regression
-type AcknowledgeRegressionRequest struct {
-	AcknowledgedBy string `json:"acknowledged_by"`
 }
 
 // handleAcknowledgeRegression acknowledges a regression
@@ -739,7 +833,14 @@ func (s *server) handleGetMetricTrends(w http.ResponseWriter, r *http.Request) {
 		client = "overall"
 	}
 
-	trend, err := s.storage.GetHistoricTrends(ctx, testName, client, metric, days)
+	// Create trend filter
+	since := time.Now().AddDate(0, 0, -days)
+	filter := types.TrendFilter{
+		Client: client,
+		Since:  since,
+	}
+
+	trend, err := s.storage.GetHistoricTrends(ctx, filter)
 	if err != nil {
 		s.log.WithError(err).Error("Failed to get metric trends")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve metric trends")
@@ -912,36 +1013,6 @@ func (s *server) BroadcastUpdate(updateType string, data interface{}) {
 
 // Grafana SimpleJSON Datasource Handlers
 
-// GrafanaSearchRequest represents a Grafana search request
-type GrafanaSearchRequest struct {
-	Target string `json:"target"`
-}
-
-// GrafanaQueryRequest represents a Grafana query request
-type GrafanaQueryRequest struct {
-	Range   GrafanaRange    `json:"range"`
-	Targets []GrafanaTarget `json:"targets"`
-}
-
-// GrafanaRange represents the time range for a query
-type GrafanaRange struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
-// GrafanaTarget represents a query target
-type GrafanaTarget struct {
-	Target string `json:"target"`
-	RefID  string `json:"refId"`
-	Type   string `json:"type"`
-}
-
-// GrafanaTimeSeries represents a time series response
-type GrafanaTimeSeries struct {
-	Target     string          `json:"target"`
-	DataPoints [][]interface{} `json:"datapoints"`
-}
-
 // handleGrafanaRoot handles the root endpoint for Grafana datasource
 func (s *server) handleGrafanaRoot(w http.ResponseWriter, r *http.Request) {
 	s.writeJSONResponse(w, http.StatusOK, map[string]string{
@@ -963,7 +1034,7 @@ func (s *server) handleGrafanaSearch(w http.ResponseWriter, r *http.Request) {
 	metrics := []string{}
 
 	// Query distinct test names and metrics from database
-	query := `SELECT DISTINCT test_name FROM historic_runs ORDER BY test_name`
+	query := `SELECT DISTINCT test_name FROM benchmark_runs ORDER BY test_name`
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		s.log.WithError(err).Error("Failed to query test names for Grafana")
@@ -1040,13 +1111,13 @@ func (s *server) handleGrafanaQuery(w http.ResponseWriter, r *http.Request) {
 		query := `
 			SELECT timestamp, 
 				   CASE 
-					   WHEN $2 = 'avg_latency' THEN avg_latency_ms
-					   WHEN $2 = 'p95_latency' THEN p95_latency_ms
-					   WHEN $2 = 'p99_latency' THEN p99_latency_ms
-					   WHEN $2 = 'error_rate' THEN overall_error_rate
+					   WHEN $2 = 'avg_latency' THEN avg_latency
+					   WHEN $2 = 'p95_latency' THEN p95_latency
+					   WHEN $2 = 'p99_latency' THEN p95_latency
+					   WHEN $2 = 'error_rate' THEN (100.0 - success_rate)
 					   ELSE 0
 				   END as value
-			FROM historic_runs
+			FROM benchmark_runs
 			WHERE test_name = $1
 			  AND timestamp >= $3
 			  AND timestamp <= $4

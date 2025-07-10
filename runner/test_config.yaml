@@ -1,0 +1,235 @@
+# Integration Test Configuration for Historic Tracking System
+# This file provides configuration templates and examples for running integration tests
+
+# Storage Configuration Template
+storage_config_template: |
+  historic_path: "./test-historic"
+  retention_days: 30
+  enable_historic: true
+  
+  postgresql:
+    host: "localhost"
+    port: 5432
+    database: "jsonrpc_bench_test"
+    username: "test_user"
+    password: "test_password"
+    ssl_mode: "disable"
+    max_connections: 25
+    max_idle_connections: 5
+    connection_max_lifetime: "30m"
+    connection_timeout: "10s"
+    schema: "public"
+    
+    grafana:
+      metrics_table: "benchmark_metrics"
+      runs_table: "benchmark_runs"
+      enable_timescaledb: false
+      chunk_interval: "24h"
+      enable_compression: false
+      compression_after: "7d"
+      
+      retention_policy:
+        metrics_retention: "30d"
+        aggregated_retention: "90d"
+        raw_data_retention: "7d"
+        enable_auto_vacuum: true
+        vacuum_interval: "24h"
+
+# Test Scenarios Configuration
+test_scenarios:
+  scenario_1:
+    name: "Fresh System Setup"
+    description: "Tests initial system setup and first benchmark run"
+    test_data:
+      num_runs: 1
+      test_name: "fresh-system-test"
+      clients: ["client-1", "client-2", "client-3"]
+      methods: ["eth_getBalance", "eth_getBlockByNumber", "eth_getTransactionByHash"]
+    
+  scenario_2:
+    name: "Trend Analysis and Regression Detection"
+    description: "Tests multiple runs with performance degradation patterns"
+    test_data:
+      num_runs: 10
+      test_name: "trend-analysis-test"
+      degradation_factor: 0.1  # 10% increase per run
+      clients: ["client-1", "client-2", "client-3"]
+      methods: ["eth_getBalance", "eth_getBlockByNumber", "eth_getTransactionByHash"]
+    
+  scenario_3:
+    name: "Baseline Management"
+    description: "Tests baseline creation, retrieval, and comparison"
+    test_data:
+      baseline_name: "baseline-test-v1"
+      baseline_description: "Test baseline for integration testing"
+    
+  scenario_4:
+    name: "WebSocket Notifications"
+    description: "Tests real-time WebSocket notifications during operations"
+    test_data:
+      websocket_url: "ws://localhost:8080/api/ws"
+      message_timeout: "5s"
+      test_operations: ["save_run", "create_baseline", "detect_regression"]
+    
+  scenario_5:
+    name: "Grafana Dashboard Queries"
+    description: "Tests Grafana SimpleJSON datasource integration"
+    test_data:
+      grafana_endpoints:
+        - "/grafana/"
+        - "/grafana/search"
+        - "/grafana/query"
+        - "/grafana/tag-keys"
+        - "/grafana/tag-values"
+      time_range_hours: 24
+    
+  scenario_6:
+    name: "Large Dataset Performance"
+    description: "Tests system performance with large amounts of data"
+    test_data:
+      num_runs: 100
+      test_name: "performance-test"
+      methods_per_client: 10
+      max_ingestion_time: "60s"
+      max_query_time: "10s"
+      max_memory_increase_mb: 100
+    
+  scenario_7:
+    name: "System Recovery"
+    description: "Tests system resilience and recovery after failures"
+    test_data:
+      failure_types: ["database_disconnect", "readonly_filesystem", "invalid_requests"]
+      recovery_timeout: "30s"
+
+# Performance Test Configuration
+performance_tests:
+  concurrent_access:
+    num_goroutines: 10
+    operations_per_goroutine: 5
+    test_name: "concurrent-test"
+    max_error_rate: 0.0  # No errors expected
+  
+  websocket_limits:
+    max_connections: 100
+    message_test_count: 10
+    connection_timeout: "10s"
+  
+  database_load:
+    num_workers: 20
+    operations_per_worker: 50
+    test_name: "load-test"
+    max_duration: "60s"
+    max_error_rate: 0.1  # 10% error rate allowed
+
+# Testcontainers Configuration
+testcontainers:
+  postgres:
+    image: "postgres:15-alpine"
+    database: "testdb"
+    username: "testuser"
+    password: "testpass"
+    startup_timeout: "60s"
+    wait_strategy: "database system is ready to accept connections"
+    wait_occurrences: 2
+  
+  docker_check:
+    timeout: "10s"
+    test_image: "hello-world"
+
+# API Testing Configuration
+api_tests:
+  base_url: "http://localhost:8080"
+  timeout: "30s"
+  
+  endpoints:
+    runs:
+      - method: "GET"
+        path: "/api/runs"
+        params: ["test", "limit"]
+      - method: "GET"
+        path: "/api/runs/{runId}"
+      - method: "DELETE"
+        path: "/api/runs/{runId}"
+      - method: "GET"
+        path: "/api/runs/{runId}/compare/{compareRunId}"
+    
+    baselines:
+      - method: "GET"
+        path: "/api/baselines"
+      - method: "POST"
+        path: "/api/baselines"
+      - method: "GET"
+        path: "/api/baselines/{baselineName}"
+      - method: "DELETE"
+        path: "/api/baselines/{baselineName}"
+    
+    tests:
+      - method: "GET"
+        path: "/api/tests"
+      - method: "GET"
+        path: "/api/tests/{testName}/summary"
+      - method: "GET"
+        path: "/api/tests/{testName}/trends"
+    
+    health:
+      - method: "GET"
+        path: "/health"
+
+# Data Generation Configuration
+data_generation:
+  default_clients: ["client-1", "client-2", "client-3"]
+  default_methods: ["eth_getBalance", "eth_getBlockByNumber", "eth_getTransactionByHash"]
+  
+  latency_ranges:
+    min: 5
+    max: 500
+    avg_base: 100
+    p95_multiplier: 2.5
+    p99_multiplier: 4.0
+  
+  request_counts:
+    base: 1000
+    increment: 100
+  
+  error_rates:
+    base: 0.01  # 1%
+    max: 0.05   # 5%
+
+# Validation Configuration
+validation:
+  benchmark_result_requirements:
+    required_fields: ["timestamp", "start_time", "end_time", "config", "summary", "client_metrics"]
+    client_metrics_requirements:
+      - "total_requests > 0"
+      - "latency.count > 0"
+      - "latency.avg > 0"
+      - "len(methods) > 0"
+  
+  performance_assertions:
+    ingestion_max_time: "60s"
+    query_max_time: "10s"
+    memory_increase_max_mb: 100
+    concurrent_error_rate_max: 0.0
+    load_test_error_rate_max: 0.1
+  
+  api_response_requirements:
+    success_status_codes: [200, 201, 204]
+    error_status_codes: [400, 404, 500]
+    required_headers: ["Content-Type"]
+
+# Cleanup Configuration
+cleanup:
+  auto_cleanup: true
+  cleanup_timeout: "30s"
+  
+  cleanup_order:
+    - "websocket_connections"
+    - "api_server"
+    - "analysis_components"
+    - "historic_storage"
+    - "database_connection"
+    - "test_containers"
+    - "test_directories"
+  
+  ignore_cleanup_errors: true
+  log_cleanup_failures: true

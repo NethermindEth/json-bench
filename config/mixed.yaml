@@ -1,34 +1,59 @@
+# Enhanced JSON-RPC Benchmark Configuration
+# This configuration now supports:
+# - Comprehensive metrics collection (p50, p90, p95, p99 percentiles)
+# - File-based RPC call loading
+# - Enhanced HTML reports with interactive charts
+# - Per-client and per-method performance tracking
+
 test_name: "Mixed RPC benchmark"
 description: "Benchmark with a mix of read and state operations"
 clients:
   - name: "geth"
-    url: "http://localhost:8545"
+    url: "http://localhost:40003"
+  # Add more clients as needed:
   - name: "nethermind"
-    url: "http://localhost:8545"
+    url: "http://localhost:40010"
+  - name: "reth"
+    url: "http://localhost:40017"
+  - name: "erigon"
+    url: "http://localhost:40024"
+  - name: "besu"
+    url: "http://localhost:40031"
 duration: "1m"
 rps: 300
 endpoints:
-  - method: "eth_call"
+  - name: "WETH Balance Check"
+    method: "eth_call"
     params:
       - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
         data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"
     frequency: 40%
-  - method: "eth_getBalance"
+  - name: "Vitalik's Balance"
+    method: "eth_getBalance"
     params:
       - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
       - "latest"
     frequency: 20%
-  - method: "eth_blockNumber"
+  - name: "Current Block"
+    method: "eth_blockNumber"
     params: []
     frequency: 20%
-  - method: "eth_getTransactionCount"
+  - name: "Vitalik's TX Count"
+    method: "eth_getTransactionCount"
     params:
       - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
       - "latest"
     frequency: 10%
-  - method: "eth_getBlockByNumber"
+  - name: "Latest Block Details"
+    method: "eth_getBlockByNumber"
     params:
       - "latest"
       - false
     frequency: 10%
+  
+  # Example: Load RPC calls from a file
+  # - file: "./rpc-calls/custom-queries.json"
+  #   file_type: "json"  # or "jsonl" for JSON Lines format
+  #   frequency: 20%
+
 validate_responses: false

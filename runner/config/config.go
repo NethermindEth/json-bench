@@ -16,20 +16,23 @@ type Client struct {
 
 // Endpoint represents a JSON-RPC method to benchmark
 type Endpoint struct {
+	Name      string        `yaml:"name,omitempty"` // Optional: custom name for this endpoint
 	Method    string        `yaml:"method"`
 	Params    []interface{} `yaml:"params"`
 	Frequency string        `yaml:"frequency"`
+	File      string        `yaml:"file,omitempty"`      // Optional: file containing RPC calls
+	FileType  string        `yaml:"file_type,omitempty"` // Type of file: "json" or "jsonl"
 }
 
 // Config represents the benchmark configuration
 type Config struct {
-	TestName         string     `yaml:"test_name"`
-	Description      string     `yaml:"description"`
-	Clients          []Client   `yaml:"clients"`
-	Duration         string     `yaml:"duration"`
-	RPS              int        `yaml:"rps"`
-	Endpoints        []Endpoint `yaml:"endpoints"`
-	ValidateResponses bool      `yaml:"validate_responses"`
+	TestName          string     `yaml:"test_name"`
+	Description       string     `yaml:"description"`
+	Clients           []Client   `yaml:"clients"`
+	Duration          string     `yaml:"duration"`
+	RPS               int        `yaml:"rps"`
+	Endpoints         []Endpoint `yaml:"endpoints"`
+	ValidateResponses bool       `yaml:"validate_responses"`
 }
 
 // LoadFromFile loads a benchmark configuration from a YAML file
@@ -43,6 +46,13 @@ func LoadFromFile(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
+
+	// Expand endpoints that reference files
+	expandedEndpoints, err := ExpandEndpointsWithFiles(cfg.Endpoints)
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand file-based endpoints: %w", err)
+	}
+	cfg.Endpoints = expandedEndpoints
 
 	if err := validateConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)

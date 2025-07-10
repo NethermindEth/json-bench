@@ -65,7 +65,7 @@ interface HistogramStats {
 const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
   let totalCount = 0
   let sum = 0
-  let values: number[] = []
+  const values: number[] = []
 
   // Calculate values for each bucket
   buckets.forEach(bucket => {

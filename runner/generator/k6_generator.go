@@ -17,16 +17,31 @@ import (
 const K6ScriptTemplate = `
 import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Counter, Rate, Trend } from 'k6/metrics';
+import { Counter, Rate, Trend, Gauge } from 'k6/metrics';
 import { randomItem } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
 
 // Custom metrics
 const rpcErrors = new Counter('rpc_errors');
 const rpcCalls = new Counter('rpc_calls');
+const rpcSuccess = new Counter('rpc_success');
 const methodCalls = {};
+const methodErrors = {};
+const methodSuccess = {};
 const methodLatency = {};
 const clientMethodCalls = {};
+const clientMethodErrors = {};
+const clientMethodSuccess = {};
 const clientMethodLatency = {};
+const clientErrors = new Counter('client_errors');
+const clientSuccess = new Counter('client_success');
+
+// Connection metrics
+const connectionReuse = new Counter('connection_reuse');
+const connectionNew = new Counter('connection_new');
+const dnsLookupTime = new Trend('dns_lookup_time');
+const tcpHandshakeTime = new Trend('tcp_handshake_time');
+const tlsHandshakeTime = new Trend('tls_handshake_time');
+const activeConnections = new Gauge('active_connections');
 
 // Configuration
 const config = {
@@ -40,6 +55,8 @@ const config = {
 config.endpoints.forEach(endpoint => {
   // Global method metrics
   methodCalls[endpoint.Method] = new Counter('method_calls_' + endpoint.Method);
+  methodErrors[endpoint.Method] = new Counter('method_errors_' + endpoint.Method);
+  methodSuccess[endpoint.Method] = new Counter('method_success_' + endpoint.Method);
   methodLatency[endpoint.Method] = new Trend('method_latency_' + endpoint.Method);
   
   // Per-client method metrics
@@ -47,9 +64,13 @@ config.endpoints.forEach(endpoint => {
     const clientName = client.Name;
     if (!clientMethodCalls[clientName]) {
       clientMethodCalls[clientName] = {};
+      clientMethodErrors[clientName] = {};
+      clientMethodSuccess[clientName] = {};
       clientMethodLatency[clientName] = {};
     }
     clientMethodCalls[clientName][endpoint.Method] = new Counter('client_' + clientName + '_method_calls_' + endpoint.Method);
+    clientMethodErrors[clientName][endpoint.Method] = new Counter('client_' + clientName + '_method_errors_' + endpoint.Method);
+    clientMethodSuccess[clientName][endpoint.Method] = new Counter('client_' + clientName + '_method_success_' + endpoint.Method);
     clientMethodLatency[clientName][endpoint.Method] = new Trend('client_' + clientName + '_method_latency_' + endpoint.Method);
   });
 });
@@ -70,6 +91,8 @@ export const options = {
     'http_req_failed': ['rate<0.01'], // Less than 1% of requests should fail
     'http_req_duration': ['p(95)<1000'], // 95% of requests should be below 1s
   },
+  // Ensure K6 calculates all percentiles including p99
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)', 'p(99.9)', 'count'],
 };
 
 // Helper function to create a JSON-RPC request
@@ -118,6 +141,22 @@ export default function() {
     
     const response = http.post(url, JSON.stringify(payload), { headers });
     
+    // Record connection metrics
+    if (response.timings.dns_lookup > 0) {
+      connectionNew.add(1, { client: String(clientName) });
+      dnsLookupTime.add(response.timings.dns_lookup);
+    } else {
+      connectionReuse.add(1, { client: String(clientName) });
+    }
+    
+    if (response.timings.connecting > 0) {
+      tcpHandshakeTime.add(response.timings.connecting);
+    }
+    
+    if (response.timings.tls_handshaking > 0) {
+      tlsHandshakeTime.add(response.timings.tls_handshaking);
+    }
+    
     // Record metrics
     rpcCalls.add(1, { client: String(clientName), method: String(method) });
     methodCalls[method].add(1);
@@ -140,8 +179,16 @@ export default function() {
       },
     });
     
-    if (!success) {
+    if (success) {
+      rpcSuccess.add(1, { client: String(clientName), method: String(method) });
+      methodSuccess[method].add(1);
+      clientMethodSuccess[clientName][method].add(1);
+      clientSuccess.add(1, { client: String(clientName) });
+    } else {
       rpcErrors.add(1, { client: String(clientName), method: String(method) });
+      methodErrors[method].add(1);
+      clientMethodErrors[clientName][method].add(1);
+      clientErrors.add(1, { client: String(clientName) });
     }
     
     // Store response for validation - using console.log instead of file operations
@@ -233,8 +280,13 @@ func RunK6Benchmark(scriptPath, outputDir string) (*types.BenchmarkResult, error
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), "K6_RESPONSES_DIR="+responsesDir)
 
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("k6 execution failed: %w", err)
+	startTime := time.Now()
+	err := cmd.Run()
+	endTime := time.Now()
+
+	// Continue even if k6 fails, as we may still have partial results
+	if err != nil {
+		fmt.Printf("Warning: k6 execution completed with errors: %v\n", err)
 	}
 
 	// Read summary file
@@ -248,12 +300,22 @@ func RunK6Benchmark(scriptPath, outputDir string) (*types.BenchmarkResult, error
 		return nil, fmt.Errorf("failed to parse summary JSON: %w", err)
 	}
 
-	// For now, return a minimal result
-	// In a real implementation, we would process the responses and calculate diffs
+	// Parse k6 results to extract client metrics
+	clientMetrics, err := ParseK6Results(outputDir)
+	if err != nil {
+		// Log error but continue with basic results
+		fmt.Printf("Warning: Failed to parse detailed metrics: %v\n", err)
+	}
+
+	// Create result
 	result := &types.BenchmarkResult{
-		Summary:      summary,
-		Timestamp:    fmt.Sprintf("%d", time.Now().Unix()),
-		ResponsesDir: responsesDir,
+		Summary:       summary,
+		ClientMetrics: clientMetrics,
+		Timestamp:     time.Now().Format("2006-01-02 15:04:05"),
+		StartTime:     startTime.Format("2006-01-02 15:04:05"),
+		EndTime:       endTime.Format("2006-01-02 15:04:05"),
+		Duration:      endTime.Sub(startTime).String(),
+		ResponsesDir:  responsesDir,
 	}
 
 	return result, nil

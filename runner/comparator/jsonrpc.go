@@ -37,7 +37,7 @@ type JSONRPCError struct {
 // formatCurlCommand formats a JSON-RPC request as a curl command for logging purposes
 func formatCurlCommand(url string, requestJSON []byte) string {
 	// Use double quotes for JSON payload to avoid shell escaping issues
-	return fmt.Sprintf("curl -X POST -H 'Content-Type: application/json' -d %q %s", 
+	return fmt.Sprintf("curl -X POST -H 'Content-Type: application/json' -d %q %s",
 		string(requestJSON), url)
 }
 
@@ -56,7 +56,7 @@ func makeJSONRPCCall(url, method string, params []interface{}, timeoutSeconds in
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	
+
 	// Log the equivalent curl command if verbose mode is enabled
 	if verbose {
 		log.Printf("JSON-RPC Request to %s: %s", url, formatCurlCommand(url, requestJSON))
@@ -114,7 +114,7 @@ func makeBatchJSONRPCCall(url string, requests []JSONRPCRequest, timeoutSeconds 
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal batch request: %w", err)
 	}
-	
+
 	// Log the equivalent curl command for batch request if verbose mode is enabled
 	if verbose {
 		log.Printf("Batch JSON-RPC Request to %s: %s", url, formatCurlCommand(url, requestJSON))

@@ -9,14 +9,14 @@ import (
 
 // ComparisonConfigYAML represents the YAML configuration for comparison
 type ComparisonConfigYAML struct {
-	Name           string                 `yaml:"name"`
-	Description    string                 `yaml:"description"`
-	Clients        []ClientYAML           `yaml:"clients"`
-	ValidateSchema bool                   `yaml:"validate_schema"`
-	Concurrency    int                    `yaml:"concurrency"`
-	TimeoutSeconds int                    `yaml:"timeout_seconds"`
-	OutputDir      string                 `yaml:"output_dir"`
-	Methods        []MethodConfigYAML     `yaml:"methods"`
+	Name           string             `yaml:"name"`
+	Description    string             `yaml:"description"`
+	Clients        []ClientYAML       `yaml:"clients"`
+	ValidateSchema bool               `yaml:"validate_schema"`
+	Concurrency    int                `yaml:"concurrency"`
+	TimeoutSeconds int                `yaml:"timeout_seconds"`
+	OutputDir      string             `yaml:"output_dir"`
+	Methods        []MethodConfigYAML `yaml:"methods"`
 }
 
 // ClientYAML represents a client configuration in YAML
@@ -47,12 +47,12 @@ func LoadConfigFromYAML(filePath string) (*ComparisonConfig, error) {
 
 	// Convert to ComparisonConfig
 	config := &ComparisonConfig{
-		Name:                 yamlConfig.Name,
-		Description:          yamlConfig.Description,
+		Name:                  yamlConfig.Name,
+		Description:           yamlConfig.Description,
 		ValidateAgainstSchema: yamlConfig.ValidateSchema,
-		Concurrency:          yamlConfig.Concurrency,
-		TimeoutSeconds:       yamlConfig.TimeoutSeconds,
-		OutputDir:            yamlConfig.OutputDir,
+		Concurrency:           yamlConfig.Concurrency,
+		TimeoutSeconds:        yamlConfig.TimeoutSeconds,
+		OutputDir:             yamlConfig.OutputDir,
 	}
 
 	// Set default values if not specified

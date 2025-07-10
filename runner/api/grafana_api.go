@@ -14,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/jsonrpc-bench/runner/storage"
-	"github.com/jsonrpc-bench/runner/types"
 )
 
 // GrafanaAPI provides Grafana SimpleJSON datasource compatibility
@@ -288,6 +287,28 @@ func (g *grafanaAPI) getAvailableMetrics(ctx context.Context, searchTarget strin
 		// Generate metric combinations
 		metricTypes := []string{"avg_latency", "p95_latency", "p99_latency", "error_rate", "throughput"}
 
+		// Get distinct methods from benchmark_metrics table
+		var methodNames []string
+		methodQuery := `
+			SELECT DISTINCT method 
+			FROM benchmark_metrics 
+			WHERE method IS NOT NULL AND method != ''
+			ORDER BY method`
+
+		methodRows, err := g.db.QueryContext(ctx, methodQuery)
+		if err != nil {
+			g.log.WithError(err).Warn("Failed to query method names")
+		} else {
+			defer methodRows.Close()
+			for methodRows.Next() {
+				var methodName string
+				if err := methodRows.Scan(&methodName); err != nil {
+					continue
+				}
+				methodNames = append(methodNames, methodName)
+			}
+		}
+
 		for _, testName := range testNames {
 			for _, metricType := range metricTypes {
 				// Overall metrics
@@ -301,6 +322,14 @@ func (g *grafanaAPI) getAvailableMetrics(ctx context.Context, searchTarget strin
 					clientMetric := fmt.Sprintf("%s.%s.%s", testName, clientName, metricType)
 					if searchTarget == "" || g.matchesSearch(clientMetric, searchTarget) {
 						metrics = append(metrics, clientMetric)
+					}
+
+					// Method-specific metrics
+					for _, methodName := range methodNames {
+						methodMetric := fmt.Sprintf("%s.%s.%s.%s", testName, clientName, methodName, metricType)
+						if searchTarget == "" || g.matchesSearch(methodMetric, searchTarget) {
+							metrics = append(metrics, methodMetric)
+						}
 					}
 				}
 			}
@@ -334,58 +363,99 @@ func (g *grafanaAPI) queryTimeSeriesData(ctx context.Context, metricInfo *Metric
 	var query string
 	var args []interface{}
 
-	// Build query based on metric type
-	switch metricInfo.MetricType {
-	case "avg_latency":
-		query = `
-			SELECT timestamp, avg_latency_ms as value
-			FROM historic_runs
-			WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
-		args = []interface{}{metricInfo.TestName, fromTime, toTime}
+	// Check if method is specified - use benchmark_metrics table for method-specific queries
+	if metricInfo.Method != "" {
+		// Query from benchmark_metrics table for method-specific data
+		var metricName string
+		switch metricInfo.MetricType {
+		case "avg_latency":
+			metricName = "latency_avg"
+		case "p95_latency":
+			metricName = "latency_p95"
+		case "p99_latency":
+			metricName = "latency_p99"
+		case "error_rate":
+			metricName = "error_rate"
+		case "throughput":
+			metricName = "throughput"
+		default:
+			return nil, fmt.Errorf("unsupported metric type: %s", metricInfo.MetricType)
+		}
 
-	case "p95_latency":
 		query = `
-			SELECT timestamp, p95_latency_ms as value
-			FROM historic_runs
-			WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
-		args = []interface{}{metricInfo.TestName, fromTime, toTime}
+			SELECT time as timestamp, value
+			FROM benchmark_metrics
+			WHERE metric_name = $1 AND client = $2 AND method = $3 
+			  AND time >= $4 AND time <= $5`
+		args = []interface{}{metricName, metricInfo.Client, metricInfo.Method, fromTime, toTime}
 
-	case "p99_latency":
-		query = `
-			SELECT timestamp, p99_latency_ms as value
-			FROM historic_runs
-			WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
-		args = []interface{}{metricInfo.TestName, fromTime, toTime}
+		// Add test name filter if we have a way to link it (through run_id)
+		if metricInfo.TestName != "" {
+			query = `
+				SELECT bm.time as timestamp, bm.value
+				FROM benchmark_metrics bm
+				JOIN benchmark_runs br ON bm.run_id = br.id
+				WHERE bm.metric_name = $1 AND bm.client = $2 AND bm.method = $3 
+				  AND bm.time >= $4 AND bm.time <= $5
+				  AND br.test_name = $6`
+			args = append(args, metricInfo.TestName)
+		}
 
-	case "error_rate":
-		query = `
-			SELECT timestamp, overall_error_rate as value
-			FROM historic_runs
-			WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
-		args = []interface{}{metricInfo.TestName, fromTime, toTime}
+		query += ` ORDER BY timestamp`
+	} else {
+		// Use historic_runs table for overall metrics (existing logic)
+		switch metricInfo.MetricType {
+		case "avg_latency":
+			query = `
+				SELECT timestamp, avg_latency_ms as value
+				FROM historic_runs
+				WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
+			args = []interface{}{metricInfo.TestName, fromTime, toTime}
 
-	case "throughput":
-		query = `
-			SELECT timestamp, 
-				   CASE 
-					   WHEN duration != '' THEN total_requests / EXTRACT(EPOCH FROM duration::interval)
-					   ELSE 0
-				   END as value
-			FROM historic_runs
-			WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
-		args = []interface{}{metricInfo.TestName, fromTime, toTime}
+		case "p95_latency":
+			query = `
+				SELECT timestamp, p95_latency_ms as value
+				FROM historic_runs
+				WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
+			args = []interface{}{metricInfo.TestName, fromTime, toTime}
 
-	default:
-		return nil, fmt.Errorf("unsupported metric type: %s", metricInfo.MetricType)
+		case "p99_latency":
+			query = `
+				SELECT timestamp, p99_latency_ms as value
+				FROM historic_runs
+				WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
+			args = []interface{}{metricInfo.TestName, fromTime, toTime}
+
+		case "error_rate":
+			query = `
+				SELECT timestamp, overall_error_rate as value
+				FROM historic_runs
+				WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
+			args = []interface{}{metricInfo.TestName, fromTime, toTime}
+
+		case "throughput":
+			query = `
+				SELECT timestamp, 
+					   CASE 
+						   WHEN duration != '' THEN total_requests / EXTRACT(EPOCH FROM duration::interval)
+						   ELSE 0
+					   END as value
+				FROM historic_runs
+				WHERE test_name = $1 AND timestamp >= $2 AND timestamp <= $3`
+			args = []interface{}{metricInfo.TestName, fromTime, toTime}
+
+		default:
+			return nil, fmt.Errorf("unsupported metric type: %s", metricInfo.MetricType)
+		}
+
+		// Add client filtering if specified (only for historic_runs)
+		if metricInfo.Client != "" && metricInfo.Client != "overall" {
+			query += ` AND performance_scores ? $4`
+			args = append(args, metricInfo.Client)
+		}
+
+		query += ` ORDER BY timestamp`
 	}
-
-	// Add client filtering if specified
-	if metricInfo.Client != "" && metricInfo.Client != "overall" {
-		query += ` AND performance_scores ? $4`
-		args = append(args, metricInfo.Client)
-	}
-
-	query += ` ORDER BY timestamp`
 
 	rows, err := g.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -427,6 +497,7 @@ func (g *grafanaAPI) queryTimeSeriesData(ctx context.Context, metricInfo *Metric
 		Meta: map[string]interface{}{
 			"test_name":   metricInfo.TestName,
 			"client":      metricInfo.Client,
+			"method":      metricInfo.Method,
 			"metric_type": metricInfo.MetricType,
 			"aggregation": metricInfo.Aggregation,
 		},
@@ -737,6 +808,7 @@ func (g *grafanaAPI) getMetricsMetadata(ctx context.Context) ([]MetricMetadata, 
 func (g *grafanaAPI) parseMetricTarget(target string) *MetricInfo {
 	// Handle aggregation functions
 	var aggregation string
+	originalTarget := target
 	if strings.Contains(target, "(") && strings.Contains(target, ")") {
 		parts := strings.Split(target, "(")
 		if len(parts) == 2 {
@@ -745,16 +817,31 @@ func (g *grafanaAPI) parseMetricTarget(target string) *MetricInfo {
 		}
 	}
 
-	// Parse format: test_name.client.metric_type
+	// Parse format: test_name.client.metric_type or test_name.client.method.metric_type
 	parts := strings.Split(target, ".")
 	if len(parts) < 3 {
 		return nil
 	}
 
+	// Check if we have method-specific format
+	if len(parts) == 4 {
+		// Format: test_name.client.method.metric_type
+		return &MetricInfo{
+			OriginalTarget: originalTarget,
+			TestName:       parts[0],
+			Client:         parts[1],
+			Method:         parts[2],
+			MetricType:     parts[3],
+			Aggregation:    aggregation,
+		}
+	}
+
+	// Default format: test_name.client.metric_type
 	return &MetricInfo{
-		OriginalTarget: target,
+		OriginalTarget: originalTarget,
 		TestName:       parts[0],
 		Client:         parts[1],
+		Method:         "",
 		MetricType:     parts[2],
 		Aggregation:    aggregation,
 	}
@@ -947,6 +1034,7 @@ type MetricInfo struct {
 	OriginalTarget string
 	TestName       string
 	Client         string
+	Method         string
 	MetricType     string
 	Aggregation    string
 }

@@ -38,7 +38,7 @@ func main() {
 	if *variationsPath != "" {
 		fmt.Printf("Using parameter variations from: %s...\n", *variationsPath)
 	}
-	
+
 	config, err := comparator.LoadMethodsFromOpenRPC(*specPath, *variationsPath)
 	if err != nil {
 		log.Fatalf("Failed to load OpenRPC specification: %v", err)
@@ -84,7 +84,7 @@ func main() {
 			if idx := strings.Index(method, "_variant"); idx > 0 {
 				baseName = method[:idx]
 			}
-			
+
 			if methodMap[baseName] || methodMap[method] {
 				filteredMethods = append(filteredMethods, method)
 				if params, ok := config.CustomParameters[method]; ok {

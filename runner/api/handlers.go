@@ -26,6 +26,7 @@ type APIHandlers interface {
 	// Historic runs handlers
 	HandleListRuns(w http.ResponseWriter, r *http.Request)
 	HandleGetRun(w http.ResponseWriter, r *http.Request)
+	HandleGetRunMethods(w http.ResponseWriter, r *http.Request)
 	HandleGetReport(w http.ResponseWriter, r *http.Request)
 	HandleDeleteRun(w http.ResponseWriter, r *http.Request)
 	HandleCompareRuns(w http.ResponseWriter, r *http.Request)
@@ -134,12 +135,12 @@ func (h *apiHandlers) HandleListRuns(w http.ResponseWriter, r *http.Request) {
 	// Build query with filtering
 	query := `
 		SELECT id, test_name, description, git_commit, git_branch,
-			   timestamp, start_time, end_time, duration,
-			   clients_count, endpoints_count, target_rps,
-			   total_requests, total_errors, overall_error_rate,
-			   avg_latency_ms, p95_latency_ms, p99_latency_ms, max_latency_ms,
-			   best_client, notes, created_at
-		FROM historic_runs
+			   timestamp, timestamp as start_time, timestamp as end_time, duration,
+			   0 as clients_count, 0 as endpoints_count, 0 as target_rps,
+			   total_requests, 0 as total_errors, (100.0 - success_rate) as overall_error_rate,
+			   avg_latency as avg_latency_ms, p95_latency as p95_latency_ms, p95_latency as p99_latency_ms, avg_latency as max_latency_ms,
+			   '' as best_client, '' as notes, timestamp as created_at
+		FROM benchmark_runs
 		WHERE 1=1`
 
 	args := []interface{}{}
@@ -216,7 +217,7 @@ func (h *apiHandlers) HandleListRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get total count for pagination
-	countQuery := `SELECT COUNT(*) FROM historic_runs WHERE 1=1`
+	countQuery := `SELECT COUNT(*) FROM benchmark_runs WHERE 1=1`
 	countArgs := args[:len(args)-2] // Remove LIMIT and OFFSET args
 
 	if testName != "" {
@@ -294,6 +295,96 @@ func (h *apiHandlers) HandleGetRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSONResponse(w, http.StatusOK, run)
+}
+
+// HandleGetRunMethods returns method-specific metrics for a run
+func (h *apiHandlers) HandleGetRunMethods(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	runID := vars["runId"]
+
+	h.log.WithField("run_id", runID).Debug("Getting method metrics for run")
+
+	// Query method metrics directly from database
+	// Note: Using MAX aggregation to handle cases where there might be multiple metric entries
+	query := `
+		SELECT 
+			method,
+			MAX(CASE WHEN metric_name = 'latency_avg' THEN value END) as avg_latency,
+			MAX(CASE WHEN metric_name = 'latency_p50' THEN value END) as p50_latency,
+			MAX(CASE WHEN metric_name = 'latency_p95' THEN value END) as p95_latency,
+			MAX(CASE WHEN metric_name = 'latency_p99' THEN value END) as p99_latency,
+			MAX(CASE WHEN metric_name = 'latency_min' THEN value END) as min_latency,
+			MAX(CASE WHEN metric_name = 'latency_max' THEN value END) as max_latency,
+			MAX(CASE WHEN metric_name = 'success_rate' THEN value END) as success_rate,
+			MAX(CASE WHEN metric_name = 'throughput' THEN value END) as throughput
+		FROM benchmark_metrics
+		WHERE run_id = $1 AND method != 'all'
+		GROUP BY method
+		ORDER BY method`
+
+	rows, err := h.db.QueryContext(r.Context(), query, runID)
+	if err != nil {
+		h.log.WithError(err).Error("Failed to query method metrics")
+		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve method metrics")
+		return
+	}
+	defer rows.Close()
+
+	methods := make(map[string]interface{})
+	methodCount := 0
+	for rows.Next() {
+		var method string
+		var avgLatency, p50Latency, p95Latency, p99Latency, minLatency, maxLatency, successRate, throughput sql.NullFloat64
+
+		err := rows.Scan(&method, &avgLatency, &p50Latency, &p95Latency, &p99Latency,
+			&minLatency, &maxLatency, &successRate, &throughput)
+		if err != nil {
+			h.log.WithError(err).Error("Failed to scan method metrics")
+			continue
+		}
+
+		// Debug logging for NULL values
+		h.log.WithFields(logrus.Fields{
+			"method":    method,
+			"p99_valid": p99Latency.Valid,
+			"p99_value": p99Latency.Float64,
+			"avg_valid": avgLatency.Valid,
+			"avg_value": avgLatency.Float64,
+		}).Debug("Scanned method metrics")
+
+		// Helper function to get value or nil from sql.NullFloat64
+		getValue := func(nf sql.NullFloat64) interface{} {
+			if nf.Valid {
+				return nf.Float64
+			}
+			return nil
+		}
+
+		methods[method] = map[string]interface{}{
+			"avg_latency":  getValue(avgLatency),
+			"p50_latency":  getValue(p50Latency),
+			"p95_latency":  getValue(p95Latency),
+			"p99_latency":  getValue(p99Latency),
+			"min_latency":  getValue(minLatency),
+			"max_latency":  getValue(maxLatency),
+			"success_rate": getValue(successRate),
+			"throughput":   getValue(throughput),
+		}
+		methodCount++
+	}
+
+	// Debug logging for total methods found
+	h.log.WithFields(logrus.Fields{
+		"run_id":       runID,
+		"method_count": methodCount,
+	}).Debug("Completed processing method metrics")
+
+	response := map[string]interface{}{
+		"run_id":  runID,
+		"methods": methods,
+	}
+
+	h.writeJSONResponse(w, http.StatusOK, response)
 }
 
 // HandleGetReport retrieves a formatted report for a historic run
@@ -855,8 +946,15 @@ func (h *apiHandlers) HandleGetMetricTrends(w http.ResponseWriter, r *http.Reque
 		client = "overall"
 	}
 
+	// Create trend filter
+	since := time.Now().AddDate(0, 0, -days)
+	filter := types.TrendFilter{
+		Client: client,
+		Since:  since,
+	}
+
 	// Get basic trend
-	trend, err := h.storage.GetHistoricTrends(ctx, testName, client, metric, days)
+	trend, err := h.storage.GetHistoricTrends(ctx, filter)
 	if err != nil {
 		h.log.WithError(err).Error("Failed to get metric trends")
 		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve metric trends")
@@ -925,7 +1023,8 @@ func (h *apiHandlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 
 	// Check storage health
 	ctx := r.Context()
-	if _, err := h.storage.ListHistoricRuns(ctx, "", 1); err != nil {
+	healthFilter := types.RunFilter{Limit: 1}
+	if _, err := h.storage.ListHistoricRuns(ctx, healthFilter); err != nil {
 		status["services"].(map[string]string)["storage"] = "error"
 		h.log.WithError(err).Warn("Storage health check failed")
 	}
@@ -1009,6 +1108,22 @@ func (h *apiHandlers) writeErrorResponse(w http.ResponseWriter, statusCode int, 
 	h.writeJSONResponse(w, statusCode, errorResponse)
 }
 
+// MethodMetric represents aggregated metrics for a specific method
+type MethodMetric struct {
+	Name          string  `json:"name"`
+	TotalRequests int64   `json:"total_requests"`
+	SuccessRate   float64 `json:"success_rate"`
+	AvgLatency    float64 `json:"avg_latency"`
+	P50Latency    float64 `json:"p50_latency"`
+	P95Latency    float64 `json:"p95_latency"`
+	P99Latency    float64 `json:"p99_latency"`
+	MinLatency    float64 `json:"min_latency"`
+	MaxLatency    float64 `json:"max_latency"`
+	StdDev        float64 `json:"std_dev"`
+	ErrorRate     float64 `json:"error_rate"`
+	Throughput    float64 `json:"throughput"`
+}
+
 // generateRunReport generates a comprehensive report for a run
 func (h *apiHandlers) generateRunReport(run *types.HistoricRun, result *types.BenchmarkResult) map[string]interface{} {
 	report := map[string]interface{}{
@@ -1033,9 +1148,35 @@ func (h *apiHandlers) generateRunReport(run *types.HistoricRun, result *types.Be
 		"target_rps":     run.TargetRPS,
 	}
 
-	// Add client breakdown
+	// Add client breakdown with method metrics
 	clientBreakdown := make(map[string]interface{})
+	methodMetrics := make([]MethodMetric, 0)
+
 	for clientName, metrics := range result.ClientMetrics {
+		// Collect method metrics for this client
+		clientMethods := make([]MethodMetric, 0)
+
+		for methodName, methodStats := range metrics.Methods {
+			methodMetric := MethodMetric{
+				Name:          methodName,
+				TotalRequests: methodStats.Count,
+				SuccessRate:   methodStats.SuccessRate,
+				AvgLatency:    methodStats.Avg,
+				P50Latency:    methodStats.P50,
+				P95Latency:    methodStats.P95,
+				P99Latency:    methodStats.P99,
+				MinLatency:    methodStats.Min,
+				MaxLatency:    methodStats.Max,
+				StdDev:        methodStats.StdDev,
+				ErrorRate:     methodStats.ErrorRate,
+				Throughput:    methodStats.Throughput,
+			}
+			clientMethods = append(clientMethods, methodMetric)
+
+			// Also add to the global method metrics list
+			methodMetrics = append(methodMetrics, methodMetric)
+		}
+
 		clientBreakdown[clientName] = map[string]interface{}{
 			"total_requests": metrics.TotalRequests,
 			"total_errors":   metrics.TotalErrors,
@@ -1049,9 +1190,13 @@ func (h *apiHandlers) generateRunReport(run *types.HistoricRun, result *types.Be
 				"throughput": metrics.Latency.Throughput,
 			},
 			"method_count": len(metrics.Methods),
+			"methods":      clientMethods, // Add method metrics per client
 		}
 	}
 	report["clients"] = clientBreakdown
+
+	// Add aggregated method metrics at the top level
+	report["method_metrics"] = methodMetrics
 
 	// Add performance scores
 	report["performance_scores"] = run.PerformanceScores
@@ -1060,7 +1205,7 @@ func (h *apiHandlers) generateRunReport(run *types.HistoricRun, result *types.Be
 }
 
 // enhanceComparison adds detailed analysis to run comparison
-func (h *apiHandlers) enhanceComparison(ctx context.Context, comparison *types.HistoricComparison, runID1, runID2 string) {
+func (h *apiHandlers) enhanceComparison(ctx context.Context, comparison *types.BaselineComparison, runID1, runID2 string) {
 	// Add regression analysis
 	// This would involve detecting regressions between the two runs
 	// For now, we'll add a placeholder for enhanced analysis

@@ -101,10 +101,10 @@ func ValidateResponses(result *types.BenchmarkResult) ([]ResponseDiff, error) {
 
 			// Create response diff
 			diff := ResponseDiff{
-				Method:      method,
-				Params:      nil, // We don't have the params in this implementation
-				Clients:     clients,
-				Differences: differences,
+				Method:       method,
+				Params:       nil, // We don't have the params in this implementation
+				Clients:      clients,
+				Differences:  differences,
 				SchemaErrors: make(map[string][]string),
 			}
 
@@ -136,25 +136,25 @@ func ValidateResponses(result *types.BenchmarkResult) ([]ResponseDiff, error) {
 func CompareResponses(resp1, resp2 map[string]interface{}) (map[string]interface{}, error) {
 	// This is a simplified implementation
 	// In a real-world scenario, we would do a deep comparison of the response objects
-	
+
 	// Check if both have result or error fields
 	result1, hasResult1 := resp1["result"]
 	result2, hasResult2 := resp2["result"]
-	
+
 	error1, hasError1 := resp1["error"]
 	error2, hasError2 := resp2["error"]
-	
+
 	differences := make(map[string]interface{})
-	
+
 	// Check for inconsistent error/result presence
 	if hasResult1 != hasResult2 {
 		differences["result_presence"] = "inconsistent"
 	}
-	
+
 	if hasError1 != hasError2 {
 		differences["error_presence"] = "inconsistent"
 	}
-	
+
 	// If both have results, compare them
 	if hasResult1 && hasResult2 {
 		// For simple types, direct comparison
@@ -163,7 +163,7 @@ func CompareResponses(resp1, resp2 map[string]interface{}) (map[string]interface
 			if result1 != result2 {
 				differences["result"] = "different values"
 			}
-			
+
 		case []interface{}:
 			// For arrays, compare length first
 			arr1 := result1.([]interface{})
@@ -171,7 +171,7 @@ func CompareResponses(resp1, resp2 map[string]interface{}) (map[string]interface
 			if !ok || len(arr1) != len(arr2) {
 				differences["result"] = "different array length or type"
 			}
-			
+
 		case map[string]interface{}:
 			// For objects, compare keys
 			obj1 := result1.(map[string]interface{})
@@ -188,7 +188,7 @@ func CompareResponses(resp1, resp2 map[string]interface{}) (map[string]interface
 						differences["missing_fields"] = append(differences["missing_fields"].([]string), key)
 					}
 				}
-				
+
 				// Check if all keys in obj2 exist in obj1
 				for key := range obj2 {
 					if _, exists := obj1[key]; !exists {
@@ -201,28 +201,28 @@ func CompareResponses(resp1, resp2 map[string]interface{}) (map[string]interface
 			}
 		}
 	}
-	
+
 	// If both have errors, compare them
 	if hasError1 && hasError2 {
 		// Compare error codes
 		errorObj1, ok1 := error1.(map[string]interface{})
 		errorObj2, ok2 := error2.(map[string]interface{})
-		
+
 		if !ok1 || !ok2 {
 			differences["error"] = "different error formats"
 		} else {
 			code1, hasCode1 := errorObj1["code"]
 			code2, hasCode2 := errorObj2["code"]
-			
+
 			if hasCode1 != hasCode2 || code1 != code2 {
 				differences["error_code"] = "different error codes"
 			}
 		}
 	}
-	
+
 	if len(differences) == 0 {
 		return nil, nil
 	}
-	
+
 	return differences, nil
 }
