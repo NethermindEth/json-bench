@@ -29,6 +29,7 @@ import (
 func main() {
 	// Parse command-line flags
 	configPath := flag.String("config", "", "Path to YAML configuration file")
+	clientsPath := flag.String("clients", "", "Path to clients configuration file (optional)")
 	outputDir := flag.String("output", "results", "Directory to store results")
 	compareResponses := flag.Bool("compare", false, "Compare JSON-RPC responses across clients")
 	validateSchema := flag.Bool("validate", true, "Validate responses against OpenRPC schema")
@@ -73,8 +74,30 @@ func main() {
 		log.Fatal("Please provide a configuration file path using -config flag")
 	}
 
-	// Load configuration
-	cfg, err := config.LoadFromFile(*configPath)
+	// Initialize client registry
+	clientRegistry := config.NewClientRegistry()
+
+	// Load clients configuration if provided
+	if *clientsPath != "" {
+		if err := clientRegistry.LoadFromFile(*clientsPath); err != nil {
+			log.Fatalf("Failed to load clients configuration: %v", err)
+		}
+		logger.Info("Loaded clients configuration from ", *clientsPath)
+	}
+
+	// Create config loader
+	configLoader := config.NewConfigLoader(clientRegistry)
+
+	// Load configuration with backward compatibility support
+	var cfg *config.Config
+	var err error
+	if *clientsPath != "" {
+		// Use new style loading when clients file is provided
+		cfg, err = configLoader.LoadTestConfig(*configPath)
+	} else {
+		// Use backward compatibility loading when no clients file is provided
+		cfg, err = configLoader.LoadWithBackwardCompatibility(*configPath)
+	}
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
@@ -224,14 +247,8 @@ func main() {
 
 // runComparison runs a comparison of JSON-RPC responses across all clients in the config
 func runComparison(cfg *config.Config, outputDir string, validateSchema bool, concurrency, timeout int) error {
-	// Create clients list for the comparator
-	var clientsList []comparator.Client
-	for _, client := range cfg.Clients {
-		clientsList = append(clientsList, comparator.Client{
-			Name: client.Name,
-			URL:  client.URL,
-		})
-	}
+	// Use resolved clients directly for the comparator
+	clientsList := cfg.ResolvedClients
 
 	// Extract methods from endpoints
 	methods := make([]string, 0, len(cfg.Endpoints))

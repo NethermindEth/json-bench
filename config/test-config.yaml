@@ -1,0 +1,20 @@
+test_name: "Test with Client References"
+description: "Testing separated client configuration"
+duration: "10s"
+rps: 100
+validate_responses: true
+
+clients: ["geth", "nethermind"]
+
+endpoints:
+  - name: "Current Block"
+    method: "eth_blockNumber"
+    params: []
+    frequency: "50/s"
+  
+  - name: "Vitalik's Balance"
+    method: "eth_getBalance"
+    params: 
+      - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+      - "latest"
+    frequency: "50/s"

@@ -1,10 +1,9 @@
 test_name: "File-based RPC benchmark"
 description: "Benchmark using RPC calls loaded from files"
+# Client references from clients.yaml
 clients:
-  - name: "geth"
-    url: "http://localhost:8545"
-  - name: "nethermind"
-    url: "http://localhost:8546"
+  - geth
+  - nethermind
 duration: "2m"
 rps: 500
 endpoints:

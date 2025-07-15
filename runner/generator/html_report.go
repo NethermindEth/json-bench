@@ -369,8 +369,8 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 	}
 
 	// Build client names string
-	clientNames := make([]string, len(cfg.Clients))
-	for i, client := range cfg.Clients {
+	clientNames := make([]string, len(cfg.ResolvedClients))
+	for i, client := range cfg.ResolvedClients {
 		clientNames[i] = client.Name
 	}
 
@@ -381,7 +381,7 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 	chartData := make(map[string][]float64)
 
 	// Initialize maps for each client
-	for _, client := range cfg.Clients {
+	for _, client := range cfg.ResolvedClients {
 		methodLatency[client.Name] = make(map[string]float64)
 		methodRate[client.Name] = make(map[string]float64)
 		methodErrorRate[client.Name] = make(map[string]float64)
@@ -395,7 +395,7 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 			// Process each client and method
 
 			// Process each client and method
-			for _, client := range cfg.Clients {
+			for _, client := range cfg.ResolvedClients {
 				clientName := client.Name
 
 				for i, method := range methods {

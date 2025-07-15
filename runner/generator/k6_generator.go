@@ -214,8 +214,17 @@ type ScriptData struct {
 
 // GenerateK6Script generates a k6 script from the benchmark configuration
 func GenerateK6Script(cfg *config.Config, outputPath string) error {
+	// Convert resolved clients to a simpler format for K6 script
+	simpleClients := make([]map[string]string, len(cfg.ResolvedClients))
+	for i, client := range cfg.ResolvedClients {
+		simpleClients[i] = map[string]string{
+			"Name": client.Name,
+			"URL":  client.URL,
+		}
+	}
+
 	// Convert clients to JSON
-	clientsJSON, err := json.Marshal(cfg.Clients)
+	clientsJSON, err := json.Marshal(simpleClients)
 	if err != nil {
 		return fmt.Errorf("failed to marshal clients: %w", err)
 	}

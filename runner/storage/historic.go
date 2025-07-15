@@ -71,6 +71,12 @@ func (h *HistoricStorage) SaveRun(result *types.BenchmarkResult, cfg *config.Con
 		return nil, fmt.Errorf("failed to copy results: %w", err)
 	}
 
+	// Save run configuration with client URLs
+	if err := h.SaveRunConfig(cfg, runDir); err != nil {
+		h.log.WithError(err).Error("Failed to save run configuration")
+		// Continue execution even if saving config fails
+	}
+
 	// Calculate config hash
 	configHash := h.calculateConfigHash(cfg)
 
@@ -125,6 +131,55 @@ func (h *HistoricStorage) SaveRun(result *types.BenchmarkResult, cfg *config.Con
 	}
 
 	return run, nil
+}
+
+// SaveRunConfig saves the full run configuration including client URLs to a JSON file
+// This method stores complete client information (name and URL) in a run_config.json file
+// within the run directory, allowing for future reference of which clients were used
+// and their endpoints during the benchmark run.
+func (h *HistoricStorage) SaveRunConfig(cfg *config.Config, runDir string) error {
+	// Create a structure to hold the full client information
+	type ClientInfo struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	}
+
+	type RunConfig struct {
+		Clients []ClientInfo `json:"clients"`
+		// Add other config fields as needed
+	}
+
+	// Extract client information from config
+	var clientInfos []ClientInfo
+	if cfg.ResolvedClients != nil {
+		for _, client := range cfg.ResolvedClients {
+			if client != nil {
+				clientInfos = append(clientInfos, ClientInfo{
+					Name: client.Name,
+					URL:  client.URL,
+				})
+			}
+		}
+	}
+
+	runConfig := RunConfig{
+		Clients: clientInfos,
+	}
+
+	// Marshal the configuration to JSON
+	configJSON, err := json.MarshalIndent(runConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal run config: %w", err)
+	}
+
+	// Save to file
+	configPath := filepath.Join(runDir, "run_config.json")
+	if err := os.WriteFile(configPath, configJSON, 0644); err != nil {
+		return fmt.Errorf("failed to write run config: %w", err)
+	}
+
+	h.log.WithField("config_path", configPath).Debug("Saved run configuration")
+	return nil
 }
 
 // generateRunID creates a unique run ID with format: YYYYMMDD-HHMMSS-COMMIT
@@ -356,6 +411,9 @@ func extractTags(cfg *config.Config) []string {
 	return []string{}
 }
 
+// extractClients extracts client names from benchmark results
+// Note: This only extracts names for the database record. Full client information
+// including URLs is saved separately via SaveRunConfig method to run_config.json
 func extractClients(result *types.BenchmarkResult) []string {
 	clients := make([]string, 0, len(result.ClientMetrics))
 	for client := range result.ClientMetrics {

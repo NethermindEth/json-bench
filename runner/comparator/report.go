@@ -90,16 +90,8 @@ func (c *Comparator) GenerateHTMLReport(outputPath string) error {
 	}
 
 	// Create benchmark result
-	clients := make([]config.Client, len(c.config.Clients))
-	for i, client := range c.config.Clients {
-		clients[i] = config.Client{
-			Name: client.Name,
-			URL:  client.URL,
-		}
-	}
-
 	cfg := &config.Config{
-		Clients: clients,
+		ResolvedClients: c.config.Clients,
 	}
 
 	benchmarkResult := &types.BenchmarkResult{
@@ -154,7 +146,7 @@ func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outpu
 
 	// Add client endpoints
 	if cfg, ok := result.Config.(*config.Config); ok && cfg != nil {
-		for _, client := range cfg.Clients {
+		for _, client := range cfg.ResolvedClients {
 			reportData.ClientEndpoints = append(reportData.ClientEndpoints, fmt.Sprintf("%s: %s", client.Name, client.URL))
 		}
 	}
