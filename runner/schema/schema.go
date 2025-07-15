@@ -15,7 +15,7 @@ import (
 const (
 	// EthereumAPIBaseURL is the base URL for the Ethereum execution API schemas
 	EthereumAPIBaseURL = "https://raw.githubusercontent.com/ethereum/execution-apis/main/openrpc.json"
-	
+
 	// LocalSchemaDir is the directory where schemas are cached
 	LocalSchemaDir = "schemas"
 )
@@ -28,7 +28,7 @@ var (
 
 // SchemaValidator handles validation of JSON-RPC responses against Ethereum execution API schemas
 type SchemaValidator struct {
-	openRPCSpec map[string]interface{}
+	openRPCSpec   map[string]interface{}
 	methodSchemas map[string]*gojsonschema.Schema
 }
 
@@ -114,7 +114,7 @@ func (v *SchemaValidator) GetSupportedMethods() []string {
 // loadOpenRPCSpec loads the Ethereum execution API OpenRPC spec
 func loadOpenRPCSpec() (map[string]interface{}, error) {
 	specPath := filepath.Join(LocalSchemaDir, "openrpc.json")
-	
+
 	// Check if we already have the spec locally
 	if _, err := os.Stat(specPath); err == nil {
 		// Load from local file
@@ -122,94 +122,94 @@ func loadOpenRPCSpec() (map[string]interface{}, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read local schema file: %w", err)
 		}
-		
+
 		var spec map[string]interface{}
 		if err := json.Unmarshal(data, &spec); err != nil {
 			return nil, fmt.Errorf("failed to parse local schema file: %w", err)
 		}
-		
+
 		return spec, nil
 	}
-	
+
 	// Download the spec
 	resp, err := http.Get(EthereumAPIBaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download schema: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to download schema: HTTP %d", resp.StatusCode)
 	}
-	
+
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema response: %w", err)
 	}
-	
+
 	// Save to local file
 	if err := ioutil.WriteFile(specPath, data, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write schema to local file: %w", err)
 	}
-	
+
 	// Parse the spec
 	var spec map[string]interface{}
 	if err := json.Unmarshal(data, &spec); err != nil {
 		return nil, fmt.Errorf("failed to parse schema: %w", err)
 	}
-	
+
 	return spec, nil
 }
 
 // extractMethodSchemas extracts JSON schemas for each method's result from the OpenRPC spec
 func extractMethodSchemas(spec map[string]interface{}) (map[string]*gojsonschema.Schema, error) {
 	methodSchemas := make(map[string]*gojsonschema.Schema)
-	
+
 	// Extract methods from the spec
 	methods, ok := spec["methods"].([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("invalid OpenRPC spec: methods not found or invalid format")
 	}
-	
+
 	for _, methodObj := range methods {
 		method, ok := methodObj.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		// Get method name
 		methodName, ok := method["name"].(string)
 		if !ok {
 			continue
 		}
-		
+
 		// Get result schema
 		result, ok := method["result"].(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		schema, ok := result["schema"].(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		// Convert schema to JSON
 		schemaJSON, err := json.Marshal(schema)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal schema for method %s: %w", methodName, err)
 		}
-		
+
 		// Compile schema
 		schemaLoader := gojsonschema.NewStringLoader(string(schemaJSON))
 		compiledSchema, err := gojsonschema.NewSchema(schemaLoader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile schema for method %s: %w", methodName, err)
 		}
-		
+
 		methodSchemas[methodName] = compiledSchema
 	}
-	
+
 	return methodSchemas, nil
 }
 
@@ -219,6 +219,6 @@ func ValidateResponseAgainstSchema(method string, response map[string]interface{
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to create schema validator: %w", err)
 	}
-	
+
 	return validator.ValidateResponse(method, response)
 }

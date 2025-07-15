@@ -1,0 +1,86 @@
+# Example Storage Configuration for Historic Tracking
+# This file configures the historic data storage and PostgreSQL integration
+
+# Historic data storage settings
+historic_path: "./historic"           # Directory to store historic benchmark files
+retention_days: 30                   # Number of days to retain historic files (0 = no cleanup)
+enable_historic: true                # Enable historic data tracking
+
+# PostgreSQL database configuration
+postgresql:
+  host: "localhost"                  # PostgreSQL server hostname
+  port: 5432                        # PostgreSQL server port
+  database: "jsonrpc_bench"         # Database name (matches Docker setup)
+  username: "postgres"              # Database username (matches Docker setup)
+  password: "postgres"              # Database password (matches Docker setup)
+  ssl_mode: "disable"               # SSL mode: disable, require, verify-ca, verify-full
+  schema: "public"                  # Database schema to use
+  
+  # Connection pool settings
+  max_connections: 25               # Maximum number of open connections
+  max_idle_connections: 5           # Maximum number of idle connections
+  connection_max_lifetime: "30m"    # Maximum lifetime of connections
+  connection_timeout: "10s"         # Connection timeout
+  
+  # Grafana-specific configuration
+  grafana:
+    metrics_table: "benchmark_metrics"     # Table name for time-series metrics
+    runs_table: "benchmark_runs"           # Table name for benchmark run metadata
+    enable_timescaledb: false              # Enable TimescaleDB optimizations (requires TimescaleDB extension)
+    chunk_interval: "24h"                  # TimescaleDB chunk interval (if enabled)
+    enable_compression: false              # Enable data compression for old data (if TimescaleDB enabled)
+    compression_after: "7d"               # Compress data older than this (if compression enabled)
+    
+    # Data retention policies
+    retention_policy:
+      metrics_retention: "30d"             # How long to keep detailed metrics
+      aggregated_retention: "90d"          # How long to keep aggregated data
+      raw_data_retention: "7d"             # How long to keep raw benchmark files
+      enable_auto_vacuum: true             # Enable automatic cleanup
+      vacuum_interval: "24h"               # How often to run cleanup
+
+# Alternative configuration for local development (SQLite-based)
+# Uncomment the following and comment out postgresql section for local testing
+# 
+# sqlite:
+#   database_path: "./historic/benchmark.db"
+#   enable_wal: true
+#   vacuum_interval: "24h"
+
+# Configuration examples for different environments:
+
+# Development environment (minimal setup)
+# postgresql:
+#   host: "localhost"
+#   port: 5432
+#   database: "json_bench_dev"
+#   username: "dev_user"
+#   password: "dev_password"
+#   ssl_mode: "disable"
+
+# Production environment (with TimescaleDB)
+# postgresql:
+#   host: "production-db.example.com"
+#   port: 5432
+#   database: "json_bench_prod"
+#   username: "benchmark_service"
+#   password: "${DB_PASSWORD}"  # Use environment variables for sensitive data
+#   ssl_mode: "verify-full"
+#   max_connections: 50
+#   grafana:
+#     enable_timescaledb: true
+#     chunk_interval: "1h"
+#     enable_compression: true
+#     compression_after: "3d"
+#     retention_policy:
+#       metrics_retention: "90d"
+#       aggregated_retention: "1y"
+
+# Docker Compose environment
+# postgresql:
+#   host: "postgres"
+#   port: 5432
+#   database: "json_bench"
+#   username: "benchmark"
+#   password: "benchmark123"
+#   ssl_mode: "disable"

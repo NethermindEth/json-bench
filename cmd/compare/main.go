@@ -53,14 +53,14 @@ func main() {
 
 	// Create comparison config
 	config := &comparator.ComparisonConfig{
-		Name:                 *configName,
-		Description:          *configDesc,
-		Clients:              clientsList,
-		Methods:              methods,
+		Name:                  *configName,
+		Description:           *configDesc,
+		Clients:               clientsList,
+		Methods:               methods,
 		ValidateAgainstSchema: *validateSchema,
-		Concurrency:          *concurrency,
-		TimeoutSeconds:       *timeout,
-		OutputDir:            *outputPath,
+		Concurrency:           *concurrency,
+		TimeoutSeconds:        *timeout,
+		OutputDir:             *outputPath,
 	}
 
 	// Create comparator

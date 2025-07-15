@@ -1,0 +1,30 @@
+test_name: "File-based RPC benchmark"
+description: "Benchmark using RPC calls loaded from files"
+clients:
+  - name: "geth"
+    url: "http://localhost:8545"
+  - name: "nethermind"
+    url: "http://localhost:8546"
+duration: "2m"
+rps: 500
+endpoints:
+  # Regular endpoint definition
+  - method: "eth_blockNumber"
+    params: []
+    frequency: 10%
+  
+  # Load multiple calls from a JSON file
+  - file: "./rpc-calls/common-queries.json"
+    file_type: "json"
+    frequency: 40%
+  
+  # Load calls from a JSONL file (one call per line)
+  - file: "./rpc-calls/historical-blocks.jsonl"
+    file_type: "jsonl"
+    frequency: 30%
+  
+  # Auto-detect file type based on extension
+  - file: "./rpc-calls/token-queries.json"
+    frequency: 20%
+
+validate_responses: true

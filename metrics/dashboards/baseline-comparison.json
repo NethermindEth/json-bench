@@ -1,0 +1,572 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": "JSON-RPC Bench API",
+        "enable": true,
+        "hide": false,
+        "iconColor": "green",
+        "name": "Baselines",
+        "query": "baselines",
+        "type": "tags"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": 2,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "PostgreSQL",
+      "description": "Comparison of current performance against established baselines",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*baseline.*/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [10, 10],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- Current performance\nSELECT\n  $__timeGroupAlias(timestamp,$__interval),\n  avg(avg_latency_ms) as \"Current Avg Latency\"\nFROM historic_runs\nWHERE\n  $__timeFilter(timestamp)\n  AND test_name = '$test_name'\nGROUP BY 1\nORDER BY 1\n\nUNION ALL\n\n-- Baseline performance\nSELECT\n  $__timeGroupAlias(hr.timestamp,$__interval),\n  avg(hr.avg_latency_ms) as \"Baseline Avg Latency\"\nFROM historic_runs hr\nJOIN baselines b ON hr.id = b.run_id\nWHERE\n  $__timeFilter(hr.timestamp)\n  AND hr.test_name = '$test_name'\n  AND b.name = '$baseline_name'\nGROUP BY 1\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Average Latency - Current vs Baseline",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "PostgreSQL",
+      "description": "Performance deviation from baseline as percentage",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 25
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "WITH baseline_avg AS (\n  SELECT \n    AVG(hr.avg_latency_ms) as baseline_latency\n  FROM historic_runs hr\n  JOIN baselines b ON hr.id = b.run_id\n  WHERE hr.test_name = '$test_name'\n    AND b.name = '$baseline_name'\n)\nSELECT\n  $__timeGroupAlias(timestamp,$__interval),\n  AVG((\n    (avg_latency_ms - baseline_avg.baseline_latency) / baseline_avg.baseline_latency\n  ) * 100) as \"Deviation from Baseline\"\nFROM historic_runs, baseline_avg\nWHERE\n  $__timeFilter(timestamp)\n  AND test_name = '$test_name'\nGROUP BY 1\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Performance Deviation from Baseline",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "PostgreSQL",
+      "description": "Error rate comparison against baseline",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "-- Current error rate\nSELECT\n  $__timeGroupAlias(timestamp,$__interval),\n  avg(overall_error_rate) as \"Current Error Rate\"\nFROM historic_runs\nWHERE\n  $__timeFilter(timestamp)\n  AND test_name = '$test_name'\nGROUP BY 1\nORDER BY 1\n\nUNION ALL\n\n-- Baseline error rate\nSELECT\n  $__timeGroupAlias(hr.timestamp,$__interval),\n  avg(hr.overall_error_rate) as \"Baseline Error Rate\"\nFROM historic_runs hr\nJOIN baselines b ON hr.id = b.run_id\nWHERE\n  $__timeFilter(hr.timestamp)\n  AND hr.test_name = '$test_name'\n  AND b.name = '$baseline_name'\nGROUP BY 1\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Error Rate - Current vs Baseline",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "PostgreSQL",
+      "description": "Detailed comparison table of key metrics",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Deviation"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 10
+                    },
+                    {
+                      "color": "red",
+                      "value": 25
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*Latency.*/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*Error Rate.*/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 8,
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Deviation"
+          }
+        ]
+      },
+      "pluginVersion": "8.0.0",
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "WITH baseline_stats AS (\n  SELECT \n    AVG(hr.avg_latency_ms) as baseline_avg_latency,\n    AVG(hr.p95_latency_ms) as baseline_p95_latency,\n    AVG(hr.p99_latency_ms) as baseline_p99_latency,\n    AVG(hr.overall_error_rate) as baseline_error_rate\n  FROM historic_runs hr\n  JOIN baselines b ON hr.id = b.run_id\n  WHERE hr.test_name = '$test_name'\n    AND b.name = '$baseline_name'\n),\ncurrent_stats AS (\n  SELECT \n    AVG(avg_latency_ms) as current_avg_latency,\n    AVG(p95_latency_ms) as current_p95_latency,\n    AVG(p99_latency_ms) as current_p99_latency,\n    AVG(overall_error_rate) as current_error_rate\n  FROM historic_runs\n  WHERE test_name = '$test_name'\n    AND $__timeFilter(timestamp)\n)\nSELECT\n  'Avg Latency' as \"Metric\",\n  ROUND(current_stats.current_avg_latency, 2) as \"Current\",\n  ROUND(baseline_stats.baseline_avg_latency, 2) as \"Baseline\",\n  ROUND((\n    (current_stats.current_avg_latency - baseline_stats.baseline_avg_latency) / baseline_stats.baseline_avg_latency\n  ) * 100, 2) as \"Deviation\"\nFROM current_stats, baseline_stats\n\nUNION ALL\n\nSELECT\n  'P95 Latency' as \"Metric\",\n  ROUND(current_stats.current_p95_latency, 2) as \"Current\",\n  ROUND(baseline_stats.baseline_p95_latency, 2) as \"Baseline\",\n  ROUND((\n    (current_stats.current_p95_latency - baseline_stats.baseline_p95_latency) / baseline_stats.baseline_p95_latency\n  ) * 100, 2) as \"Deviation\"\nFROM current_stats, baseline_stats\n\nUNION ALL\n\nSELECT\n  'P99 Latency' as \"Metric\",\n  ROUND(current_stats.current_p99_latency, 2) as \"Current\",\n  ROUND(baseline_stats.baseline_p99_latency, 2) as \"Baseline\",\n  ROUND((\n    (current_stats.current_p99_latency - baseline_stats.baseline_p99_latency) / baseline_stats.baseline_p99_latency\n  ) * 100, 2) as \"Deviation\"\nFROM current_stats, baseline_stats\n\nUNION ALL\n\nSELECT\n  'Error Rate' as \"Metric\",\n  ROUND(current_stats.current_error_rate, 2) as \"Current\",\n  ROUND(baseline_stats.baseline_error_rate, 2) as \"Baseline\",\n  ROUND((\n    (current_stats.current_error_rate - baseline_stats.baseline_error_rate) / baseline_stats.baseline_error_rate\n  ) * 100, 2) as \"Deviation\"\nFROM current_stats, baseline_stats",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Baseline Comparison Summary",
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": [
+    "baseline",
+    "comparison",
+    "performance"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
+          "text": "mixed",
+          "value": "mixed"
+        },
+        "datasource": "PostgreSQL",
+        "definition": "SELECT DISTINCT test_name FROM historic_runs ORDER BY test_name",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Test Name",
+        "multi": false,
+        "name": "test_name",
+        "options": [],
+        "query": "SELECT DISTINCT test_name FROM historic_runs ORDER BY test_name",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
+          "text": "stable",
+          "value": "stable"
+        },
+        "datasource": "PostgreSQL",
+        "definition": "SELECT DISTINCT name FROM baselines ORDER BY name",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Baseline",
+        "multi": false,
+        "name": "baseline_name",
+        "options": [],
+        "query": "SELECT DISTINCT name FROM baselines ORDER BY name",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Baseline Comparison Dashboard",
+  "uid": "baseline-comparison",
+  "version": 1
+}

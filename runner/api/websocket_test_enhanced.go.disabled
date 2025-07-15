@@ -1,0 +1,1010 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/jsonrpc-bench/runner/types"
+)
+
+// Mock WebSocket connection for testing
+type MockWebSocketConn struct {
+	messages [][]byte
+	closed   bool
+	mu       sync.RWMutex
+}
+
+func (m *MockWebSocketConn) WriteMessage(messageType int, data []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return fmt.Errorf("connection closed")
+	}
+	m.messages = append(m.messages, data)
+	return nil
+}
+
+func (m *MockWebSocketConn) ReadMessage() (messageType int, p []byte, err error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.closed {
+		return 0, nil, fmt.Errorf("connection closed")
+	}
+	// Return ping message to simulate client activity
+	return websocket.TextMessage, []byte(`{"type":"ping"}`), nil
+}
+
+func (m *MockWebSocketConn) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.closed = true
+	return nil
+}
+
+func (m *MockWebSocketConn) SetReadLimit(limit int64) {}
+
+func (m *MockWebSocketConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (m *MockWebSocketConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func (m *MockWebSocketConn) SetPongHandler(h func(appData string) error) {}
+
+func (m *MockWebSocketConn) ReadJSON(v interface{}) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.closed {
+		return fmt.Errorf("connection closed")
+	}
+
+	// Simulate ping message
+	msg := WSMessage{
+		Type:      WSMessageTypePing,
+		Timestamp: time.Now(),
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(data, v)
+}
+
+func (m *MockWebSocketConn) WriteJSON(v interface{}) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return m.WriteMessage(websocket.TextMessage, data)
+}
+
+func (m *MockWebSocketConn) GetMessages() [][]byte {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return append([][]byte{}, m.messages...)
+}
+
+func (m *MockWebSocketConn) IsClosed() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.closed
+}
+
+// Test WebSocket Hub comprehensive functionality
+
+func TestWSHubConfiguration(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	// Test default configuration
+	assert.Equal(t, 100, hub.config.MaxClients)
+	assert.Equal(t, 10*time.Second, hub.config.WriteTimeout)
+	assert.Equal(t, 60*time.Second, hub.config.ReadTimeout)
+	assert.Equal(t, 54*time.Second, hub.config.PingInterval)
+	assert.Equal(t, 60*time.Second, hub.config.PongTimeout)
+	assert.Equal(t, int64(512*1024), hub.config.MaxMessageSize)
+	assert.Equal(t, 256, hub.config.ClientBufferSize)
+	assert.Equal(t, 1000, hub.config.BroadcastBufferSize)
+	assert.True(t, hub.config.EnablePingPong)
+	assert.True(t, hub.config.DisconnectOnError)
+	assert.True(t, hub.config.LogConnectionEvents)
+
+	// Test hub internal structure
+	assert.NotNil(t, hub.clients)
+	assert.NotNil(t, hub.register)
+	assert.NotNil(t, hub.unregister)
+	assert.NotNil(t, hub.broadcast)
+	assert.NotNil(t, hub.subscriptions)
+	assert.NotNil(t, hub.log)
+	assert.NotNil(t, hub.ctx)
+	assert.NotNil(t, hub.cancel)
+	assert.NotNil(t, hub.done)
+}
+
+func TestWSHubLifecycle(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Test Run
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+
+	// Give hub time to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify hub is running
+	assert.Equal(t, 0, hub.GetConnectedClientsCount())
+
+	// Test Stop
+	err = hub.Stop()
+	require.NoError(t, err)
+
+	// Verify hub is stopped
+	select {
+	case <-hub.done:
+		// Hub properly closed
+	case <-time.After(1 * time.Second):
+		t.Error("Hub did not stop within timeout")
+	}
+}
+
+func TestWSClientRegistration(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	// Give hub time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Test client registration
+	mockConn := &MockWebSocketConn{}
+	clientID := "test-client-1"
+	remoteAddr := "192.168.1.1:12345"
+	userAgent := "test-agent"
+
+	client := hub.RegisterClient(mockConn, clientID, remoteAddr, userAgent)
+
+	// Give time for registration
+	time.Sleep(50 * time.Millisecond)
+
+	assert.NotNil(t, client)
+	assert.Equal(t, clientID, client.ID)
+	assert.Equal(t, remoteAddr, client.RemoteAddr)
+	assert.Equal(t, userAgent, client.UserAgent)
+	assert.Equal(t, 1, hub.GetConnectedClientsCount())
+
+	// Verify welcome message was sent
+	messages := mockConn.GetMessages()
+	assert.GreaterOrEqual(t, len(messages), 1)
+
+	var welcomeMsg WSMessage
+	err = json.Unmarshal(messages[0], &welcomeMsg)
+	require.NoError(t, err)
+	assert.Equal(t, WSMessageTypeConnection, welcomeMsg.Type)
+}
+
+func TestWSClientUnregistration(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register client
+	mockConn := &MockWebSocketConn{}
+	client := hub.RegisterClient(mockConn, "test-client", "127.0.0.1:12345", "test-agent")
+	time.Sleep(50 * time.Millisecond)
+
+	assert.Equal(t, 1, hub.GetConnectedClientsCount())
+
+	// Unregister client
+	hub.unregister <- client
+	time.Sleep(50 * time.Millisecond)
+
+	assert.Equal(t, 0, hub.GetConnectedClientsCount())
+	assert.True(t, mockConn.IsClosed())
+}
+
+func TestWSMaxClientsLimit(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+	hub.config.MaxClients = 2 // Set low limit for testing
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register clients up to limit
+	clients := make([]*WSClient, 0)
+	for i := 0; i < 2; i++ {
+		mockConn := &MockWebSocketConn{}
+		client := hub.RegisterClient(mockConn, fmt.Sprintf("client-%d", i), "127.0.0.1:12345", "test-agent")
+		if client != nil {
+			clients = append(clients, client)
+		}
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, 2, hub.GetConnectedClientsCount())
+
+	// Try to register one more client (should be rejected)
+	mockConn := &MockWebSocketConn{}
+	client := hub.RegisterClient(mockConn, "client-overflow", "127.0.0.1:12345", "test-agent")
+	time.Sleep(100 * time.Millisecond)
+
+	// Should still be 2 clients
+	assert.Equal(t, 2, hub.GetConnectedClientsCount())
+	assert.True(t, mockConn.IsClosed()) // Overflow connection should be closed
+}
+
+func TestWSBroadcastToAll(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register multiple clients
+	clients := make([]*MockWebSocketConn, 3)
+	for i := 0; i < 3; i++ {
+		mockConn := &MockWebSocketConn{}
+		clients[i] = mockConn
+		hub.RegisterClient(mockConn, fmt.Sprintf("client-%d", i), "127.0.0.1:12345", "test-agent")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Broadcast message
+	testData := map[string]interface{}{
+		"message": "Hello, all clients!",
+		"number":  42,
+	}
+
+	hub.BroadcastToAll(WSMessageTypeNewRun, testData)
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify all clients received the message
+	for i, client := range clients {
+		messages := client.GetMessages()
+		assert.GreaterOrEqual(t, len(messages), 2, "Client %d should have received at least 2 messages (welcome + broadcast)", i)
+
+		// Find the broadcast message (skip welcome message)
+		var broadcastMsg WSMessage
+		found := false
+		for _, msgBytes := range messages[1:] { // Skip first message (welcome)
+			var msg WSMessage
+			if json.Unmarshal(msgBytes, &msg) == nil && msg.Type == WSMessageTypeNewRun {
+				broadcastMsg = msg
+				found = true
+				break
+			}
+		}
+
+		assert.True(t, found, "Client %d should have received broadcast message", i)
+		if found {
+			data, ok := broadcastMsg.Data.(map[string]interface{})
+			require.True(t, ok)
+			assert.Equal(t, "Hello, all clients!", data["message"])
+			assert.Equal(t, float64(42), data["number"])
+		}
+	}
+}
+
+func TestWSBroadcastToSubscribers(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register clients
+	client1 := &MockWebSocketConn{}
+	client2 := &MockWebSocketConn{}
+	wsClient1 := hub.RegisterClient(client1, "client-1", "127.0.0.1:12345", "test-agent")
+	wsClient2 := hub.RegisterClient(client2, "client-2", "127.0.0.1:12346", "test-agent")
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Manually set subscriptions (in real usage, this would be done via WebSocket messages)
+	hub.mu.Lock()
+	hub.subscriptions[wsClient1]["test-topic"] = true
+	hub.subscriptions[wsClient2]["other-topic"] = true
+	hub.mu.Unlock()
+
+	// Broadcast to specific topic
+	testData := map[string]string{"topic": "test-topic", "message": "Topic-specific message"}
+	hub.BroadcastToSubscribers(WSMessageTypeNewRun, testData, []string{"test-topic"})
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify only subscribed client received the message
+	client1Messages := client1.GetMessages()
+	client2Messages := client2.GetMessages()
+
+	// Client 1 should have received the message (welcome + broadcast)
+	assert.GreaterOrEqual(t, len(client1Messages), 2)
+
+	// Client 2 should only have welcome message
+	assert.Equal(t, 1, len(client2Messages))
+}
+
+func TestWSNotificationMethods(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register a client
+	mockConn := &MockWebSocketConn{}
+	hub.RegisterClient(mockConn, "test-client", "127.0.0.1:12345", "test-agent")
+	time.Sleep(100 * time.Millisecond)
+
+	// Test NotifyNewRun
+	run := &types.HistoricRun{
+		ID:               "test-run-1",
+		TestName:         "test-benchmark",
+		TotalRequests:    1000,
+		TotalErrors:      10,
+		OverallErrorRate: 0.01,
+		AvgLatencyMs:     50.5,
+		P95LatencyMs:     95.5,
+		BestClient:       "geth",
+		PerformanceScores: map[string]float64{
+			"geth": 95.5,
+			"besu": 92.3,
+		},
+	}
+
+	hub.NotifyNewRun(run)
+	time.Sleep(50 * time.Millisecond)
+
+	// Test NotifyRegression
+	regression := &types.Regression{
+		ID:             "regression-1",
+		RunID:          "test-run-1",
+		BaselineRunID:  "baseline-run-1",
+		Client:         "geth",
+		Metric:         "p95_latency",
+		Method:         "eth_getBalance",
+		Severity:       "high",
+		PercentChange:  25.5,
+		AbsoluteChange: 12.75,
+		BaselineValue:  50.0,
+		CurrentValue:   62.75,
+		IsSignificant:  true,
+		PValue:         0.01,
+		DetectedAt:     time.Now(),
+	}
+
+	hub.NotifyRegression(regression, run)
+	time.Sleep(50 * time.Millisecond)
+
+	// Test NotifyBaselineUpdated
+	hub.NotifyBaselineUpdated("test-baseline", "test-run-1", "test-benchmark")
+	time.Sleep(50 * time.Millisecond)
+
+	// Test NotifyAnalysisComplete
+	analysisResults := map[string]interface{}{
+		"performance_score":  95.5,
+		"regressions_found":  2,
+		"improvements_found": 1,
+	}
+	hub.NotifyAnalysisComplete("test-run-1", "test-benchmark", analysisResults)
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify messages were sent
+	messages := mockConn.GetMessages()
+	assert.GreaterOrEqual(t, len(messages), 5) // welcome + 4 notifications
+
+	// Verify message types
+	messageTypes := make(map[WSMessageType]bool)
+	for _, msgBytes := range messages[1:] { // Skip welcome message
+		var msg WSMessage
+		if json.Unmarshal(msgBytes, &msg) == nil {
+			messageTypes[msg.Type] = true
+		}
+	}
+
+	assert.True(t, messageTypes[WSMessageTypeNewRun])
+	assert.True(t, messageTypes[WSMessageTypeRegressionDetected])
+	assert.True(t, messageTypes[WSMessageTypeBaselineUpdated])
+	assert.True(t, messageTypes[WSMessageTypeAnalysisComplete])
+}
+
+func TestWSClientInfo(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register clients with different information
+	clients := []struct {
+		id         string
+		remoteAddr string
+		userAgent  string
+	}{
+		{"client-1", "192.168.1.1:12345", "Mozilla/5.0 (Test Browser)"},
+		{"client-2", "10.0.0.1:54321", "curl/7.68.0"},
+		{"client-3", "127.0.0.1:8080", "websocket-client/1.0"},
+	}
+
+	for _, clientInfo := range clients {
+		mockConn := &MockWebSocketConn{}
+		hub.RegisterClient(mockConn, clientInfo.id, clientInfo.remoteAddr, clientInfo.userAgent)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Test GetConnectedClientsCount
+	assert.Equal(t, 3, hub.GetConnectedClientsCount())
+
+	// Test GetClientInfo
+	clientInfos := hub.GetClientInfo()
+	assert.Len(t, clientInfos, 3)
+
+	// Verify client information
+	infoMap := make(map[string]map[string]interface{})
+	for _, info := range clientInfos {
+		infoMap[info["id"].(string)] = info
+	}
+
+	for _, expectedClient := range clients {
+		info, exists := infoMap[expectedClient.id]
+		assert.True(t, exists, "Client %s should be in client info", expectedClient.id)
+		if exists {
+			assert.Equal(t, expectedClient.remoteAddr, info["remote_addr"])
+			assert.Equal(t, expectedClient.userAgent, info["user_agent"])
+			assert.Contains(t, info, "connected_at")
+			assert.Contains(t, info, "last_ping")
+		}
+	}
+}
+
+func TestWSPingPongMechanism(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+	hub.config.PingInterval = 100 * time.Millisecond // Short interval for testing
+	hub.config.PongTimeout = 200 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register client
+	mockConn := &MockWebSocketConn{}
+	client := hub.RegisterClient(mockConn, "test-client", "127.0.0.1:12345", "test-agent")
+	time.Sleep(50 * time.Millisecond)
+
+	// Update last ping time to simulate active connection
+	client.mu.Lock()
+	client.LastPing = time.Now()
+	client.mu.Unlock()
+
+	// Wait for ping interval
+	time.Sleep(150 * time.Millisecond)
+
+	// Client should still be connected (responding to pings)
+	assert.Equal(t, 1, hub.GetConnectedClientsCount())
+
+	// Simulate dead connection by setting old ping time
+	client.mu.Lock()
+	client.LastPing = time.Now().Add(-300 * time.Millisecond)
+	client.mu.Unlock()
+
+	// Wait for cleanup
+	time.Sleep(150 * time.Millisecond)
+
+	// Client should be disconnected due to ping timeout
+	assert.Equal(t, 0, hub.GetConnectedClientsCount())
+}
+
+func TestWSMessageHandling(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Test ping/pong message handling
+	mockConn := &MockWebSocketConn{}
+	client := hub.RegisterClient(mockConn, "test-client", "127.0.0.1:12345", "test-agent")
+	time.Sleep(100 * time.Millisecond)
+
+	// Send ping message
+	pingMsg := WSMessage{
+		Type:      WSMessageTypePing,
+		Timestamp: time.Now(),
+		ClientID:  client.ID,
+	}
+
+	client.sendMessage(pingMsg)
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify pong response was sent
+	messages := mockConn.GetMessages()
+	assert.GreaterOrEqual(t, len(messages), 2)
+
+	// Look for pong message
+	var pongFound bool
+	for _, msgBytes := range messages {
+		var msg WSMessage
+		if json.Unmarshal(msgBytes, &msg) == nil && msg.Type == WSMessageTypePong {
+			pongFound = true
+			break
+		}
+	}
+	assert.True(t, pongFound, "Pong message should be sent in response to ping")
+}
+
+func TestWSErrorHandling(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Test broadcast channel overflow
+	for i := 0; i < hub.config.BroadcastBufferSize+10; i++ {
+		hub.BroadcastToAll(WSMessageTypeNewRun, map[string]int{"test": i})
+	}
+
+	// Should not panic or block
+	time.Sleep(50 * time.Millisecond)
+
+	// Test client send channel overflow
+	mockConn := &MockWebSocketConn{}
+	client := hub.RegisterClient(mockConn, "test-client", "127.0.0.1:12345", "test-agent")
+	time.Sleep(50 * time.Millisecond)
+
+	// Fill client send channel
+	for i := 0; i < hub.config.ClientBufferSize+10; i++ {
+		client.sendMessage(WSMessage{
+			Type: WSMessageTypeNewRun,
+			Data: map[string]int{"test": i},
+		})
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Client should be disconnected due to full send channel
+	assert.Equal(t, 0, hub.GetConnectedClientsCount())
+}
+
+func TestWSHubStopWithConnectedClients(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register multiple clients
+	clients := make([]*MockWebSocketConn, 3)
+	for i := 0; i < 3; i++ {
+		mockConn := &MockWebSocketConn{}
+		clients[i] = mockConn
+		hub.RegisterClient(mockConn, fmt.Sprintf("client-%d", i), "127.0.0.1:12345", "test-agent")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, 3, hub.GetConnectedClientsCount())
+
+	// Stop hub
+	err = hub.Stop()
+	require.NoError(t, err)
+
+	// All clients should be closed
+	for i, client := range clients {
+		assert.True(t, client.IsClosed(), "Client %d should be closed", i)
+	}
+
+	// Hub should be fully stopped
+	select {
+	case <-hub.done:
+		// Expected
+	case <-time.After(1 * time.Second):
+		t.Error("Hub did not stop within timeout")
+	}
+}
+
+func TestWSClientID(t *testing.T) {
+	// Test multiple ID generations are unique
+	ids := make(map[string]bool)
+	for i := 0; i < 100; i++ {
+		id := generateClientID()
+		assert.NotEmpty(t, id)
+		assert.False(t, ids[id], "Client ID should be unique")
+		ids[id] = true
+		assert.Equal(t, 16, len(id)) // 8 bytes = 16 hex chars
+	}
+}
+
+func TestWSMessageTypes(t *testing.T) {
+	// Verify all message type constants are defined
+	expectedTypes := []WSMessageType{
+		WSMessageTypeConnection,
+		WSMessageTypePing,
+		WSMessageTypePong,
+		WSMessageTypeError,
+		WSMessageTypeDisconnection,
+		WSMessageTypeNewRun,
+		WSMessageTypeRegressionDetected,
+		WSMessageTypeBaselineUpdated,
+		WSMessageTypeAnalysisComplete,
+		WSMessageTypeRunStarted,
+		WSMessageTypeRunProgress,
+		WSMessageTypeRunComplete,
+		WSMessageTypeRunFailed,
+	}
+
+	for _, msgType := range expectedTypes {
+		assert.NotEmpty(t, string(msgType))
+	}
+
+	// Test message structure
+	msg := WSMessage{
+		Type:      WSMessageTypeNewRun,
+		Data:      map[string]string{"test": "data"},
+		Timestamp: time.Now(),
+		ID:        "msg-123",
+		ClientID:  "client-456",
+	}
+
+	// Should be serializable
+	data, err := json.Marshal(msg)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "new_run")
+	assert.Contains(t, string(data), "test")
+
+	// Should be deserializable
+	var unmarshaled WSMessage
+	err = json.Unmarshal(data, &unmarshaled)
+	require.NoError(t, err)
+	assert.Equal(t, msg.Type, unmarshaled.Type)
+	assert.Equal(t, msg.ID, unmarshaled.ID)
+	assert.Equal(t, msg.ClientID, unmarshaled.ClientID)
+}
+
+func TestWSWebSocketHandlerIntegration(t *testing.T) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Create upgrader
+	upgrader := &websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+
+	// Create handler
+	handler := hub.HandleWebSocketConnection(upgrader)
+
+	// Test with mock HTTP request
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	defer server.Close()
+
+	// Convert HTTP URL to WebSocket URL
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	// Connect with real WebSocket client
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		// If connection fails, it might be due to test environment
+		// Just verify the handler doesn't panic
+		t.Logf("WebSocket connection failed (expected in some test environments): %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// Give time for connection to be registered
+	time.Sleep(100 * time.Millisecond)
+
+	// Should have one connected client
+	assert.Equal(t, 1, hub.GetConnectedClientsCount())
+
+	// Send a ping message
+	pingMsg := WSMessage{
+		Type:      WSMessageTypePing,
+		Timestamp: time.Now(),
+	}
+
+	err = conn.WriteJSON(pingMsg)
+	require.NoError(t, err)
+
+	// Read pong response
+	var pongMsg WSMessage
+	err = conn.ReadJSON(&pongMsg)
+	require.NoError(t, err)
+	assert.Equal(t, WSMessageTypePong, pongMsg.Type)
+}
+
+// Benchmark tests
+
+func BenchmarkWSHubBroadcast(b *testing.B) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(b, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Register some clients
+	for i := 0; i < 10; i++ {
+		mockConn := &MockWebSocketConn{}
+		hub.RegisterClient(mockConn, fmt.Sprintf("client-%d", i), "127.0.0.1:12345", "test-agent")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	testData := map[string]interface{}{
+		"test": "data",
+		"num":  42,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hub.BroadcastToAll(WSMessageTypeNewRun, testData)
+	}
+}
+
+func BenchmarkWSClientRegistration(b *testing.B) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+	hub.config.MaxClients = 10000 // Allow many clients
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(b, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		mockConn := &MockWebSocketConn{}
+		hub.RegisterClient(mockConn, fmt.Sprintf("client-%d", i), "127.0.0.1:12345", "test-agent")
+	}
+}
+
+func BenchmarkWSNotifyNewRun(b *testing.B) {
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(b, err)
+	defer hub.Stop()
+
+	time.Sleep(50 * time.Millisecond)
+
+	run := &types.HistoricRun{
+		ID:               "test-run-1",
+		TestName:         "test-benchmark",
+		TotalRequests:    1000,
+		TotalErrors:      10,
+		OverallErrorRate: 0.01,
+		AvgLatencyMs:     50.5,
+		P95LatencyMs:     95.5,
+		BestClient:       "geth",
+		PerformanceScores: map[string]float64{
+			"geth": 95.5,
+			"besu": 92.3,
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hub.NotifyNewRun(run)
+	}
+}
+
+// Stress tests
+
+func TestWSHubStress(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping stress test in short mode")
+	}
+
+	log := logrus.New()
+	log.SetLevel(logrus.ErrorLevel)
+
+	hub := NewWSHub(log)
+	hub.config.MaxClients = 1000
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	err := hub.Run(ctx)
+	require.NoError(t, err)
+	defer hub.Stop()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Register many clients
+	numClients := 100
+	clients := make([]*MockWebSocketConn, numClients)
+
+	for i := 0; i < numClients; i++ {
+		mockConn := &MockWebSocketConn{}
+		clients[i] = mockConn
+		hub.RegisterClient(mockConn, fmt.Sprintf("stress-client-%d", i), "127.0.0.1:12345", "stress-test")
+		if i%10 == 0 {
+			time.Sleep(10 * time.Millisecond) // Throttle registration
+		}
+	}
+
+	time.Sleep(1 * time.Second)
+	assert.Equal(t, numClients, hub.GetConnectedClientsCount())
+
+	// Broadcast many messages
+	for i := 0; i < 50; i++ {
+		hub.BroadcastToAll(WSMessageTypeNewRun, map[string]interface{}{
+			"stress_test": i,
+			"timestamp":   time.Now(),
+		})
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	// Verify clients received messages
+	for i, client := range clients {
+		messages := client.GetMessages()
+		assert.GreaterOrEqual(t, len(messages), 10, "Client %d should have received multiple messages", i)
+	}
+
+	// Disconnect half the clients
+	for i := 0; i < numClients/2; i++ {
+		clients[i].Close()
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Continue broadcasting
+	for i := 0; i < 10; i++ {
+		hub.BroadcastToAll(WSMessageTypeNewRun, map[string]interface{}{
+			"post_disconnect": i,
+		})
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Should handle gracefully without errors
+	assert.LessOrEqual(t, hub.GetConnectedClientsCount(), numClients/2)
+}

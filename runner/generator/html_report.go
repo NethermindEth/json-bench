@@ -326,7 +326,7 @@ type HTMLReportData struct {
 func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outputPath string) error {
 	// Extract response diffs from the result
 	var responseDiffs []types.ResponseDiff
-	
+
 	// If we have comparison results in the benchmark result, convert them to ResponseDiffs
 	if result.ResponseDiff != nil {
 		// First try to get pre-converted diffs
@@ -341,25 +341,25 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 	// Prepare chart colors for each client
 	// Colors for: geth, nethermind, besu, erigon, reth, nimbusel, and extras
 	chartColors := []string{
-		"'rgba(54, 162, 235, 0.5)'",   // Blue - Geth
-		"'rgba(255, 99, 132, 0.5)'",   // Red - Nethermind
-		"'rgba(75, 192, 192, 0.5)'",   // Teal - Besu
-		"'rgba(255, 206, 86, 0.5)'",   // Yellow - Erigon
-		"'rgba(153, 102, 255, 0.5)'",  // Purple - Reth
-		"'rgba(255, 159, 64, 0.5)'",   // Orange - NimbusEL
-		"'rgba(46, 204, 113, 0.5)'",   // Green - Extra 1
-		"'rgba(231, 76, 60, 0.5)'",    // Dark Red - Extra 2
+		"'rgba(54, 162, 235, 0.5)'",  // Blue - Geth
+		"'rgba(255, 99, 132, 0.5)'",  // Red - Nethermind
+		"'rgba(75, 192, 192, 0.5)'",  // Teal - Besu
+		"'rgba(255, 206, 86, 0.5)'",  // Yellow - Erigon
+		"'rgba(153, 102, 255, 0.5)'", // Purple - Reth
+		"'rgba(255, 159, 64, 0.5)'",  // Orange - NimbusEL
+		"'rgba(46, 204, 113, 0.5)'",  // Green - Extra 1
+		"'rgba(231, 76, 60, 0.5)'",   // Dark Red - Extra 2
 	}
 
 	chartBorders := []string{
-		"'rgba(54, 162, 235, 1)'",   // Blue - Geth
-		"'rgba(255, 99, 132, 1)'",   // Red - Nethermind
-		"'rgba(75, 192, 192, 1)'",   // Teal - Besu
-		"'rgba(255, 206, 86, 1)'",   // Yellow - Erigon
-		"'rgba(153, 102, 255, 1)'",  // Purple - Reth
-		"'rgba(255, 159, 64, 1)'",   // Orange - NimbusEL
-		"'rgba(46, 204, 113, 1)'",   // Green - Extra 1
-		"'rgba(231, 76, 60, 1)'",    // Dark Red - Extra 2
+		"'rgba(54, 162, 235, 1)'",  // Blue - Geth
+		"'rgba(255, 99, 132, 1)'",  // Red - Nethermind
+		"'rgba(75, 192, 192, 1)'",  // Teal - Besu
+		"'rgba(255, 206, 86, 1)'",  // Yellow - Erigon
+		"'rgba(153, 102, 255, 1)'", // Purple - Reth
+		"'rgba(255, 159, 64, 1)'",  // Orange - NimbusEL
+		"'rgba(46, 204, 113, 1)'",  // Green - Extra 1
+		"'rgba(231, 76, 60, 1)'",   // Dark Red - Extra 2
 	}
 
 	// Extract methods from config
@@ -397,7 +397,7 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 			// Process each client and method
 			for _, client := range cfg.Clients {
 				clientName := client.Name
-				
+
 				for i, method := range methods {
 					// Get client-specific latency metrics
 					clientLatencyKey := fmt.Sprintf("client_%s_method_latency_%s", clientName, method)

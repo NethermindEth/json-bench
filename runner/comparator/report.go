@@ -1,30 +1,30 @@
 package comparator
 
 import (
-"bytes"
-"encoding/json"
-"fmt"
-"os"
-"path/filepath"
-"sort"
-"strings"
-"text/template"
-"time"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"text/template"
+	"time"
 
-"github.com/jsonrpc-bench/runner/config"
-"github.com/jsonrpc-bench/runner/types"
+	"github.com/jsonrpc-bench/runner/config"
+	"github.com/jsonrpc-bench/runner/types"
 )
 
 // MethodComparisonResult represents the result of a single method comparison for the report
 type MethodComparisonResult struct {
-	Method            string                 `json:"method"`
-	Params            []interface{}          `json:"params"`
-	ParamsDisplay     string                 `json:"params_display"`
-	Differences       map[string]interface{} `json:"differences"`
-	DifferencesDisplay string                `json:"differences_display"`
-	SchemaErrors      map[string][]string    `json:"schema_errors,omitempty"`
-	Responses         map[string]string      `json:"responses"`
-	Error             error                  `json:"error,omitempty"`
+	Method             string                 `json:"method"`
+	Params             []interface{}          `json:"params"`
+	ParamsDisplay      string                 `json:"params_display"`
+	Differences        map[string]interface{} `json:"differences"`
+	DifferencesDisplay string                 `json:"differences_display"`
+	SchemaErrors       map[string][]string    `json:"schema_errors,omitempty"`
+	Responses          map[string]string      `json:"responses"`
+	Error              error                  `json:"error,omitempty"`
 }
 
 // ComparisonSummary represents summary statistics for the comparison
@@ -39,17 +39,17 @@ type ComparisonSummary struct {
 
 // ReportData represents the data for the HTML report
 type ReportData struct {
-	Title           string                                  `json:"title"`
-	Timestamp       string                                  `json:"timestamp"`
-	ComparisonID    string                                  `json:"comparison_id"`
-	Configuration   *ComparisonConfig                       `json:"configuration"`
-	MethodResults   map[string][]MethodComparisonResult     `json:"method_results"`
-	ClientEndpoints []string                                `json:"client_endpoints"`
-	ErrorMethods    map[string][]MethodComparisonResult     `json:"error_methods"`
-	DiffMethods     map[string][]MethodComparisonResult     `json:"diff_methods"`
-	MatchMethods    map[string][]MethodComparisonResult     `json:"match_methods"`
-	Summary         ComparisonSummary                       `json:"summary"`
-	Scopes          []string                                `json:"scopes"`
+	Title           string                                         `json:"title"`
+	Timestamp       string                                         `json:"timestamp"`
+	ComparisonID    string                                         `json:"comparison_id"`
+	Configuration   *ComparisonConfig                              `json:"configuration"`
+	MethodResults   map[string][]MethodComparisonResult            `json:"method_results"`
+	ClientEndpoints []string                                       `json:"client_endpoints"`
+	ErrorMethods    map[string][]MethodComparisonResult            `json:"error_methods"`
+	DiffMethods     map[string][]MethodComparisonResult            `json:"diff_methods"`
+	MatchMethods    map[string][]MethodComparisonResult            `json:"match_methods"`
+	Summary         ComparisonSummary                              `json:"summary"`
+	Scopes          []string                                       `json:"scopes"`
 	ScopedMethods   map[string]map[string][]MethodComparisonResult `json:"scoped_methods"`
 }
 
@@ -72,10 +72,10 @@ func (c *Comparator) GenerateHTMLReport(outputPath string) error {
 		for client := range result.Responses {
 			clientNames = append(clientNames, client)
 		}
-		
+
 		// Check if there are differences
 		hasDiff := len(result.Differences) > 0
-		
+
 		// Create ResponseDiff
 		responseDiffs[i] = types.ResponseDiff{
 			Method:       result.Method,
@@ -88,7 +88,7 @@ func (c *Comparator) GenerateHTMLReport(outputPath string) error {
 			HasDiff:      hasDiff,
 		}
 	}
-	
+
 	// Create benchmark result
 	clients := make([]config.Client, len(c.config.Clients))
 	for i, client := range c.config.Clients {
@@ -97,11 +97,11 @@ func (c *Comparator) GenerateHTMLReport(outputPath string) error {
 			URL:  client.URL,
 		}
 	}
-	
+
 	cfg := &config.Config{
 		Clients: clients,
 	}
-	
+
 	benchmarkResult := &types.BenchmarkResult{
 		Config: cfg,
 		ResponseDiff: map[string]interface{}{
@@ -111,177 +111,177 @@ func (c *Comparator) GenerateHTMLReport(outputPath string) error {
 	}
 
 	// Create output directory if it doesn't exist
-outputDir := filepath.Dir(outputPath)
-if err := os.MkdirAll(outputDir, 0755); err != nil {
-return fmt.Errorf("failed to create output directory: %w", err)
-}
+	outputDir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
 
-// Generate HTML report using the template
-tmpl, err := template.New("report").Parse(htmlReportTemplate)
-if err != nil {
-return fmt.Errorf("failed to parse HTML template: %w", err)
-}
+	// Generate HTML report using the template
+	tmpl, err := template.New("report").Parse(htmlReportTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse HTML template: %w", err)
+	}
 
-var buf bytes.Buffer
-if err := tmpl.Execute(&buf, reportData(benchmarkResult, responseDiffs, outputPath)); err != nil {
-return fmt.Errorf("failed to execute template: %w", err)
-}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, reportData(benchmarkResult, responseDiffs, outputPath)); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
 
-// Write to file
-if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
-return fmt.Errorf("failed to write HTML report: %w", err)
-}
+	// Write to file
+	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write HTML report: %w", err)
+	}
 
-return nil
+	return nil
 }
 
 // reportData creates the report data from benchmark result and response diffs
 func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outputPath string) ReportData {
-// Create report data
-reportData := ReportData{
-Title:           "JSON-RPC Response Comparison Report",
-Timestamp:       time.Now().Format(time.RFC1123),
-ComparisonID:    time.Now().Format("20060102-150405"),
-Configuration:   &ComparisonConfig{}, // Placeholder
-MethodResults:   make(map[string][]MethodComparisonResult),
-ClientEndpoints: make([]string, 0),
-ErrorMethods:    make(map[string][]MethodComparisonResult),
-DiffMethods:     make(map[string][]MethodComparisonResult),
-MatchMethods:    make(map[string][]MethodComparisonResult),
-ScopedMethods:   make(map[string]map[string][]MethodComparisonResult),
-Scopes:          make([]string, 0),
-}
+	// Create report data
+	reportData := ReportData{
+		Title:           "JSON-RPC Response Comparison Report",
+		Timestamp:       time.Now().Format(time.RFC1123),
+		ComparisonID:    time.Now().Format("20060102-150405"),
+		Configuration:   &ComparisonConfig{}, // Placeholder
+		MethodResults:   make(map[string][]MethodComparisonResult),
+		ClientEndpoints: make([]string, 0),
+		ErrorMethods:    make(map[string][]MethodComparisonResult),
+		DiffMethods:     make(map[string][]MethodComparisonResult),
+		MatchMethods:    make(map[string][]MethodComparisonResult),
+		ScopedMethods:   make(map[string]map[string][]MethodComparisonResult),
+		Scopes:          make([]string, 0),
+	}
 
-// Add client endpoints
-if cfg, ok := result.Config.(*config.Config); ok && cfg != nil {
-for _, client := range cfg.Clients {
-reportData.ClientEndpoints = append(reportData.ClientEndpoints, fmt.Sprintf("%s: %s", client.Name, client.URL))
-}
-}
-sort.Strings(reportData.ClientEndpoints)
+	// Add client endpoints
+	if cfg, ok := result.Config.(*config.Config); ok && cfg != nil {
+		for _, client := range cfg.Clients {
+			reportData.ClientEndpoints = append(reportData.ClientEndpoints, fmt.Sprintf("%s: %s", client.Name, client.URL))
+		}
+	}
+	sort.Strings(reportData.ClientEndpoints)
 
-// Process each response diff into method comparison results
-for _, diff := range diffs {
-// Convert raw comparison result to report format
-paramsJSON, _ := json.Marshal(diff.Params)
+	// Process each response diff into method comparison results
+	for _, diff := range diffs {
+		// Convert raw comparison result to report format
+		paramsJSON, _ := json.Marshal(diff.Params)
 
-// Format responses for display
-formattedResponses := make(map[string]string)
-for client, resp := range diff.Responses {
-formatted, _ := formatJSON(resp)
-formattedResponses[client] = formatted
-}
+		// Format responses for display
+		formattedResponses := make(map[string]string)
+		for client, resp := range diff.Responses {
+			formatted, _ := formatJSON(resp)
+			formattedResponses[client] = formatted
+		}
 
-// Format differences for display
-diffDisplay := ""
-if len(diff.Differences) > 0 {
-diffJSON, _ := formatJSON(diff.Differences)
-diffDisplay = diffJSON
-}
+		// Format differences for display
+		diffDisplay := ""
+		if len(diff.Differences) > 0 {
+			diffJSON, _ := formatJSON(diff.Differences)
+			diffDisplay = diffJSON
+		}
 
-methodResult := MethodComparisonResult{
-Method:            diff.Method,
-Params:            diff.Params,
-ParamsDisplay:     string(paramsJSON),
-Differences:       diff.Differences,
-DifferencesDisplay: diffDisplay,
-SchemaErrors:      diff.SchemaErrors,
-Responses:         formattedResponses,
-}
+		methodResult := MethodComparisonResult{
+			Method:             diff.Method,
+			Params:             diff.Params,
+			ParamsDisplay:      string(paramsJSON),
+			Differences:        diff.Differences,
+			DifferencesDisplay: diffDisplay,
+			SchemaErrors:       diff.SchemaErrors,
+			Responses:          formattedResponses,
+		}
 
-// Add to method results map
-if _, exists := reportData.MethodResults[diff.Method]; !exists {
-reportData.MethodResults[diff.Method] = make([]MethodComparisonResult, 0)
-}
-reportData.MethodResults[diff.Method] = append(reportData.MethodResults[diff.Method], methodResult)
+		// Add to method results map
+		if _, exists := reportData.MethodResults[diff.Method]; !exists {
+			reportData.MethodResults[diff.Method] = make([]MethodComparisonResult, 0)
+		}
+		reportData.MethodResults[diff.Method] = append(reportData.MethodResults[diff.Method], methodResult)
 
-// Add to grouped results based on status
-hasError := false
-hasDiff := false
+		// Add to grouped results based on status
+		hasError := false
+		hasDiff := false
 
-// Check for errors
-if methodResult.Error != nil {
-hasError = true
-}
+		// Check for errors
+		if methodResult.Error != nil {
+			hasError = true
+		}
 
-// Check for schema errors
-if len(methodResult.SchemaErrors) > 0 {
-hasError = true
-}
+		// Check for schema errors
+		if len(methodResult.SchemaErrors) > 0 {
+			hasError = true
+		}
 
-// Check for differences
-if len(methodResult.Differences) > 0 {
-hasDiff = true
-}
+		// Check for differences
+		if len(methodResult.Differences) > 0 {
+			hasDiff = true
+		}
 
-// Add to appropriate group
-if hasError {
-if _, exists := reportData.ErrorMethods[diff.Method]; !exists {
-reportData.ErrorMethods[diff.Method] = make([]MethodComparisonResult, 0)
-}
-reportData.ErrorMethods[diff.Method] = append(reportData.ErrorMethods[diff.Method], methodResult)
-} else if hasDiff {
-if _, exists := reportData.DiffMethods[diff.Method]; !exists {
-reportData.DiffMethods[diff.Method] = make([]MethodComparisonResult, 0)
-}
-reportData.DiffMethods[diff.Method] = append(reportData.DiffMethods[diff.Method], methodResult)
-} else {
-if _, exists := reportData.MatchMethods[diff.Method]; !exists {
-reportData.MatchMethods[diff.Method] = make([]MethodComparisonResult, 0)
-}
-reportData.MatchMethods[diff.Method] = append(reportData.MatchMethods[diff.Method], methodResult)
-}
+		// Add to appropriate group
+		if hasError {
+			if _, exists := reportData.ErrorMethods[diff.Method]; !exists {
+				reportData.ErrorMethods[diff.Method] = make([]MethodComparisonResult, 0)
+			}
+			reportData.ErrorMethods[diff.Method] = append(reportData.ErrorMethods[diff.Method], methodResult)
+		} else if hasDiff {
+			if _, exists := reportData.DiffMethods[diff.Method]; !exists {
+				reportData.DiffMethods[diff.Method] = make([]MethodComparisonResult, 0)
+			}
+			reportData.DiffMethods[diff.Method] = append(reportData.DiffMethods[diff.Method], methodResult)
+		} else {
+			if _, exists := reportData.MatchMethods[diff.Method]; !exists {
+				reportData.MatchMethods[diff.Method] = make([]MethodComparisonResult, 0)
+			}
+			reportData.MatchMethods[diff.Method] = append(reportData.MatchMethods[diff.Method], methodResult)
+		}
 
-// Extract method scope (namespace)
-scope := "other"
-parts := strings.Split(diff.Method, "_")
-if len(parts) > 1 {
-scope = parts[0] + "_"
-}
+		// Extract method scope (namespace)
+		scope := "other"
+		parts := strings.Split(diff.Method, "_")
+		if len(parts) > 1 {
+			scope = parts[0] + "_"
+		}
 
-// Add to scoped methods
-if _, exists := reportData.ScopedMethods[scope]; !exists {
-reportData.ScopedMethods[scope] = make(map[string][]MethodComparisonResult)
-reportData.Scopes = append(reportData.Scopes, scope)
-}
+		// Add to scoped methods
+		if _, exists := reportData.ScopedMethods[scope]; !exists {
+			reportData.ScopedMethods[scope] = make(map[string][]MethodComparisonResult)
+			reportData.Scopes = append(reportData.Scopes, scope)
+		}
 
-if _, exists := reportData.ScopedMethods[scope][diff.Method]; !exists {
-reportData.ScopedMethods[scope][diff.Method] = make([]MethodComparisonResult, 0)
-}
+		if _, exists := reportData.ScopedMethods[scope][diff.Method]; !exists {
+			reportData.ScopedMethods[scope][diff.Method] = make([]MethodComparisonResult, 0)
+		}
 
-reportData.ScopedMethods[scope][diff.Method] = append(reportData.ScopedMethods[scope][diff.Method], methodResult)
-}
+		reportData.ScopedMethods[scope][diff.Method] = append(reportData.ScopedMethods[scope][diff.Method], methodResult)
+	}
 
-// Calculate summary statistics
-summary := ComparisonSummary{
-TotalMethods:     len(reportData.MethodResults),
-TotalComparisons: len(diffs),
-MatchingResponses: 0,
-DifferentResponses: 0,
-SchemaErrors:     0,
-CallErrors:       0,
-}
+	// Calculate summary statistics
+	summary := ComparisonSummary{
+		TotalMethods:       len(reportData.MethodResults),
+		TotalComparisons:   len(diffs),
+		MatchingResponses:  0,
+		DifferentResponses: 0,
+		SchemaErrors:       0,
+		CallErrors:         0,
+	}
 
-for _, diff := range diffs {
-if len(diff.SchemaErrors) > 0 {
-summary.SchemaErrors++
-}
+	for _, diff := range diffs {
+		if len(diff.SchemaErrors) > 0 {
+			summary.SchemaErrors++
+		}
 
-if len(diff.Differences) > 0 {
-summary.DifferentResponses++
-} else {
-summary.MatchingResponses++
-}
-}
-reportData.Summary = summary
+		if len(diff.Differences) > 0 {
+			summary.DifferentResponses++
+		} else {
+			summary.MatchingResponses++
+		}
+	}
+	reportData.Summary = summary
 
-return reportData
+	return reportData
 }
 
 // formatJSONForDisplay formats JSON data for display in the HTML report
 // This is kept for backward compatibility but formatJSON should be used instead
 func formatJSONForDisplay(data interface{}) (string, error) {
-return formatJSON(data)
+	return formatJSON(data)
 }
 
 // htmlReportTemplate is the HTML template for the comparison report

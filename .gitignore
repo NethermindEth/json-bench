@@ -1,3 +1,44 @@
 docs/
 results/
 geth-kurtosis.yml
+
+# Go binaries
+runner/runner
+runner/verify-flow
+runner/cmd/*/debug-*
+runner/cmd/*/*
+!runner/cmd/*/*.go
+!runner/cmd/*/*.sh
+!runner/cmd/*/README.md
+benchmark
+build/
+
+# Environment files
+.env
+.env.*
+*.env
+!*.env.example
+
+# Test outputs
+test-results/
+results-test/
+playwright-report/
+coverage/
+*.log
+
+# Debug and temporary files
+*.bak
+debug_*.json
+verify_flow_debug.json
+parsed_metrics.json
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

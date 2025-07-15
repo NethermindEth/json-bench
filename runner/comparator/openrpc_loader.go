@@ -27,7 +27,7 @@ type OpenRPCMethod struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		Schema      struct {
-			Type    string `json:"type"`
+			Type    string      `json:"type"`
 			Default interface{} `json:"default,omitempty"`
 		} `json:"schema"`
 		Required bool `json:"required"`
@@ -63,14 +63,14 @@ func LoadMethodsFromOpenRPC(specPath string, variationsPath string) (*Comparison
 
 	// Create comparison config
 	config := &ComparisonConfig{
-		Name:                 spec.Info.Title,
-		Description:          spec.Info.Description,
-		Methods:              make([]string, 0),
-		CustomParameters:     make(map[string][]interface{}),
+		Name:                  spec.Info.Title,
+		Description:           spec.Info.Description,
+		Methods:               make([]string, 0),
+		CustomParameters:      make(map[string][]interface{}),
 		ValidateAgainstSchema: true,
-		Concurrency:          5,
-		TimeoutSeconds:       30,
-		OutputDir:            "comparison-results",
+		Concurrency:           5,
+		TimeoutSeconds:        30,
+		OutputDir:             "comparison-results",
 	}
 
 	// Process methods and their parameters

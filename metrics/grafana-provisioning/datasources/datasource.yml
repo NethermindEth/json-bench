@@ -5,5 +5,39 @@ datasources:
     type: prometheus
     access: proxy
     url: http://prometheus:9090
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+    
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: jsonrpc_bench
+    user: postgres
+    isDefault: false
+    editable: true
+    jsonData:
+      sslmode: "disable"
+      maxOpenConns: 100
+      maxIdleConns: 100
+      maxIdleConnsAuto: true
+      connMaxLifetime: 14400
+      postgresVersion: 1300
+      timescaledb: false
+    secureJsonData:
+      password: "postgres"
+      
+  - name: JSON-RPC Bench API
+    type: simplejson
+    access: proxy
+    url: http://runner:8080/api/grafana
     isDefault: true
     editable: true
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: "POST"
+    withCredentials: false

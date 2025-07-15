@@ -1,0 +1,40 @@
+# Docker Storage Configuration for Historic Tracking
+# This file configures the historic data storage for Docker environment
+
+# Historic data storage settings
+historic_path: "/app/historic"          # Directory to store historic benchmark files (mounted volume)
+retention_days: 30                     # Number of days to retain historic files (0 = no cleanup)
+enable_historic: true                  # Enable historic data tracking
+
+# PostgreSQL database configuration for Docker environment
+postgresql:
+  host: "postgres"                     # PostgreSQL container hostname
+  port: 5432                          # PostgreSQL server port
+  database: "jsonrpc_bench"           # Database name
+  username: "postgres"                # Database username
+  password: "postgres"                # Database password
+  ssl_mode: "disable"                 # SSL mode: disable for Docker internal network
+  schema: "public"                    # Database schema to use
+  
+  # Connection pool settings
+  max_connections: 25                 # Maximum number of open connections
+  max_idle_connections: 5             # Maximum number of idle connections
+  connection_max_lifetime: "30m"      # Maximum lifetime of connections
+  connection_timeout: "10s"           # Connection timeout
+  
+  # Grafana-specific configuration
+  grafana:
+    metrics_table: "benchmark_metrics"       # Table name for time-series metrics
+    runs_table: "benchmark_runs"             # Table name for benchmark run metadata
+    enable_timescaledb: false                # Enable TimescaleDB optimizations
+    chunk_interval: "24h"                    # TimescaleDB chunk interval (if enabled)
+    enable_compression: false                # Enable data compression for old data
+    compression_after: "7d"                 # Compress data older than this
+    
+    # Data retention policies
+    retention_policy:
+      metrics_retention: "30d"               # How long to keep detailed metrics
+      aggregated_retention: "90d"            # How long to keep aggregated data
+      raw_data_retention: "7d"               # How long to keep raw benchmark files
+      enable_auto_vacuum: true               # Enable automatic cleanup
+      vacuum_interval: "24h"                 # How often to run cleanup

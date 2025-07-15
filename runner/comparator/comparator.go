@@ -15,13 +15,13 @@ import (
 
 // ComparisonResult represents the result of comparing responses from different clients
 type ComparisonResult struct {
-	Method       string                   `json:"method"`
-	Params       []interface{}            `json:"params"`
-	Timestamp    string                   `json:"timestamp"`
-	Responses    map[string]interface{}   `json:"responses"`
-	Differences  map[string]interface{}   `json:"differences"`
-	SchemaErrors map[string][]string      `json:"schema_errors,omitempty"`
-	Metadata     map[string]interface{}   `json:"metadata,omitempty"`
+	Method       string                 `json:"method"`
+	Params       []interface{}          `json:"params"`
+	Timestamp    string                 `json:"timestamp"`
+	Responses    map[string]interface{} `json:"responses"`
+	Differences  map[string]interface{} `json:"differences"`
+	SchemaErrors map[string][]string    `json:"schema_errors,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Client represents a client endpoint for comparison
@@ -32,26 +32,26 @@ type Client struct {
 
 // ComparisonConfig represents the configuration for response comparison
 type ComparisonConfig struct {
-	Name                string                   `json:"name"`
-	Description         string                   `json:"description"`
-	Methods             []string                 `json:"methods"`
-	Clients             []Client                 `json:"clients"`
-	ValidateAgainstSchema bool                   `json:"validate_against_schema"`
-	OutputDir           string                   `json:"output_dir"`
-	TimeoutSeconds      int                      `json:"timeout_seconds"`
-	Concurrency         int                      `json:"concurrency"`
-	CustomParameters    map[string][]interface{} `json:"custom_parameters,omitempty"`
-	Verbose             bool                     `json:"verbose,omitempty"`
+	Name                  string                   `json:"name"`
+	Description           string                   `json:"description"`
+	Methods               []string                 `json:"methods"`
+	Clients               []Client                 `json:"clients"`
+	ValidateAgainstSchema bool                     `json:"validate_against_schema"`
+	OutputDir             string                   `json:"output_dir"`
+	TimeoutSeconds        int                      `json:"timeout_seconds"`
+	Concurrency           int                      `json:"concurrency"`
+	CustomParameters      map[string][]interface{} `json:"custom_parameters,omitempty"`
+	Verbose               bool                     `json:"verbose,omitempty"`
 }
 
 // Comparator handles comparing responses between different Ethereum clients
 type Comparator struct {
-	config      *ComparisonConfig
-	validator   *schema.SchemaValidator
-	outputDir   string
-	mutex       sync.Mutex
-	results     []ComparisonResult
-	verbose     bool
+	config    *ComparisonConfig
+	validator *schema.SchemaValidator
+	outputDir string
+	mutex     sync.Mutex
+	results   []ComparisonResult
+	verbose   bool
 }
 
 // NewComparator creates a new response comparator
@@ -94,22 +94,22 @@ func NewComparator(cfg *ComparisonConfig) (*Comparator, error) {
 func (c *Comparator) CompareResponses(method string, params []interface{}) (*ComparisonResult, error) {
 	responses := make(map[string]interface{})
 	schemaErrors := make(map[string][]string)
-	
+
 	// Extract base method name if this is a variant (e.g., eth_call_variant1 -> eth_call)
 	rpcMethod := method
 	if idx := strings.Index(method, "_variant"); idx > 0 {
 		rpcMethod = method[:idx]
 	}
-	
+
 	// Make JSON-RPC calls to all clients
 	for _, client := range c.config.Clients {
 		response, err := makeJSONRPCCall(client.URL, rpcMethod, params, c.config.TimeoutSeconds, c.verbose)
 		if err != nil {
 			return nil, fmt.Errorf("failed to call %s on %s: %w", rpcMethod, client.Name, err)
 		}
-		
+
 		responses[client.Name] = response
-		
+
 		// Validate response against schema if enabled
 		if c.config.ValidateAgainstSchema && c.validator != nil {
 			// Use the base method name for schema validation
@@ -117,20 +117,20 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 			if err != nil {
 				return nil, fmt.Errorf("schema validation error for %s on %s: %w", rpcMethod, client.Name, err)
 			}
-			
+
 			if !valid && len(errors) > 0 {
 				schemaErrors[client.Name] = errors
 			}
 		}
 	}
-	
+
 	// Compare responses between clients
 	differences := make(map[string]interface{})
 	if len(c.config.Clients) >= 2 {
 		// Use first client as reference
 		refClient := c.config.Clients[0].Name
 		refResponse := responses[refClient].(map[string]interface{})
-		
+
 		// Compare with other clients
 		for _, client := range c.config.Clients[1:] {
 			clientResponse := responses[client.Name].(map[string]interface{})
@@ -138,13 +138,13 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 			if err != nil {
 				return nil, fmt.Errorf("failed to compare responses: %w", err)
 			}
-			
+
 			if diff != nil && len(diff) > 0 {
 				differences[client.Name] = diff
 			}
 		}
 	}
-	
+
 	// Create comparison result
 	result := &ComparisonResult{
 		Method:       method,
@@ -157,12 +157,12 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 			"clients": c.config.Clients,
 		},
 	}
-	
+
 	// Save result
 	c.mutex.Lock()
 	c.results = append(c.results, *result)
 	c.mutex.Unlock()
-	
+
 	return result, nil
 }
 
@@ -172,7 +172,7 @@ func (c *Comparator) VerifyNetworkConsistency() error {
 	if len(c.config.Clients) <= 1 {
 		return nil
 	}
-	
+
 	// Get chainId from all clients
 	chainIDs := make(map[string]string)
 	for _, client := range c.config.Clients {
@@ -180,21 +180,21 @@ func (c *Comparator) VerifyNetworkConsistency() error {
 		if err != nil {
 			return fmt.Errorf("failed to get chainId from %s: %w", client.Name, err)
 		}
-		
+
 		// Extract chainId from response
 		result, ok := response["result"]
 		if !ok {
 			return fmt.Errorf("invalid response from %s: missing result field", client.Name)
 		}
-		
+
 		chainIDStr, ok := result.(string)
 		if !ok {
 			return fmt.Errorf("invalid chainId from %s: expected string, got %T", client.Name, result)
 		}
-		
+
 		chainIDs[client.Name] = chainIDStr
 	}
-	
+
 	// Check if all chainIds are the same
 	var referenceChainID string
 	var referenceClient string
@@ -203,15 +203,15 @@ func (c *Comparator) VerifyNetworkConsistency() error {
 			referenceChainID = chainID
 			referenceClient = client
 		} else if chainID != referenceChainID {
-			return fmt.Errorf("network mismatch: %s has chainId %s, but %s has chainId %s", 
+			return fmt.Errorf("network mismatch: %s has chainId %s, but %s has chainId %s",
 				referenceClient, referenceChainID, client, chainID)
 		}
 	}
-	
+
 	if c.verbose {
 		log.Printf("Network consistency verified: all clients are on chainId %s", referenceChainID)
 	}
-	
+
 	return nil
 }
 
@@ -220,7 +220,7 @@ func (c *Comparator) RunComparisons() ([]ComparisonResult, error) {
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, c.config.Concurrency)
 	errCh := make(chan error, len(c.config.Methods))
-	
+
 	for _, method := range c.config.Methods {
 		// Get parameters for this method
 		var params []interface{}
@@ -230,36 +230,36 @@ func (c *Comparator) RunComparisons() ([]ComparisonResult, error) {
 			// Use default parameters based on method
 			params = getDefaultParams(method)
 		}
-		
+
 		wg.Add(1)
 		go func(method string, params []interface{}) {
 			defer wg.Done()
-			
+
 			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
-			
+
 			_, err := c.CompareResponses(method, params)
 			if err != nil {
 				errCh <- fmt.Errorf("comparison failed for %s: %w", method, err)
 			}
 		}(method, params)
 	}
-	
+
 	// Wait for all comparisons to complete
 	wg.Wait()
 	close(errCh)
-	
+
 	// Check for errors
 	var errors []string
 	for err := range errCh {
 		errors = append(errors, err.Error())
 	}
-	
+
 	if len(errors) > 0 {
 		return c.results, fmt.Errorf("some comparisons failed: %s", strings.Join(errors, "; "))
 	}
-	
+
 	return c.results, nil
 }
 
@@ -275,7 +275,7 @@ func (c *Comparator) Run() ([]ComparisonResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return results, nil
 }
 
@@ -283,24 +283,24 @@ func (c *Comparator) Run() ([]ComparisonResult, error) {
 func (c *Comparator) SaveResults(filename string) error {
 	// Use the provided filename directly as it should already be a full path
 	outputPath := filename
-	
+
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
-	
+
 	// Marshal results to JSON
 	data, err := json.MarshalIndent(c.results, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal results: %w", err)
 	}
-	
+
 	// Write to file
 	if err := os.WriteFile(outputPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write results: %w", err)
 	}
-	
+
 	return nil
 }
 

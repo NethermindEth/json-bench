@@ -1,0 +1,236 @@
+apiVersion: 1
+
+groups:
+  - name: jsonrpc-bench-alerts
+    orgId: 1
+    folder: JSON-RPC Bench
+    interval: 1m
+    rules:
+      - uid: latency-regression
+        title: "High Latency Regression"
+        condition: C
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              target: "avg_latency"
+              refId: A
+              datasource:
+                type: simplejson
+                uid: JSON-RPC Bench API
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 3600
+              to: 600
+            model:
+              target: "avg_latency"
+              refId: B
+              datasource:
+                type: simplejson
+                uid: JSON-RPC Bench API
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1.5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "A / B"
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+        noDataState: NoData
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          description: "Average latency has increased by more than 50% compared to the previous 10 minutes"
+          summary: "Latency regression detected"
+        labels:
+          severity: major
+          component: performance
+          
+      - uid: error-rate-spike
+        title: "High Error Rate"
+        condition: C
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              target: "error_rate"
+              refId: A
+              datasource:
+                type: simplejson
+                uid: JSON-RPC Bench API
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "A"
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+        noDataState: NoData
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          description: "Error rate has exceeded 5% for the past 5 minutes"
+          summary: "High error rate detected"
+        labels:
+          severity: critical
+          component: reliability
+          
+      - uid: throughput-drop
+        title: "Throughput Drop"
+        condition: C
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              target: "throughput"
+              refId: A
+              datasource:
+                type: simplejson
+                uid: JSON-RPC Bench API
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 1800
+              to: 300
+            model:
+              target: "throughput"
+              refId: B
+              datasource:
+                type: simplejson
+                uid: JSON-RPC Bench API
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.7
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "A / B"
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+        noDataState: NoData
+        execErrState: Alerting
+        for: 3m
+        annotations:
+          description: "Throughput has dropped by more than 30% compared to the previous 25 minutes"
+          summary: "Throughput degradation detected"
+        labels:
+          severity: major
+          component: performance
+          
+      - uid: no-data-received
+        title: "No Benchmark Data"
+        condition: C
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 900
+              to: 0
+            model:
+              target: "avg_latency"
+              refId: A
+              datasource:
+                type: simplejson
+                uid: JSON-RPC Bench API
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: no_value
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: "A"
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: "No benchmark data has been received for the past 15 minutes"
+          summary: "Benchmark data missing"
+        labels:
+          severity: major
+          component: monitoring
