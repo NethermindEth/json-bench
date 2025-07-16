@@ -1,0 +1,10 @@
+clients:
+  - name: "geth"
+    url: "http://localhost:40003"
+    timeout: "30s"
+    max_retries: 3
+  
+  - name: "nethermind"
+    url: "http://localhost:40010"
+    timeout: "30s"
+    max_retries: 3

@@ -1,0 +1,160 @@
+# Production client configurations for JSON-RPC benchmarking
+# This file demonstrates advanced client configuration options including
+# authentication, rate limiting, custom headers, and failover patterns.
+
+clients:
+  # Production endpoints with authentication
+  - name: "infura_mainnet"
+    url: "https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}"
+    timeout: "60s"
+    max_retries: 5
+    auth:
+      type: "bearer"
+      token: "${INFURA_API_SECRET}"
+    rate_limit:
+      requests_per_second: 100
+      burst: 20
+    headers:
+      X-Environment: "production"
+      X-Client-Version: "1.0.0"
+  
+  - name: "alchemy_mainnet"
+    url: "https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+    timeout: "60s"
+    max_retries: 5
+    rate_limit:
+      requests_per_second: 150
+      burst: 30
+    headers:
+      X-Alchemy-Token: "${ALCHEMY_API_KEY}"
+  
+  - name: "quicknode_mainnet"
+    url: "https://${QUICKNODE_ENDPOINT}.quiknode.pro/${QUICKNODE_TOKEN}"
+    timeout: "45s"
+    max_retries: 3
+    auth:
+      type: "api_key"
+      api_key: "${QUICKNODE_API_KEY}"
+    headers:
+      X-QuickNode-Version: "2"
+
+  # Private node pool with internal authentication
+  - name: "internal_geth_1"
+    url: "https://geth_1.internal.company.com"
+    timeout: "30s"
+    max_retries: 3
+    auth:
+      type: "basic"
+      username: "${INTERNAL_USERNAME}"
+      password: "${INTERNAL_PASSWORD}"
+    headers:
+      X-Internal-Client: "benchmark-tool"
+      X-Request-Priority: "high"
+  
+  - name: "internal_geth_2"
+    url: "https://geth_2.internal.company.com"
+    timeout: "30s"
+    max_retries: 3
+    auth:
+      type: "basic"
+      username: "${INTERNAL_USERNAME}"
+      password: "${INTERNAL_PASSWORD}"
+    headers:
+      X-Internal-Client: "benchmark-tool"
+      X-Request-Priority: "high"
+
+  # Archive nodes for historical data
+  - name: "archive_node_1"
+    url: "https://archive_1.ethereum.company.com"
+    timeout: "120s"  # Longer timeout for archive queries
+    max_retries: 2
+    auth:
+      type: "bearer"
+      token: "${ARCHIVE_NODE_TOKEN}"
+    rate_limit:
+      requests_per_second: 50  # Lower rate for archive nodes
+      burst: 10
+    headers:
+      X-Node-Type: "archive"
+      X-Max-Block-Range: "1000"
+
+  # Regional endpoints for geographic distribution
+  - name: "us_east_1"
+    url: "https://eth_us_east_1.regional.provider.com"
+    timeout: "40s"
+    max_retries: 3
+    headers:
+      X-Region: "us_east_1"
+      X-Routing-Policy: "latency"
+  
+  - name: "eu_west_1"
+    url: "https://eth_eu_west_1.regional.provider.com"
+    timeout: "40s"
+    max_retries: 3
+    headers:
+      X-Region: "eu_west_1"
+      X-Routing-Policy: "latency"
+  
+  - name: "ap_southeast_1"
+    url: "https://eth_ap_southeast_1.regional.provider.com"
+    timeout: "40s"
+    max_retries: 3
+    headers:
+      X-Region: "ap_southeast_1"
+      X-Routing-Policy: "latency"
+
+# Client groups for load balancing and failover
+# (This is a conceptual example - actual implementation would require
+# additional logic in the benchmark tool)
+#
+# groups:
+#   mainnet-providers:
+#     strategy: "round-robin"
+#     clients:
+#       - "infura_mainnet"
+#       - "alchemy_mainnet"
+#       - "quicknode_mainnet"
+#   
+#   internal-pool:
+#     strategy: "failover"
+#     clients:
+#       - "internal_geth_1"
+#       - "internal_geth_2"
+#   
+#   global-distribution:
+#     strategy: "latency-based"
+#     clients:
+#       - "us_east_1"
+#       - "eu_west_1"
+#       - "ap_southeast_1"
+
+# Environment-specific overrides
+# These can be applied based on deployment environment
+#
+# overrides:
+#   staging:
+#     rate_limit:
+#       requests_per_second: 10
+#       burst: 5
+#     timeout: "10s"
+#   
+#   development:
+#     rate_limit:
+#       requests_per_second: 5
+#       burst: 2
+#     timeout: "5s"
+#     max_retries: 1
+
+# Monitoring and alerting configuration
+# (Conceptual - would require integration with monitoring systems)
+#
+# monitoring:
+#   enabled: true
+#   metrics_endpoint: "https://metrics.company.com/v1/ingest"
+#   alerts:
+#     - name: "high_error_rate"
+#       condition: "error_rate > 0.05"
+#       channels: ["pagerduty", "slack"]
+#     - name: "slow_response"
+#       condition: "p95_latency > 1000ms"
+#       channels: ["slack"]

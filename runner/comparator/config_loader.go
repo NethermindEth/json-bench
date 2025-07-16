@@ -4,25 +4,20 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jsonrpc-bench/runner/types"
 	"gopkg.in/yaml.v3"
 )
 
 // ComparisonConfigYAML represents the YAML configuration for comparison
 type ComparisonConfigYAML struct {
-	Name           string             `yaml:"name"`
-	Description    string             `yaml:"description"`
-	Clients        []ClientYAML       `yaml:"clients"`
-	ValidateSchema bool               `yaml:"validate_schema"`
-	Concurrency    int                `yaml:"concurrency"`
-	TimeoutSeconds int                `yaml:"timeout_seconds"`
-	OutputDir      string             `yaml:"output_dir"`
-	Methods        []MethodConfigYAML `yaml:"methods"`
-}
-
-// ClientYAML represents a client configuration in YAML
-type ClientYAML struct {
-	Name string `yaml:"name"`
-	URL  string `yaml:"url"`
+	Name           string                `yaml:"name"`
+	Description    string                `yaml:"description"`
+	Clients        []*types.ClientConfig `yaml:"clients"`
+	ValidateSchema bool                  `yaml:"validate_schema"`
+	Concurrency    int                   `yaml:"concurrency"`
+	TimeoutSeconds int                   `yaml:"timeout_seconds"`
+	OutputDir      string                `yaml:"output_dir"`
+	Methods        []MethodConfigYAML    `yaml:"methods"`
 }
 
 // MethodConfigYAML represents a method configuration in YAML
@@ -67,13 +62,7 @@ func LoadConfigFromYAML(filePath string) (*ComparisonConfig, error) {
 	}
 
 	// Convert clients
-	config.Clients = make([]Client, 0, len(yamlConfig.Clients))
-	for _, client := range yamlConfig.Clients {
-		config.Clients = append(config.Clients, Client{
-			Name: client.Name,
-			URL:  client.URL,
-		})
-	}
+	config.Clients = yamlConfig.Clients
 
 	// Extract methods
 	config.Methods = make([]string, 0, len(yamlConfig.Methods))

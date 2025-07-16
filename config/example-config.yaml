@@ -2,14 +2,11 @@
 name: "Ethereum Client Comparison"
 description: "Comparing responses from different Ethereum clients"
 
-# Client endpoints
+# Client references from clients.yaml
 clients:
-  - name: "Geth"
-    url: "http://localhost:8545"
-  - name: "Erigon"
-    url: "http://localhost:8546"
-  - name: "Nethermind"
-    url: "http://localhost:8547"
+  - geth
+  - erigon
+  - nethermind
 
 # Methods to compare
 methods:

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jsonrpc-bench/runner/schema"
+	"github.com/jsonrpc-bench/runner/types"
 )
 
 // ComparisonResult represents the result of comparing responses from different clients
@@ -24,18 +25,12 @@ type ComparisonResult struct {
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// Client represents a client endpoint for comparison
-type Client struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
-
 // ComparisonConfig represents the configuration for response comparison
 type ComparisonConfig struct {
 	Name                  string                   `json:"name"`
 	Description           string                   `json:"description"`
 	Methods               []string                 `json:"methods"`
-	Clients               []Client                 `json:"clients"`
+	Clients               []*types.ClientConfig    `json:"clients"`
 	ValidateAgainstSchema bool                     `json:"validate_against_schema"`
 	OutputDir             string                   `json:"output_dir"`
 	TimeoutSeconds        int                      `json:"timeout_seconds"`

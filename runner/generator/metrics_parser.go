@@ -51,6 +51,8 @@ func ParseK6Results(resultsDir string) (map[string]*types.ClientMetrics, error) 
 	clientNames := extractClientNames(summary.Metrics)
 	clientMetrics := make(map[string]*types.ClientMetrics)
 
+	fmt.Printf("DEBUG: Found %d clients: %v\n", len(clientNames), clientNames)
+
 	// Initialize client metrics with enhanced fields
 	for _, clientName := range clientNames {
 		clientMetrics[clientName] = &types.ClientMetrics{
@@ -59,6 +61,8 @@ func ParseK6Results(resultsDir string) (map[string]*types.ClientMetrics, error) 
 			ConnectionMetrics: types.ConnectionMetrics{},
 			ErrorTypes:        make(map[string]int64),
 			StatusCodes:       make(map[int]int64),
+			TotalRequests:     0,
+			TotalErrors:       0,
 		}
 	}
 
@@ -66,73 +70,69 @@ func ParseK6Results(resultsDir string) (map[string]*types.ClientMetrics, error) 
 	for metricName, metricValue := range summary.Metrics {
 		if strings.HasPrefix(metricName, "client_") && strings.Contains(metricName, "_method_") {
 			// Parse client-specific method metrics
-			parts := strings.Split(metricName, "_")
-			if len(parts) >= 5 {
-				clientName := parts[1]
-				metricType := parts[2]
+			// Extract client name by finding _method_ position
+			methodIndex := strings.Index(metricName, "_method_")
+			if methodIndex > 7 { // "client_" is 7 chars
+				clientName := metricName[7:methodIndex]    // Extract everything between "client_" and "_method_"
+				remainder := metricName[methodIndex+8:]    // Everything after "_method_"
+				parts := strings.SplitN(remainder, "_", 2) // Split into metric type and method name
 
-				if client, exists := clientMetrics[clientName]; exists {
-					if metricType == "method" {
-						if parts[3] == "calls" {
-							methodName := strings.Join(parts[4:], "_")
-							if _, exists := client.Methods[methodName]; !exists {
-								client.Methods[methodName] = types.MetricSummary{}
-							}
-							method := client.Methods[methodName]
-							method.Count = metricValue.Count
-							client.Methods[methodName] = method
-							// Add to total requests
-							client.TotalRequests += metricValue.Count
-						} else if parts[3] == "latency" {
-							methodName := strings.Join(parts[4:], "_")
-							if _, exists := client.Methods[methodName]; !exists {
-								client.Methods[methodName] = types.MetricSummary{}
-							}
-							method := client.Methods[methodName]
-							method.Min = metricValue.Min
-							method.Max = metricValue.Max
-							method.Avg = metricValue.Avg
-							method.P50 = metricValue.Med
-							method.P90 = metricValue.P90
-							method.P95 = metricValue.P95
-							method.P99 = metricValue.P99
-							method.StdDev = calculateStdDev(metricValue)
-							// Calculate additional metrics
-							if method.Avg > 0 {
-								method.CoeffVar = (method.StdDev / method.Avg) * 100
-							}
-							method.SuccessRate = 100.0 // Will be updated with error data
-							client.Methods[methodName] = method
+				if len(parts) >= 2 && clientMetrics[clientName] != nil {
+					client := clientMetrics[clientName]
+					metricType := parts[0]
+					methodName := parts[1]
 
-							// Validate percentiles
-							warnings := ValidatePercentiles(metricValue, fmt.Sprintf("%s.%s", clientName, methodName))
-							for _, warning := range warnings {
-								log.Printf("WARNING: %s", warning)
-							}
-						} else if parts[3] == "errors" {
-							methodName := strings.Join(parts[4:], "_")
-							if _, exists := client.Methods[methodName]; !exists {
-								client.Methods[methodName] = types.MetricSummary{}
-							}
-							method := client.Methods[methodName]
-							errorCount := metricValue.Count
-							if method.Count > 0 {
-								method.ErrorRate = float64(errorCount) / float64(method.Count) * 100
-								method.SuccessRate = 100.0 - method.ErrorRate
-							}
-							client.Methods[methodName] = method
-							// Add to total errors
-							client.TotalErrors += errorCount
-						} else if parts[3] == "success" {
-							// Handle success metrics if needed
-							methodName := strings.Join(parts[4:], "_")
-							if _, exists := client.Methods[methodName]; !exists {
-								client.Methods[methodName] = types.MetricSummary{}
-							}
-							method := client.Methods[methodName]
-							method.SuccessCount = metricValue.Count
-							client.Methods[methodName] = method
+					if metricType == "calls" {
+						if _, exists := client.Methods[methodName]; !exists {
+							client.Methods[methodName] = types.MetricSummary{}
 						}
+						method := client.Methods[methodName]
+						method.Count = metricValue.Count
+						client.Methods[methodName] = method
+						// Add to total requests
+						client.TotalRequests += metricValue.Count
+					} else if metricType == "latency" {
+						if _, exists := client.Methods[methodName]; !exists {
+							client.Methods[methodName] = types.MetricSummary{}
+						}
+						method := client.Methods[methodName]
+						method.Min = metricValue.Min
+						method.Max = metricValue.Max
+						method.Avg = metricValue.Avg
+						method.P50 = metricValue.Med
+						method.P90 = metricValue.P90
+						method.P95 = metricValue.P95
+						method.P99 = metricValue.P99
+						method.StdDev = calculateStdDev(metricValue)
+						// Calculate additional metrics
+						if method.Avg > 0 {
+							method.CoeffVar = (method.StdDev / method.Avg) * 100
+						}
+						method.SuccessRate = 100.0 // Will be updated with error data
+						client.Methods[methodName] = method
+
+						// Validate percentiles
+						warnings := ValidatePercentiles(metricValue, fmt.Sprintf("%s.%s", clientName, methodName))
+						for _, warning := range warnings {
+							log.Printf("WARNING: %s", warning)
+						}
+					} else if metricType == "errors" {
+						if _, exists := client.Methods[methodName]; !exists {
+							client.Methods[methodName] = types.MetricSummary{}
+						}
+						method := client.Methods[methodName]
+						method.ErrorCount = metricValue.Count
+						client.Methods[methodName] = method
+						// Add to total errors
+						client.TotalErrors += metricValue.Count
+					} else if metricType == "success" {
+						// Handle success metrics if needed
+						if _, exists := client.Methods[methodName]; !exists {
+							client.Methods[methodName] = types.MetricSummary{}
+						}
+						method := client.Methods[methodName]
+						method.SuccessCount = metricValue.Count
+						client.Methods[methodName] = method
 					}
 				}
 			}
@@ -157,20 +157,65 @@ func ParseK6Results(resultsDir string) (map[string]*types.ClientMetrics, error) 
 		}
 	}
 
+	// Post-process: Calculate success and error rates for each method
+	for _, client := range clientMetrics {
+		for methodName, method := range client.Methods {
+			// If we have a total count for the method
+			if method.Count > 0 {
+				// Special case: If error count equals total count, it's 100% errors
+				if method.ErrorCount == method.Count {
+					method.SuccessCount = 0
+					method.SuccessRate = 0
+					method.ErrorRate = 100.0
+				} else if method.SuccessCount == method.Count {
+					// Special case: If success count equals total count, it's 100% success
+					method.ErrorCount = 0
+					method.ErrorRate = 0
+					method.SuccessRate = 100.0
+				} else {
+					// Calculate success count if we don't have it explicitly
+					if method.SuccessCount == 0 && method.ErrorCount > 0 {
+						method.SuccessCount = method.Count - method.ErrorCount
+					}
+
+					// Calculate error count if we don't have it explicitly
+					if method.ErrorCount == 0 && method.SuccessCount > 0 {
+						method.ErrorCount = method.Count - method.SuccessCount
+					}
+
+					// Calculate rates
+					if method.ErrorCount > 0 {
+						method.ErrorRate = float64(method.ErrorCount) / float64(method.Count) * 100
+					} else {
+						method.ErrorRate = 0
+					}
+					method.SuccessRate = 100.0 - method.ErrorRate
+				}
+
+				// Update the method in the map
+				client.Methods[methodName] = method
+			}
+		}
+	}
+
 	// Calculate overall metrics for each client
 	for _, client := range clientMetrics {
-		if client.TotalRequests > 0 {
-			client.ErrorRate = float64(client.TotalErrors) / float64(client.TotalRequests) * 100
-		} else {
-			// If TotalRequests wasn't set from rpc_calls metric, calculate from method counts
-			var totalMethodCalls int64
-			for _, method := range client.Methods {
-				totalMethodCalls += method.Count
-			}
-			client.TotalRequests = totalMethodCalls
-			if client.TotalRequests > 0 {
-				client.ErrorRate = float64(client.TotalErrors) / float64(client.TotalRequests) * 100
-			}
+		// Recalculate totals based on method data to ensure accuracy
+		var totalRequests int64
+		var totalErrors int64
+		var totalSuccess int64
+
+		for _, method := range client.Methods {
+			totalRequests += method.Count
+			totalErrors += method.ErrorCount
+			totalSuccess += method.SuccessCount
+		}
+
+		// Update client totals
+		if totalRequests > 0 {
+			client.TotalRequests = totalRequests
+			client.TotalErrors = totalErrors
+			client.ErrorRate = float64(totalErrors) / float64(totalRequests) * 100
 		}
 
 		// Calculate overall latency from method latencies
@@ -258,9 +303,10 @@ func extractClientNames(metrics map[string]K6MetricValue) []string {
 	for metricName := range metrics {
 		// Look for client_<name>_method_calls_ pattern
 		if strings.HasPrefix(metricName, "client_") && strings.Contains(metricName, "_method_calls_") {
-			parts := strings.Split(metricName, "_")
-			if len(parts) >= 4 && parts[2] == "method" && parts[3] == "calls" {
-				clientName := parts[1]
+			// Extract client name by finding _method_ position
+			methodIndex := strings.Index(metricName, "_method_")
+			if methodIndex > 7 { // "client_" is 7 chars
+				clientName := metricName[7:methodIndex]
 				// Skip generic metrics and validate it's an actual client name
 				if clientName != "success" && clientName != "errors" && clientName != "" {
 					// Double check this is a real client by looking for multiple method metrics

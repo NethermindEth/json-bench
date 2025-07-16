@@ -1,10 +1,9 @@
 test_name: "Read-heavy RPC benchmark"
 description: "Benchmark focusing on read operations like eth_call and eth_getLogs"
+# Client references from clients.yaml
 clients:
-  - name: "geth"
-    url: "http://localhost:8545"
-  - name: "nethermind"
-    url: "http://localhost:8545"
+  - geth
+  - nethermind
 duration: "5m"
 rps: 200
 endpoints:

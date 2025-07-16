@@ -5,14 +5,9 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/jsonrpc-bench/runner/types"
 	"gopkg.in/yaml.v3"
 )
-
-// Client represents an Ethereum client to benchmark
-type Client struct {
-	Name string `yaml:"name"`
-	URL  string `yaml:"url"`
-}
 
 // Endpoint represents a JSON-RPC method to benchmark
 type Endpoint struct {
@@ -26,13 +21,14 @@ type Endpoint struct {
 
 // Config represents the benchmark configuration
 type Config struct {
-	TestName          string     `yaml:"test_name"`
-	Description       string     `yaml:"description"`
-	Clients           []Client   `yaml:"clients"`
-	Duration          string     `yaml:"duration"`
-	RPS               int        `yaml:"rps"`
-	Endpoints         []Endpoint `yaml:"endpoints"`
-	ValidateResponses bool       `yaml:"validate_responses"`
+	TestName          string                `yaml:"test_name"`
+	Description       string                `yaml:"description"`
+	ClientRefs        []string              `yaml:"clients"`
+	Duration          string                `yaml:"duration"`
+	RPS               int                   `yaml:"rps"`
+	Endpoints         []Endpoint            `yaml:"endpoints"`
+	ValidateResponses bool                  `yaml:"validate_responses"`
+	ResolvedClients   []*types.ClientConfig `yaml:"-"`
 }
 
 // LoadFromFile loads a benchmark configuration from a YAML file
@@ -67,7 +63,7 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("test_name is required")
 	}
 
-	if len(cfg.Clients) == 0 {
+	if len(cfg.ClientRefs) == 0 {
 		return fmt.Errorf("at least one client is required")
 	}
 

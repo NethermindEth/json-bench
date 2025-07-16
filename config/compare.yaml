@@ -2,12 +2,11 @@
 name: "Ethereum API Comparison"
 description: "Comparing responses across multiple Ethereum clients"
 
-# Client endpoints
+# Client references from clients.yaml
+# Note: Update clients.yaml with these specific IPs if needed
 clients:
-  - name: "geth"
-    url: "http://172.232.169.248:8545"
-  - name: "nethermind"
-    url: "http://172.232.169.243:8545"
+  - geth
+  - nethermind
 
 # Settings
 validate_schema: false

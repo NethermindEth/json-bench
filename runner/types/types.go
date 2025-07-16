@@ -26,6 +26,7 @@ type MetricSummary struct {
 	P999       float64 `json:"p99.9"`
 	StdDev     float64 `json:"std_dev"`
 	ErrorRate  float64 `json:"error_rate"`
+	ErrorCount int64   `json:"error_count"`
 	Throughput float64 `json:"throughput"`
 
 	// Advanced metrics

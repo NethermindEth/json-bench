@@ -25,6 +25,7 @@ results-test/
 playwright-report/
 coverage/
 *.log
+historic/
 
 # Debug and temporary files
 *.bak
