@@ -107,10 +107,39 @@ export function PerClientMetricsTable({
   // Get methods for a specific client
   const getMethodsForClient = useCallback((clientName: string): MethodMetrics[] => {
     if (!data.methodMetrics) return []
-    // Return all methods since they should have aggregate data
-    // In practice, we might want to filter based on whether the client made requests to this method
-    return data.methodMetrics
-  }, [data.methodMetrics])
+    // Return method metrics with client-specific data if available
+    return data.methodMetrics.map(method => {
+      // Check if we have client-specific data in the method
+      const clientSpecificData = data.clientMethodMetrics?.[clientName]?.[method.methodName]
+      
+      if (clientSpecificData) {
+        // Return method with client-specific metrics
+        return {
+          ...method,
+          requestCount: clientSpecificData.total_requests || method.requestCount,
+          latencyPercentiles: {
+            ...method.latencyPercentiles,
+            p50: clientSpecificData.p50_latency ?? method.latencyPercentiles.p50,
+            p95: clientSpecificData.p95_latency ?? method.latencyPercentiles.p95,
+            p99: clientSpecificData.p99_latency ?? method.latencyPercentiles.p99,
+            min: clientSpecificData.min_latency ?? method.latencyPercentiles.min,
+            max: clientSpecificData.max_latency ?? method.latencyPercentiles.max,
+            mean: clientSpecificData.avg_latency ?? method.latencyPercentiles.mean,
+          },
+          // Update error rate for this client
+          errorsByClient: {
+            ...method.errorsByClient,
+            [clientName]: {
+              count: Math.round((clientSpecificData.total_requests || 0) * (clientSpecificData.error_rate || 0) / 100),
+              percentage: clientSpecificData.error_rate || 0
+            }
+          }
+        }
+      }
+      
+      return method
+    })
+  }, [data.methodMetrics, data.clientMethodMetrics])
 
 
   // Get trend icon
@@ -335,9 +364,10 @@ export function PerClientMetricsTable({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {methods.map((method) => {
-              // Calculate success rate for this method based on error data
-              const errorData = method.errorsByClient[clientName]
-              const successRate = errorData ? (100 - errorData.percentage) : 100
+              // Calculate success rate for this method
+              const successRate = method.errorsByClient[clientName] 
+                ? (100 - method.errorsByClient[clientName].percentage) 
+                : (100 - (method.errorRate || 0))
               
               return (
                 <tr key={method.methodName}>

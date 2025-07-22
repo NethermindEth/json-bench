@@ -161,6 +161,7 @@ export function transformHistoricRunToDetailedMetrics(run: HistoricRun, apiClien
           coefficientOfVariation: (method.avg_latency && method.std_dev) ? (method.std_dev / method.avg_latency) : 0
         },
         errorsByClient: {},
+        errorRate: method.error_rate ?? 0,
         complexity: 0,
         reliability: {
           uptime: 100,

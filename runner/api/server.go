@@ -337,24 +337,56 @@ func (s *server) handleGetRunMethods(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	// Query method metrics directly from database
-	query := `
-		SELECT 
-			method,
-			MAX(CASE WHEN metric_name = 'latency_avg' THEN value END) as avg_latency,
-			MAX(CASE WHEN metric_name = 'latency_p50' THEN value END) as p50_latency,
-			MAX(CASE WHEN metric_name = 'latency_p95' THEN value END) as p95_latency,
-			MAX(CASE WHEN metric_name = 'latency_p99' THEN value END) as p99_latency,
-			MAX(CASE WHEN metric_name = 'latency_min' THEN value END) as min_latency,
-			MAX(CASE WHEN metric_name = 'latency_max' THEN value END) as max_latency,
-			MAX(CASE WHEN metric_name = 'success_rate' THEN value END) as success_rate,
-			MAX(CASE WHEN metric_name = 'throughput' THEN value END) as throughput
-		FROM benchmark_metrics
-		WHERE run_id = $1 AND method != 'all'
-		GROUP BY method
-		ORDER BY method`
+	// Check if client parameter is provided for filtering
+	clientFilter := r.URL.Query().Get("client")
 
-	rows, err := s.db.QueryContext(r.Context(), query, runID)
+	var query string
+	var args []interface{}
+
+	if clientFilter != "" {
+		// Query method metrics for a specific client
+		query = `
+			SELECT 
+				method,
+				MAX(CASE WHEN metric_name = 'latency_avg' THEN value END) as avg_latency,
+				MAX(CASE WHEN metric_name = 'latency_p50' THEN value END) as p50_latency,
+				MAX(CASE WHEN metric_name = 'latency_p95' THEN value END) as p95_latency,
+				MAX(CASE WHEN metric_name = 'latency_p99' THEN value END) as p99_latency,
+				MAX(CASE WHEN metric_name = 'latency_min' THEN value END) as min_latency,
+				MAX(CASE WHEN metric_name = 'latency_max' THEN value END) as max_latency,
+				MAX(CASE WHEN metric_name = 'success_rate' THEN value END) as success_rate,
+				MAX(CASE WHEN metric_name = 'throughput' THEN value END) as throughput,
+				MAX(CASE WHEN metric_name = 'total_requests' THEN value END) as total_requests,
+				MAX(CASE WHEN metric_name = 'error_rate' THEN value END) as error_rate
+			FROM benchmark_metrics
+			WHERE run_id = $1 AND client = $2 AND method != 'all'
+			GROUP BY method
+			ORDER BY method`
+		args = []interface{}{runID, clientFilter}
+	} else {
+		// Query method metrics with client grouping for all clients
+		query = `
+			SELECT 
+				client,
+				method,
+				MAX(CASE WHEN metric_name = 'latency_avg' THEN value END) as avg_latency,
+				MAX(CASE WHEN metric_name = 'latency_p50' THEN value END) as p50_latency,
+				MAX(CASE WHEN metric_name = 'latency_p95' THEN value END) as p95_latency,
+				MAX(CASE WHEN metric_name = 'latency_p99' THEN value END) as p99_latency,
+				MAX(CASE WHEN metric_name = 'latency_min' THEN value END) as min_latency,
+				MAX(CASE WHEN metric_name = 'latency_max' THEN value END) as max_latency,
+				MAX(CASE WHEN metric_name = 'success_rate' THEN value END) as success_rate,
+				MAX(CASE WHEN metric_name = 'throughput' THEN value END) as throughput,
+				MAX(CASE WHEN metric_name = 'total_requests' THEN value END) as total_requests,
+				MAX(CASE WHEN metric_name = 'error_rate' THEN value END) as error_rate
+			FROM benchmark_metrics
+			WHERE run_id = $1 AND method != 'all'
+			GROUP BY client, method
+			ORDER BY client, method`
+		args = []interface{}{runID}
+	}
+
+	rows, err := s.db.QueryContext(r.Context(), query, args...)
 	if err != nil {
 		s.log.WithError(err).Error("Failed to query method metrics")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve method metrics")
@@ -363,47 +395,96 @@ func (s *server) handleGetRunMethods(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	methods := make(map[string]interface{})
-	for rows.Next() {
-		var method string
-		var avgLatency, p50Latency, p95Latency, p99Latency, minLatency, maxLatency, successRate, throughput sql.NullFloat64
+	clientMethods := make(map[string]map[string]interface{})
 
-		err := rows.Scan(&method, &avgLatency, &p50Latency, &p95Latency, &p99Latency,
-			&minLatency, &maxLatency, &successRate, &throughput)
-		if err != nil {
-			s.log.WithError(err).Error("Failed to scan method metrics")
-			continue
-		}
+	if clientFilter != "" {
+		// Single client response
+		for rows.Next() {
+			var method string
+			var avgLatency, p50Latency, p95Latency, p99Latency, minLatency, maxLatency, successRate, throughput, totalRequests, errorRate sql.NullFloat64
 
-		// Debug logging for p99 values
-		s.log.WithFields(logrus.Fields{
-			"method":    method,
-			"p99_valid": p99Latency.Valid,
-			"p99_value": p99Latency.Float64,
-		}).Debug("Method metrics p99 value")
-
-		// Helper function to get value or nil
-		getValue := func(nf sql.NullFloat64) interface{} {
-			if nf.Valid {
-				return nf.Float64
+			err := rows.Scan(&method, &avgLatency, &p50Latency, &p95Latency, &p99Latency,
+				&minLatency, &maxLatency, &successRate, &throughput, &totalRequests, &errorRate)
+			if err != nil {
+				s.log.WithError(err).Error("Failed to scan method metrics")
+				continue
 			}
-			return nil
-		}
 
-		methods[method] = map[string]interface{}{
-			"avg_latency":  getValue(avgLatency),
-			"p50_latency":  getValue(p50Latency),
-			"p95_latency":  getValue(p95Latency),
-			"p99_latency":  getValue(p99Latency),
-			"min_latency":  getValue(minLatency),
-			"max_latency":  getValue(maxLatency),
-			"success_rate": getValue(successRate),
-			"throughput":   getValue(throughput),
+			// Helper function to get value or nil
+			getValue := func(nf sql.NullFloat64) interface{} {
+				if nf.Valid {
+					return nf.Float64
+				}
+				return nil
+			}
+
+			methods[method] = map[string]interface{}{
+				"avg_latency":    getValue(avgLatency),
+				"p50_latency":    getValue(p50Latency),
+				"p95_latency":    getValue(p95Latency),
+				"p99_latency":    getValue(p99Latency),
+				"min_latency":    getValue(minLatency),
+				"max_latency":    getValue(maxLatency),
+				"success_rate":   getValue(successRate),
+				"throughput":     getValue(throughput),
+				"total_requests": getValue(totalRequests),
+				"error_rate":     getValue(errorRate),
+			}
+		}
+	} else {
+		// Multiple clients response
+		for rows.Next() {
+			var client, method string
+			var avgLatency, p50Latency, p95Latency, p99Latency, minLatency, maxLatency, successRate, throughput, totalRequests, errorRate sql.NullFloat64
+
+			err := rows.Scan(&client, &method, &avgLatency, &p50Latency, &p95Latency, &p99Latency,
+				&minLatency, &maxLatency, &successRate, &throughput, &totalRequests, &errorRate)
+			if err != nil {
+				s.log.WithError(err).Error("Failed to scan method metrics")
+				continue
+			}
+
+			// Initialize client map if not exists
+			if _, exists := clientMethods[client]; !exists {
+				clientMethods[client] = make(map[string]interface{})
+			}
+
+			// Helper function to get value or nil
+			getValue := func(nf sql.NullFloat64) interface{} {
+				if nf.Valid {
+					return nf.Float64
+				}
+				return nil
+			}
+
+			clientMethods[client][method] = map[string]interface{}{
+				"avg_latency":    getValue(avgLatency),
+				"p50_latency":    getValue(p50Latency),
+				"p95_latency":    getValue(p95Latency),
+				"p99_latency":    getValue(p99Latency),
+				"min_latency":    getValue(minLatency),
+				"max_latency":    getValue(maxLatency),
+				"success_rate":   getValue(successRate),
+				"throughput":     getValue(throughput),
+				"total_requests": getValue(totalRequests),
+				"error_rate":     getValue(errorRate),
+			}
 		}
 	}
 
-	response := map[string]interface{}{
-		"run_id":  runID,
-		"methods": methods,
+	var response map[string]interface{}
+
+	if clientFilter != "" {
+		response = map[string]interface{}{
+			"run_id":  runID,
+			"client":  clientFilter,
+			"methods": methods,
+		}
+	} else {
+		response = map[string]interface{}{
+			"run_id":            runID,
+			"methods_by_client": clientMethods,
+		}
 	}
 
 	s.writeJSONResponse(w, http.StatusOK, response)

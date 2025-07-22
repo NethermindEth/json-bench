@@ -4,6 +4,7 @@
 export interface DetailedMetrics {
   clientMetrics: ClientMetrics[]
   methodMetrics: MethodMetrics[]
+  clientMethodMetrics?: Record<string, Record<string, any>> // client -> method -> metrics
   errorAnalysis: ErrorAnalysis
   systemMetrics: SystemMetrics
   latencyDistribution: LatencyDistribution
@@ -34,6 +35,7 @@ export interface MethodMetrics {
   requestCount: number
   latencyPercentiles: LatencyPercentiles
   errorsByClient: Record<string, ErrorBreakdown>
+  errorRate?: number
   complexity: number
   reliability: ReliabilityMetrics
   trendIndicator: TrendIndicator

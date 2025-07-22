@@ -184,7 +184,9 @@ export interface MetricQuery {
 
 // Method metrics data returned by /api/runs/{id}/methods endpoint
 export interface MethodMetricsData {
-  methods: {
+  run_id: string
+  client?: string
+  methods?: {
     [methodName: string]: {
       total_requests?: number
       success_rate?: number
@@ -197,6 +199,23 @@ export interface MethodMetricsData {
       error_rate?: number
       throughput?: number
       std_dev?: number | null
+    }
+  }
+  methods_by_client?: {
+    [clientName: string]: {
+      [methodName: string]: {
+        total_requests?: number
+        success_rate?: number
+        avg_latency?: number | null
+        p50_latency?: number | null
+        p95_latency?: number | null
+        p99_latency?: number | null
+        min_latency?: number | null
+        max_latency?: number | null
+        error_rate?: number
+        throughput?: number
+        std_dev?: number | null
+      }
     }
   }
 }

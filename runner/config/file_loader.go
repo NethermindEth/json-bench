@@ -112,17 +112,24 @@ func ExpandEndpointsWithFiles(endpoints []Endpoint) ([]Endpoint, error) {
 				if freq[len(freq)-1] == '%' {
 					freq = freq[:len(freq)-1]
 				}
-				var totalFreq float64
-				fmt.Sscanf(freq, "%f", &totalFreq)
+				var totalFreq int
+				fmt.Sscanf(freq, "%d", &totalFreq)
 
-				// Distribute frequency evenly among calls
-				perCallFreq := totalFreq / float64(len(calls))
+				// Distribute frequency among calls
+				baseFreq := totalFreq / len(calls)
+				remainder := totalFreq % len(calls)
 
-				for _, call := range calls {
+				for i, call := range calls {
+					// Add 1 to the first 'remainder' calls to handle rounding
+					callFreq := baseFreq
+					if i < remainder {
+						callFreq++
+					}
+
 					expandedEndpoints = append(expandedEndpoints, Endpoint{
 						Method:    call.Method,
 						Params:    call.Params,
-						Frequency: fmt.Sprintf("%.2f%%", perCallFreq),
+						Frequency: fmt.Sprintf("%d%%", callFreq),
 					})
 				}
 			}
