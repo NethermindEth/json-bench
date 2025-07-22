@@ -39,6 +39,7 @@ parsed_metrics.json
 *.swp
 *.swo
 *~
+bin/
 
 # OS files
 .DS_Store

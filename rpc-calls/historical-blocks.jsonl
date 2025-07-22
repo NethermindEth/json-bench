@@ -1,0 +1,5 @@
+{"method": "eth_getBlockByNumber", "params": ["0x1", true]}
+{"method": "eth_getBlockByNumber", "params": ["0x100", false]}
+{"method": "eth_getBlockByNumber", "params": ["0x1000", true]}
+{"method": "eth_getBlockByHash", "params": ["0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3", false]}
+{"method": "eth_getBlockTransactionCountByNumber", "params": ["0x10"]}

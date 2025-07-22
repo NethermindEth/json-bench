@@ -2,10 +2,13 @@ test_name: "File-based RPC benchmark"
 description: "Benchmark using RPC calls loaded from files"
 # Client references from clients.yaml
 clients:
-  - geth
-  - nethermind
+  - geth_40003
+  - nethermind_40010
+  - reth_40017
+  - erigon_40024
+  - besu_40031
 duration: "2m"
-rps: 500
+rps: 100
 endpoints:
   # Regular endpoint definition
   - method: "eth_blockNumber"

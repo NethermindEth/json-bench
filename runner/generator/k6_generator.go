@@ -160,11 +160,16 @@ export default function() {
     // Record metrics
     rpcCalls.add(1, { client: String(clientName), method: String(method) });
     methodCalls[method].add(1);
-    methodLatency[method].add(response.timings.duration);
+    
+    // Use http_req_duration if available, otherwise use response.timings.duration
+    // Note: response.timings.duration can sometimes be 0 under high load
+    const duration = response.timings.duration;
+    
+    methodLatency[method].add(duration);
     
     // Record client-specific metrics
     clientMethodCalls[clientName][method].add(1);
-    clientMethodLatency[clientName][method].add(response.timings.duration);
+    clientMethodLatency[clientName][method].add(duration);
     
     // Check response
     const success = check(response, {

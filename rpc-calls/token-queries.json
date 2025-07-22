@@ -1,0 +1,33 @@
+[
+  {
+    "method": "eth_call",
+    "params": [
+      {
+        "to": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "data": "0x70a08231000000000000000000000000742d35Cc6634C0532925a3b844Bc9e7595f3574"
+      },
+      "latest"
+    ]
+  },
+  {
+    "method": "eth_getLogs",
+    "params": [
+      {
+        "fromBlock": "0x1",
+        "toBlock": "0x100",
+        "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "topics": [
+          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+        ]
+      }
+    ]
+  },
+  {
+    "method": "eth_getStorageAt",
+    "params": [
+      "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "0x0",
+      "latest"
+    ]
+  }
+]
