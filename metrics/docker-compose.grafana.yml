@@ -101,6 +101,7 @@ services:
       - "--web.console.templates=/etc/prometheus/consoles"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
+      - "--web.enable-remote-write-receiver"
     networks:
       - jsonrpc-bench-network
     healthcheck:
