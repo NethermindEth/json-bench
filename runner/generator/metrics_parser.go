@@ -3,13 +3,13 @@ package generator
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"path/filepath"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/jsonrpc-bench/runner/types"
+	"github.com/sirupsen/logrus"
 )
 
 // K6MetricValue represents a k6 metric value
@@ -34,10 +34,9 @@ type K6Summary struct {
 }
 
 // ParseK6Results parses k6 results and extracts comprehensive metrics
-func ParseK6Results(resultsDir string) (map[string]*types.ClientMetrics, error) {
+func ParseK6Results(summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
 	// Read the summary file
-	summaryPath := filepath.Join(resultsDir, "summary.json")
-	data, err := ioutil.ReadFile(summaryPath)
+	data, err := os.ReadFile(summaryPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read summary file: %w", err)
 	}
@@ -51,7 +50,7 @@ func ParseK6Results(resultsDir string) (map[string]*types.ClientMetrics, error) 
 	clientNames := extractClientNames(summary.Metrics)
 	clientMetrics := make(map[string]*types.ClientMetrics)
 
-	fmt.Printf("DEBUG: Found %d clients: %v\n", len(clientNames), clientNames)
+	logger.Debugf("found %d clients: %v", len(clientNames), clientNames)
 
 	// Initialize client metrics with enhanced fields
 	for _, clientName := range clientNames {

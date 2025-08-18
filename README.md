@@ -64,24 +64,27 @@ json-bench/
 - **Docker and Docker Compose** (for client nodes and infrastructure)
 - **Go 1.20+** (for the benchmark runner)
 - **Node.js 18+** (for the React dashboard)
-- **k6** (for load testing - install from https://k6.io/)
+- **k6** (for load testing - install from <https://k6.io/>)
 - **PostgreSQL** (for historic tracking - included in Docker Compose)
 
 ### Quick Start
 
 1. **Clone the repository:**
+
    ```bash
    git clone <repository-url>
    cd json-bench
    ```
 
 2. **Start the infrastructure (PostgreSQL and Prometheus):**
+
    ```bash
    # Start PostgreSQL and Prometheus for data storage
    docker-compose -f metrics/docker-compose.grafana.yml up postgres prometheus -d
    ```
 
 3. **Set up your client nodes:**
+
    ```bash
    # Start Ethereum client containers
    docker-compose up -d geth nethermind
@@ -90,6 +93,7 @@ json-bench/
    ```
 
 4. **Run a benchmark:**
+
    ```bash
    # Basic benchmark (no historic tracking)
    go run ./runner/main.go -config ./config/mixed.yaml
@@ -103,8 +107,8 @@ json-bench/
 
 5. **Access the services:**
    - **PostgreSQL**: localhost:5432 (postgres/postgres)
-   - **Prometheus**: http://localhost:9090
-   - **API Server**: http://localhost:8080 (when running with `-api` flag)
+   - **Prometheus**: <http://localhost:9090>
+   - **API Server**: <http://localhost:8080> (when running with `-api` flag)
    - **Grafana**: Manual setup required (see Grafana Integration section)
 
 ## Usage
@@ -158,6 +162,7 @@ go run ./runner/main.go \
 ```
 
 **Available API endpoints:**
+
 - `GET /api/runs` - List historic benchmark runs
 - `GET /api/runs/:id` - Get specific run details
 - `GET /api/trends` - Get performance trend data
@@ -185,6 +190,7 @@ npm run preview
 ```
 
 **Dashboard Features:**
+
 - **Dashboard Page**: Overview of recent runs and performance trends
 - **Run Details**: Detailed analysis of individual benchmark runs
 - **Comparison View**: Side-by-side comparison of multiple runs
@@ -197,6 +203,7 @@ npm run preview
 For advanced time-series analysis and alerting, you can set up Grafana manually:
 
 1. **Install Grafana locally or use Docker:**
+
    ```bash
    # Using Docker
    docker run -d --name=grafana -p 3000:3000 grafana/grafana:latest
@@ -204,14 +211,14 @@ For advanced time-series analysis and alerting, you can set up Grafana manually:
    # Or install locally from https://grafana.com/grafana/download
    ```
 
-2. **Open Grafana**: http://localhost:3000 (admin/admin)
+2. **Open Grafana**: <http://localhost:3000> (admin/admin)
 
 3. **Configure data sources**:
-   - **Prometheus**: 
+   - **Prometheus**:
      - URL: `http://localhost:9090` (or `http://prometheus:9090` if using Docker network)
      - Access: Server (default)
    - **PostgreSQL** (for historic data):
-     - Host: `localhost:5432` (or `postgres:5432` if using Docker network) 
+     - Host: `localhost:5432` (or `postgres:5432` if using Docker network)
      - Database: `jsonrpc_bench`
      - User: `postgres`
      - Password: `postgres`
@@ -257,12 +264,14 @@ open comparison-results/comparison-report.html
 Configure PostgreSQL storage for historic tracking. Choose the appropriate configuration file based on your setup:
 
 **Local Development (outside Docker):**
+
 ```bash
 # Use storage-example.yaml for local PostgreSQL connection
 go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
 ```
 
 **Docker Environment:**
+
 ```bash
 # Use storage-docker.yaml when running inside Docker containers
 # (This config uses 'postgres' hostname which only exists in Docker network)
@@ -270,6 +279,7 @@ docker run ... -storage-config ./config/storage-docker.yaml
 ```
 
 **Configuration Examples:**
+
 ```yaml
 # config/storage-example.yaml (for local development)
 historic_path: "./historic"
