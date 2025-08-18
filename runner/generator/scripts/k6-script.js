@@ -25,8 +25,8 @@ export default async function () {
 
   const rpcEndpoint = __ENV.RPC_CLIENT_ENDPOINT;
 
-  const reqName = value[0];
-  const payload = JSON.parse(value[1]);
+  const reqName = value[1];
+  const payload = JSON.parse(value[2]);
   try {
     const headers = {
       "Content-Type": "application/json",

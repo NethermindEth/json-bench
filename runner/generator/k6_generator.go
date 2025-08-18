@@ -57,7 +57,7 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 		Options: types.K6Options{
 			Thresholds:        make(types.K6Thresholds, 0),
 			Scenarios:         scenarios,
-			SystemTags:        []string{"status", "url", "check", "error", "error_code"},
+			SystemTags:        []string{"scenario", "status", "url", "check", "error", "error_code"},
 			SummaryTrendStats: []string{"avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"},
 			Tags: map[string]string{
 				"testid": cfg.TestName,
@@ -68,8 +68,10 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 	// Add thresholds to config
 	config.Options.Thresholds["http_req_failed"] = []string{"rate < 0.01"}
 	for _, endpoint := range cfg.Endpoints {
-		thresholdsTarget := fmt.Sprintf("http_req_duration{req_name:%s}", endpoint.Name)
-		config.Options.Thresholds[thresholdsTarget] = endpoint.Thresholds
+		if endpoint.Thresholds != nil {
+			thresholdsTarget := fmt.Sprintf("http_req_duration{req_name:'%s'}", endpoint.Name)
+			config.Options.Thresholds[thresholdsTarget] = endpoint.Thresholds
+		}
 	}
 
 	// Add scenario to config for each client
@@ -94,14 +96,18 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 	}
 
 	// Write config file
-	configJSON, err := json.Marshal(config)
+	configFile, err := os.Create(configPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal config: %w", err)
+		return "", fmt.Errorf("failed to create config file: %w", err)
 	}
+	defer configFile.Close()
 
-	err = os.WriteFile(configPath, configJSON, 0644)
-	if err != nil {
-		return "", fmt.Errorf("failed to write config file: %w", err)
+	jsonEncoder := json.NewEncoder(configFile)
+	jsonEncoder.SetIndent("", "  ")
+	jsonEncoder.SetEscapeHTML(false)
+
+	if err = jsonEncoder.Encode(config); err != nil {
+		return "", fmt.Errorf("failed to marshal config: %w", err)
 	}
 
 	absPath, err := filepath.Abs(configPath)
@@ -140,8 +146,9 @@ func GenerateK6Payloads(cfg *config.Config, outputDir string) (string, error) {
 		for _, endpoint := range cfg.Endpoints {
 			cumFreq += endpoint.GetFrequency()
 			if reqRand < cumFreq {
+				id := reqsCount
 				payload := map[string]interface{}{
-					"id":      reqsCount,
+					"id":      id,
 					"jsonrpc": "2.0",
 					"method":  endpoint.Method,
 					"params":  endpoint.Params,
@@ -150,7 +157,8 @@ func GenerateK6Payloads(cfg *config.Config, outputDir string) (string, error) {
 				if err != nil {
 					return "", fmt.Errorf("failed to marshal payload: %w", err)
 				}
-				writer.Write([]string{strconv.Itoa(reqsCount), endpoint.Name, string(payloadJSON)})
+				writer.Write([]string{strconv.Itoa(id), endpoint.Name, string(payloadJSON)})
+				break
 			}
 		}
 		reqsCount++
@@ -211,6 +219,7 @@ func GenerateK6Cmd(
 // configureOutputs configures the outputs for the k6 command
 func configureOutputs(cfg *config.Config, cmd *exec.Cmd) *exec.Cmd {
 	if cfg.Outputs.PrometheusRW != nil {
+		cmd.Args = append(cmd.Args, "--out", "experimental-prometheus-rw")
 		cmd.Env = append(cmd.Env,
 			fmt.Sprintf("K6_PROMETHEUS_RW_SERVER_URL=%s", cfg.Outputs.PrometheusRW.GetRWEndpoint()),
 			"K6_PROMETHEUS_RW_TREND_STATS=min,max,p(95),p(99)",

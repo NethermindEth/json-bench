@@ -213,7 +213,7 @@ func main() {
 	// 	}
 	// }
 
-	logger.Info("benchmark completed successfully!")
+	logger.Info("benchmark completed")
 
 	// // Run response comparison if enabled
 	// if *compareResponses {
