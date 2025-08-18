@@ -12,10 +12,10 @@ func RunComparison(cfg *config.Config, outputDir string, validateSchema bool, co
 	// Use resolved clients directly for the comparator
 	clientsList := cfg.ResolvedClients
 
-	// Extract methods from endpoints
-	methods := make([]string, 0, len(cfg.Endpoints))
-	for _, endpoint := range cfg.Endpoints {
-		methods = append(methods, endpoint.Method)
+	// Extract methods from config
+	methods := make([]string, 0, len(cfg.Methods))
+	for _, method := range cfg.Methods {
+		methods = append(methods, method.Method)
 	}
 
 	// Create comparison config

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -42,7 +41,7 @@ func LoadCallsFromFile(filePath string, fileType string) ([]RPCCall, error) {
 
 // loadCallsFromJSON loads RPC calls from a JSON file
 func loadCallsFromJSON(filePath string) ([]RPCCall, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -93,51 +92,48 @@ func loadCallsFromJSONL(filePath string) ([]RPCCall, error) {
 	return calls, nil
 }
 
-// ExpandEndpointsWithFiles expands endpoints that reference files into individual calls
-func ExpandEndpointsWithFiles(endpoints []Endpoint) ([]Endpoint, error) {
-	var expandedEndpoints []Endpoint
+// ExpandMethodsWithFiles expands methods that reference files into individual calls
+func ExpandMethodsWithFiles(methods []Method) ([]Method, error) {
+	var expandedMethods []Method
 
-	for _, endpoint := range endpoints {
-		if endpoint.File != "" {
+	for _, method := range methods {
+		if method.File != "" {
 			// Load calls from file
-			calls, err := LoadCallsFromFile(endpoint.File, endpoint.FileType)
+			calls, err := LoadCallsFromFile(method.File, method.FileType)
 			if err != nil {
-				return nil, fmt.Errorf("failed to load calls from %s: %w", endpoint.File, err)
+				return nil, fmt.Errorf("failed to load calls from %s: %w", method.File, err)
 			}
 
-			// Create an endpoint for each call, distributing the frequency
+			// Create a method for each call, distributing the weight
 			if len(calls) > 0 {
 				// Parse frequency percentage
-				freq := endpoint.Frequency
-				if freq[len(freq)-1] == '%' {
-					freq = freq[:len(freq)-1]
-				}
-				var totalFreq int
-				fmt.Sscanf(freq, "%d", &totalFreq)
+				totalWeight := method.Weight
 
 				// Distribute frequency among calls
-				baseFreq := totalFreq / len(calls)
-				remainder := totalFreq % len(calls)
+				baseWeight := totalWeight / len(calls)
+				remainder := totalWeight % len(calls)
 
 				for i, call := range calls {
 					// Add 1 to the first 'remainder' calls to handle rounding
-					callFreq := baseFreq
+					callWeight := baseWeight
 					if i < remainder {
-						callFreq++
+						callWeight++
 					}
 
-					expandedEndpoints = append(expandedEndpoints, Endpoint{
-						Method:    call.Method,
-						Params:    call.Params,
-						Frequency: fmt.Sprintf("%d%%", callFreq),
+					expandedMethods = append(expandedMethods, Method{
+						Name:       fmt.Sprintf("%s-%d", method.Name, i), // Add a unique name to the expanded method
+						Method:     call.Method,
+						Params:     call.Params,
+						Weight:     callWeight,
+						Thresholds: method.Thresholds, // Expanded methods inherit thresholds from the original method
 					})
 				}
 			}
 		} else {
-			// Regular endpoint without file
-			expandedEndpoints = append(expandedEndpoints, endpoint)
+			// Regular method without file
+			expandedMethods = append(expandedMethods, method)
 		}
 	}
 
-	return expandedEndpoints, nil
+	return expandedMethods, nil
 }

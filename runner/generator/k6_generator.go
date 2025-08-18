@@ -53,7 +53,7 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 	configPath := path.Join(outputDir, K6ConfigFilename)
 	scenarios := make(types.K6Scenarios, len(cfg.ResolvedClients))
 	config := types.K6Config{
-		// TODO: add more k6 options to be configurable
+		// TODO: make more k6 options configurable
 		Options: types.K6Options{
 			Thresholds:        make(types.K6Thresholds, 0),
 			Scenarios:         scenarios,
@@ -67,10 +67,20 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 
 	// Add thresholds to config
 	config.Options.Thresholds["http_req_failed"] = []string{"rate < 0.01"}
-	for _, endpoint := range cfg.Endpoints {
-		if endpoint.Thresholds != nil {
-			thresholdsTarget := fmt.Sprintf("http_req_duration{req_name:'%s'}", endpoint.Name)
-			config.Options.Thresholds[thresholdsTarget] = endpoint.Thresholds
+	for _, method := range cfg.Methods {
+		if method.Thresholds != nil {
+			// If method name is empty, use the rpc method as identifier
+			identifier := method.Name
+			if identifier == "" {
+				identifier = method.Method
+			}
+			thresholdsTarget := fmt.Sprintf("http_req_duration{req_name:'%s'}", identifier)
+			// Avoid overriding existing thresholds
+			if existingThresholds, exists := config.Options.Thresholds[thresholdsTarget]; !exists {
+				config.Options.Thresholds[thresholdsTarget] = method.Thresholds
+			} else {
+				config.Options.Thresholds[thresholdsTarget] = append(existingThresholds, method.Thresholds...)
+			}
 		}
 	}
 
@@ -138,26 +148,31 @@ func GenerateK6Payloads(cfg *config.Config, outputDir string) (string, error) {
 		return "", fmt.Errorf("failed to parse config duration: %w", err)
 	}
 
+	totalWeight := 0
+	for _, method := range cfg.Methods {
+		totalWeight += method.Weight
+	}
+
 	// Calculate the number of requests to generate based on the duration and RPS
 	maxRequests := (cfg.RPS * int(duration.Seconds())) + ReqsCountThreshold
 	for reqsCount <= maxRequests {
-		reqRand := rand.Float64() * 100
+		reqRand := rand.Float64() * float64(totalWeight)
 		cumFreq := 0.0
-		for _, endpoint := range cfg.Endpoints {
-			cumFreq += endpoint.GetFrequency()
+		for _, method := range cfg.Methods {
+			cumFreq += float64(method.Weight)
 			if reqRand < cumFreq {
 				id := reqsCount
 				payload := map[string]interface{}{
 					"id":      id,
 					"jsonrpc": "2.0",
-					"method":  endpoint.Method,
-					"params":  endpoint.Params,
+					"method":  method.Method,
+					"params":  method.Params,
 				}
 				payloadJSON, err := json.Marshal(payload)
 				if err != nil {
 					return "", fmt.Errorf("failed to marshal payload: %w", err)
 				}
-				writer.Write([]string{strconv.Itoa(id), endpoint.Name, string(payloadJSON)})
+				writer.Write([]string{strconv.Itoa(id), method.Name, string(payloadJSON)})
 				break
 			}
 		}

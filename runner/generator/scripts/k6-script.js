@@ -35,6 +35,9 @@ export default async function () {
       "req_name": reqName,
       "rpc_method": payload["method"],
     }
+    if (reqName === "") {
+      tags["req_name"] = payload["method"];
+    }
 
     const response = http.post(rpcEndpoint, JSON.stringify(payload), {
       headers: headers,

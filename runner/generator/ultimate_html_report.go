@@ -669,10 +669,10 @@ func prepareUltimateReportData(cfg *config.Config, result *types.BenchmarkResult
 		EndpointNames:    make(map[string]string),
 	}
 
-	// Populate endpoint names from config
-	for _, endpoint := range cfg.Endpoints {
-		if endpoint.Name != "" {
-			data.EndpointNames[endpoint.Method] = endpoint.Name
+	// Populate methods names from config
+	for _, method := range cfg.Methods {
+		if method.Name != "" {
+			data.EndpointNames[method.Name] = method.Name
 		}
 	}
 
