@@ -180,11 +180,48 @@ func main() {
 
 	// Run k6 benchmark
 	logger.Info("running benchmark")
+	// startTime := time.Now()
 	err = k6Cmd.Run()
+	endTime := time.Now()
+	// testDuration := endTime.Sub(startTime)
 	if err != nil {
 		logger.WithError(err).Warn("k6 command execution completed with errors")
 	} else {
 		logger.WithField("summary_path", summaryPath).Info("k6 command executed successfully")
+	}
+
+	// Collect benchmark results
+	clientsMetrics, err := metrics.CollectClientsMetrics(cfg, endTime, summaryPath)
+	if err != nil {
+		logger.WithError(err).Warn("failed to collect benchmark clients metrics")
+	}
+
+	// Log summary of p99 validation
+	totalMethods := 0
+	methodsWithP99 := 0
+	methodsWithZeroP99 := 0
+
+	for clientName, client := range clientsMetrics {
+		for methodName, method := range client.Methods {
+			totalMethods++
+			if method.P99 > 0 {
+				methodsWithP99++
+			} else if method.Count > 0 {
+				// Only count as zero if there were actual calls
+				methodsWithZeroP99++
+				logger.Warnf("method %s.%s has zero p99 value (count: %d, avg: %.2f)",
+					clientName, methodName, method.Count, method.Avg)
+			}
+		}
+	}
+
+	if totalMethods > 0 {
+		p99Coverage := float64(methodsWithP99) / float64(totalMethods) * 100
+		logger.Infof("p99 validation summary: %d/%d methods have p99 values (%.1f%% coverage)",
+			methodsWithP99, totalMethods, p99Coverage)
+		if methodsWithZeroP99 > 0 {
+			logger.Warnf("%d methods with actual traffic have p99=0", methodsWithZeroP99)
+		}
 	}
 
 	// // Add system metrics to results if available

@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { group, check } from 'k6';
 import fs from 'k6/experimental/fs';
 import csv from 'k6/experimental/csv';
 
@@ -39,19 +39,20 @@ export default async function () {
       tags["req_name"] = payload["method"];
     }
 
-    const response = http.post(rpcEndpoint, JSON.stringify(payload), {
-      headers: headers,
-      tags: tags,
+    group(reqName, function() {
+      const response = http.post(rpcEndpoint, JSON.stringify(payload), {
+        headers: headers,
+        tags: tags,
+      });
+      // Checks
+      check(response, {
+        'status_200': (r) => r.status === 200,
+        'has_result': (r) => {
+          const data = r.json();
+          return data !== undefined && data.result !== undefined && data.error === undefined;
+        },
+      }, tags);
     });
-
-    // Checks
-    check(response, {
-      'status_200': (r) => r.status === 200,
-      'has_result': (r) => {
-        const data = r.json();
-        return data !== undefined && data.result !== undefined && data.error === undefined;
-      },
-    }, tags);
   } catch (e) {
     console.error(e);
   }

@@ -57,7 +57,7 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 		Options: types.K6Options{
 			Thresholds:        make(types.K6Thresholds, 0),
 			Scenarios:         scenarios,
-			SystemTags:        []string{"scenario", "status", "url", "check", "error", "error_code"},
+			SystemTags:        []string{"scenario", "status", "url", "group", "check", "error", "error_code"},
 			SummaryTrendStats: []string{"avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"},
 			Tags: map[string]string{
 				"testid": cfg.TestName,
@@ -218,6 +218,7 @@ func GenerateK6Cmd(
 		absScriptPath,
 		"--env", fmt.Sprintf("RPC_PAYLOADS_FILE_PATH=%s", absPayloadsPath),
 		"--env", fmt.Sprintf("RPC_CONFIG_FILE_PATH=%s", absConfigPath),
+		"--summary-mode", "full",
 		"--summary-export", absSummaryPath,
 	}
 
@@ -237,7 +238,7 @@ func configureOutputs(cfg *config.Config, cmd *exec.Cmd) *exec.Cmd {
 		cmd.Args = append(cmd.Args, "--out", "experimental-prometheus-rw")
 		cmd.Env = append(cmd.Env,
 			fmt.Sprintf("K6_PROMETHEUS_RW_SERVER_URL=%s", cfg.Outputs.PrometheusRW.GetRWEndpoint()),
-			"K6_PROMETHEUS_RW_TREND_STATS=min,max,p(95),p(99)",
+			"K6_PROMETHEUS_RW_TREND_STATS=min,max,avg,med,p(90),p(95),p(99)",
 		)
 		if cfg.Outputs.PrometheusRW.BasicAuth.Username != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("K6_PROMETHEUS_RW_USERNAME=%s", cfg.Outputs.PrometheusRW.BasicAuth.Username))
