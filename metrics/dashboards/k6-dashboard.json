@@ -20,7 +20,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 19665,
   "graphTooltip": 2,
-  "id": 6,
+  "id": 7,
   "links": [
     {
       "asDropdown": false,
@@ -951,7 +951,7 @@
           "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_duration_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "A"
         },
@@ -963,7 +963,7 @@
           "editorMode": "code",
           "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"true\"})",
           "instant": false,
-          "legendFormat": "success_http_req_duration_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "success_http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "C"
         },
@@ -976,7 +976,7 @@
           "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"false\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "errors_http_req_duration_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "errors_http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "B"
         }
@@ -1092,7 +1092,7 @@
           "expr": "avg by(scenario, req_name) (k6_http_req_blocked_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_blocked_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_blocked_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "B"
         },
@@ -1105,7 +1105,7 @@
           "expr": "avg by(scenario, req_name) (k6_http_req_tls_handshaking_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_tls_handshaking_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_tls_handshaking_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "C"
         },
@@ -1118,7 +1118,7 @@
           "expr": "avg by(scenario, req_name) (k6_http_req_sending_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_sending_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_sending_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "D"
         },
@@ -1131,7 +1131,7 @@
           "expr": "avg by(scenario, req_name) (k6_http_req_waiting_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_waiting_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_waiting_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "E"
         },
@@ -1144,7 +1144,7 @@
           "expr": "avg by(scenario, req_name) (k6_http_req_receiving_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_receiving_$quantile_stat - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_receiving_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "F"
         }
@@ -1320,7 +1320,7 @@
           "editorMode": "code",
           "expr": "sum by (scenario, req_name) (irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
           "instant": false,
-          "legendFormat": "http_req_s - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_s - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "A"
         },
@@ -1333,7 +1333,7 @@
           "expr": "sum by (scenario, req_name) (irate(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"false\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_s_errors - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_s_errors - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "B"
         },
@@ -1346,7 +1346,7 @@
           "expr": "sum by (scenario, req_name) (irate(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"true\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_s_success - {{scenario}} {{req_name}}",
+          "legendFormat": "http_req_s_success - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "C"
         }
@@ -1471,7 +1471,7 @@
         ]
       },
       "gridPos": {
-        "h": 7,
+        "h": 9,
         "w": 24,
         "x": 0,
         "y": 65
@@ -1499,7 +1499,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_min{testid=~\"$testid\"})",
+          "expr": "avg by(name, method, status, scenario) (k6_http_req_duration_min{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1513,7 +1513,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_max{testid=~\"$testid\"})",
+          "expr": "avg by(name, method, status, scenario) (k6_http_req_duration_max{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1527,7 +1527,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_p95{testid=~\"$testid\"})",
+          "expr": "avg by(name, method, status, scenario) (k6_http_req_duration_p95{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1541,7 +1541,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(name, method, status) (k6_http_req_duration_p99{testid=~\"$testid\"})",
+          "expr": "avg by(name, method, status, scenario) (k6_http_req_duration_p99{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1592,6 +1592,10 @@
                 "aggregations": [],
                 "operation": "groupby"
               },
+              "scenario": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
               "status": {
                 "aggregations": [],
                 "operation": "groupby"
@@ -1636,7 +1640,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 74
       },
       "id": 11,
       "panels": [],
@@ -1665,7 +1669,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           }
@@ -1717,7 +1722,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 75
       },
       "id": 12,
       "options": {
@@ -1869,7 +1874,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -1881,7 +1887,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 73
+        "y": 75
       },
       "id": 13,
       "options": {
@@ -1922,7 +1928,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 81
+        "y": 83
       },
       "id": 23,
       "options": {
@@ -1938,7 +1944,7 @@
       "type": "text"
     }
   ],
-  "refresh": "",
+  "refresh": false,
   "schemaVersion": 38,
   "tags": [
     "prometheus",
@@ -2049,6 +2055,6 @@
   "timezone": "",
   "title": "k6 Prometheus",
   "uid": "ccbb2351-2ae2-462f-ae0e-f2c893ad1028",
-  "version": 5,
+  "version": 3,
   "weekStart": ""
 }
