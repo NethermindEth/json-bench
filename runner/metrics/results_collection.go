@@ -64,7 +64,7 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 
 	// Get benchmark metrics
 	query, _, err := api.Query(context.Background(),
-		`{__name__=~"k6_http_req.+"}`,
+		fmt.Sprintf(`{__name__=~"k6_http_req.+",testid="%s"}`, cfg.TestName),
 		timestamp,
 	)
 	if err != nil {
@@ -147,6 +147,7 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			}
 		} else if strings.EqualFold(string(metricName), "k6_http_reqs_total") { // Parse total requests metrics per tags
 			_, isError := sample.Metric["error_code"]
+			method.Count += int64(metricValue)
 			if isError {
 				method.ErrorCount += int64(metricValue)
 				// Update rates with latest available values
@@ -154,9 +155,8 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			} else {
 				method.SuccessCount += int64(metricValue)
 				// Update rates with latest available values
-				method.SuccessRate = float64(method.SuccessCount) / float64(method.Count)
+				method.SuccessRate = (float64(method.SuccessCount) / float64(method.Count)) * 100
 			}
-			method.Count += int64(metricValue)
 		}
 		// Update method metrics
 		client.Methods[string(metricMethod)] = method

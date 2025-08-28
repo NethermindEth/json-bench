@@ -1,70 +1,13 @@
 package generator
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/jsonrpc-bench/runner/config"
-	"github.com/jsonrpc-bench/runner/storage"
 	"github.com/jsonrpc-bench/runner/types"
-	"github.com/sirupsen/logrus"
 )
-
-// runHistoricAnalysis runs historic analysis mode
-func RunHistoricAnalysis(cfg *config.Config, historicStorage *storage.HistoricStorage, outputDir string, logger *logrus.Logger) error {
-	ctx := context.Background()
-
-	logger.Info("Running historic analysis mode")
-
-	// Extract test name from config
-	testName := cfg.TestName
-	if testName == "" {
-		testName = "unknown"
-	}
-
-	// Get historic summary
-	filter := types.RunFilter{
-		TestName: testName,
-		Limit:    100,
-	}
-	summary, err := historicStorage.GetHistoricSummary(ctx, filter)
-	if err != nil {
-		return fmt.Errorf("failed to get historic summary: %w", err)
-	}
-
-	logger.WithFields(logrus.Fields{
-		"total_runs": summary.TotalRuns,
-	}).Info("Historic summary retrieved")
-
-	// Get recent trends for key metrics using TrendFilter
-	trendFilter := types.TrendFilter{
-		Since: time.Now().AddDate(0, 0, -30),
-	}
-	trendData, err := historicStorage.GetHistoricTrends(ctx, trendFilter)
-	if err != nil {
-		logger.WithError(err).Warn("Failed to get historic trends")
-	}
-	// Get recent runs for comparison
-	filter2 := types.RunFilter{
-		TestName: testName,
-		Limit:    10,
-	}
-	recentRuns, err := historicStorage.ListHistoricRuns(ctx, filter2)
-	if err != nil {
-		logger.WithError(err).Warn("Failed to get recent runs")
-	}
-
-	// Generate historic analysis report
-	if err := GenerateHistoricAnalysisReport(summary, trendData, recentRuns, outputDir); err != nil {
-		return fmt.Errorf("failed to generate historic analysis report: %w", err)
-	}
-
-	logger.Info("Historic analysis completed successfully")
-	return nil
-}
 
 // GenerateHistoricAnalysisReport generates an HTML report for historic analysis
 func GenerateHistoricAnalysisReport(summary *types.HistoricSummary, trends []*types.TrendData, recentRuns []*types.HistoricRun, outputDir string) error {

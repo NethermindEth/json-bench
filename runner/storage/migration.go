@@ -14,8 +14,8 @@ type Migration struct {
 }
 
 // RunMigrations runs all database migrations
-func RunMigrations(db *sql.DB) error {
-	log := logrus.WithField("component", "migration")
+func RunMigrations(db *sql.DB, logger *logrus.Logger) error {
+	log := logger.WithField("component", "migration")
 
 	// Create migration tracking table
 	if err := createMigrationTable(db); err != nil {
