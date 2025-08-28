@@ -32,12 +32,12 @@ func (cl *ConfigLoader) LoadTestConfig(filename string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal test config: %w", err)
 	}
 
-	// Expand endpoints that reference files
-	expandedEndpoints, err := ExpandEndpointsWithFiles(config.Endpoints)
+	// Expand methods that reference files
+	expandedMethods, err := ExpandMethodsWithFiles(config.Methods)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based endpoints: %w", err)
+		return nil, fmt.Errorf("failed to expand file-based methods: %w", err)
 	}
-	config.Endpoints = expandedEndpoints
+	config.Methods = expandedMethods
 
 	// Validate the configuration
 	if err := validateConfig(&config); err != nil {
@@ -122,7 +122,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Clients           []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
 		Duration          string               `yaml:"duration"`
 		RPS               int                  `yaml:"rps"`
-		Endpoints         []Endpoint           `yaml:"endpoints"`
+		Methods           []Method             `yaml:"methods"`
 		ValidateResponses bool                 `yaml:"validate_responses"`
 	}
 
@@ -137,7 +137,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Description:       oldConfig.Description,
 		Duration:          oldConfig.Duration,
 		RPS:               oldConfig.RPS,
-		Endpoints:         oldConfig.Endpoints,
+		Methods:           oldConfig.Methods,
 		ValidateResponses: oldConfig.ValidateResponses,
 		ClientRefs:        make([]string, 0, len(oldConfig.Clients)),
 		ResolvedClients:   make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
@@ -163,12 +163,12 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		newConfig.ResolvedClients = append(newConfig.ResolvedClients, client)
 	}
 
-	// Expand endpoints that reference files
-	expandedEndpoints, err := ExpandEndpointsWithFiles(newConfig.Endpoints)
+	// Expand methods that reference files
+	expandedMethods, err := ExpandMethodsWithFiles(newConfig.Methods)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based endpoints: %w", err)
+		return nil, fmt.Errorf("failed to expand file-based methods: %w", err)
 	}
-	newConfig.Endpoints = expandedEndpoints
+	newConfig.Methods = expandedMethods
 
 	// Validate the configuration
 	if err := validateConfig(newConfig); err != nil {

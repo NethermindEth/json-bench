@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -17,7 +17,6 @@ import (
 	"github.com/jsonrpc-bench/runner/analysis"
 	"github.com/jsonrpc-bench/runner/analyzer"
 	"github.com/jsonrpc-bench/runner/api"
-	"github.com/jsonrpc-bench/runner/comparator"
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/exporter"
 	"github.com/jsonrpc-bench/runner/generator"
@@ -30,11 +29,14 @@ func main() {
 	// Parse command-line flags
 	configPath := flag.String("config", "", "Path to YAML configuration file")
 	clientsPath := flag.String("clients", "", "Path to clients configuration file (optional)")
-	outputDir := flag.String("output", "results", "Directory to store results")
-	compareResponses := flag.Bool("compare", false, "Compare JSON-RPC responses across clients")
-	validateSchema := flag.Bool("validate", true, "Validate responses against OpenRPC schema")
-	concurrency := flag.Int("concurrency", 5, "Number of concurrent requests for comparison")
-	timeout := flag.Int("timeout", 30, "Request timeout in seconds for comparison")
+	outputDir := flag.String("output", "outputs", "Directory to store outputs")
+	prometheusRWEndpoint := flag.String("prometheus-rw", "http://localhost:9090", "Prometheus remote write endpoint for metrics")
+	prometheusRWUsername := flag.String("prometheus-rw-user", "", "Prometheus remote write username for basic authentication (optional)")
+	prometheusRWPassword := flag.String("prometheus-rw-pass", "", "Prometheus remote write password for basic authentication (optional)")
+	// compareResponses := flag.Bool("compare", false, "Compare JSON-RPC responses across clients")
+	// validateSchema := flag.Bool("validate", true, "Validate responses against OpenRPC schema")
+	// concurrency := flag.Int("concurrency", 5, "Number of concurrent requests for comparison")
+	// timeout := flag.Int("timeout", 30, "Request timeout in seconds for comparison")
 
 	// Historic storage flags
 	enableHistoric := flag.Bool("historic", false, "Enable historic data storage and analysis")
@@ -42,6 +44,7 @@ func main() {
 	historicMode := flag.Bool("historic-mode", false, "Run in historic analysis mode (no new benchmark)")
 
 	// API server flags
+	apiAddr := flag.String("api-addr", ":8081", "Address to bind the API server to")
 	apiMode := flag.Bool("api", false, "Run in API server mode (HTTP server + WebSocket)")
 
 	flag.Parse()
@@ -64,14 +67,14 @@ func main() {
 
 	// API server mode
 	if *apiMode {
-		if err := runAPIServer(*storageConfig, logger); err != nil {
-			log.Fatalf("API server failed: %v", err)
+		if err := runAPIServer(*storageConfig, *apiAddr, logger); err != nil {
+			logger.WithError(err).Fatal("api server failed")
 		}
 		return
 	}
 
-	if *configPath == "" && !*historicMode {
-		log.Fatal("Please provide a configuration file path using -config flag")
+	if *configPath == "" {
+		logger.Fatal("Please provide a configuration file path using -config flag")
 	}
 
 	// Initialize client registry
@@ -80,7 +83,7 @@ func main() {
 	// Load clients configuration if provided
 	if *clientsPath != "" {
 		if err := clientRegistry.LoadFromFile(*clientsPath); err != nil {
-			log.Fatalf("Failed to load clients configuration: %v", err)
+			logger.WithError(err).Fatal("Failed to load clients configuration")
 		}
 		logger.Info("Loaded clients configuration from ", *clientsPath)
 	}
@@ -99,26 +102,40 @@ func main() {
 		cfg, err = configLoader.LoadWithBackwardCompatibility(*configPath)
 	}
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		logger.WithError(err).Fatal("failed to load configuration")
+	}
+
+	// Add outputs to the config
+	cfg.Outputs = new(config.Outputs)
+	if *prometheusRWEndpoint != "" {
+		cfg.Outputs.PrometheusRW = &config.PrometheusRW{
+			Endpoint: *prometheusRWEndpoint,
+			BasicAuth: config.BasicAuth{
+				Username: *prometheusRWUsername,
+				Password: *prometheusRWPassword,
+			},
+		}
+	} else {
+		logger.Fatal("No metrics outputs configured")
 	}
 
 	// Initialize historic storage if enabled
 	var historicStorage *storage.HistoricStorage
 	if *enableHistoric || *historicMode {
 		if *storageConfig == "" {
-			log.Fatal("Storage configuration path is required when historic mode is enabled. Use -storage-config flag.")
+			logger.Fatal("Storage configuration path is required when historic mode is enabled. Use -storage-config flag")
 		}
 
 		storageCfg, err := config.LoadStorageConfig(*storageConfig, logger)
 		if err != nil {
-			log.Fatalf("Failed to load storage configuration: %v", err)
+			logger.WithError(err).Fatal("Failed to load storage configuration")
 		}
 
 		if storageCfg.EnableHistoric {
 			// Initialize PostgreSQL storage
 			db, err := sql.Open("postgres", storageCfg.PostgreSQL.ConnectionString())
 			if err != nil {
-				log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+				logger.WithError(err).Fatal("Failed to connect to postgres database")
 			}
 			defer db.Close()
 
@@ -126,82 +143,116 @@ func main() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := db.PingContext(ctx); err != nil {
-				log.Fatalf("Failed to ping PostgreSQL database: %v", err)
+				logger.WithError(err).Fatal("Failed to ping postgres database")
 			}
 
 			// Run migrations
-			if err := storage.RunMigrations(db); err != nil {
-				log.Fatalf("Failed to run database migrations: %v", err)
+			if err := storage.RunMigrations(db, logger); err != nil {
+				logger.WithError(err).Fatal("Failed to run database migrations")
 			}
 
 			// Initialize historic storage
-			historicStorage, err = storage.NewHistoricStorage(storageCfg)
+			historicStorage, err = storage.NewHistoricStorage(storageCfg, logger)
 			if err != nil {
-				log.Fatalf("Failed to create historic storage: %v", err)
+				logger.WithError(err).Fatal("Failed to create historic storage")
 			}
 
 			logger.Info("Historic storage initialized successfully")
 		} else {
-			log.Fatal("Historic storage must be enabled in configuration")
+			logger.Fatal("Historic storage must be enabled in configuration")
 		}
 	}
 
 	// Handle historic mode (analysis only, no new benchmark)
 	if *historicMode {
 		if err := runHistoricAnalysis(cfg, historicStorage, *outputDir, logger); err != nil {
-			log.Fatalf("Historic analysis failed: %v", err)
+			logger.WithError(err).Fatal("Historic analysis failed")
 		}
 		return
 	}
 
 	// Create output directory if it doesn't exist
 	if err := os.MkdirAll(*outputDir, 0755); err != nil {
-		log.Fatalf("Failed to create output directory: %v", err)
+		logger.WithError(err).Fatal("Failed to create output directory")
 	}
 
 	// Generate k6 script
-	scriptPath := filepath.Join(*outputDir, "k6-script.js")
-	if err := generator.GenerateK6Script(cfg, scriptPath); err != nil {
-		log.Fatalf("Failed to generate k6 script: %v", err)
+
+	k6Cmd, summaryPath, err := generator.GenerateK6(cfg, *outputDir)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to generate k6 command")
 	}
-	fmt.Printf("Generated k6 script at: %s\n", scriptPath)
 
 	// Start system metrics collection
 	systemCollector, err := metrics.NewSystemCollector(1 * time.Second)
 	if err != nil {
-		log.Printf("Warning: Failed to create system collector: %v", err)
+		logger.WithError(err).Warn("Failed to create system collector")
 	} else {
 		systemCollector.Start()
 		defer systemCollector.Stop()
 	}
 
 	// Run k6 benchmark
-	fmt.Println("Running benchmark...")
-	results, err := generator.RunK6Benchmark(scriptPath, *outputDir)
+	logger.Info("Running benchmark")
+	startTime := time.Now()
+	err = k6Cmd.Run()
+	endTime := time.Now()
+	testDuration := endTime.Sub(startTime)
 	if err != nil {
-		// Log the error but continue to generate the report
-		log.Printf("Benchmark execution warning: %v", err)
+		logger.WithError(err).Warn("K6 command execution completed with errors")
+	} else {
+		logger.WithField("summary_path", summaryPath).Info("K6 command executed successfully")
+	}
+
+	// Collect k6 summary
+	k6SummaryRaw, err := os.ReadFile(summaryPath)
+	if err != nil {
+		logger.WithError(err).Warn("Failed to read k6 summary file")
+	}
+
+	var k6Summary map[string]any
+	if err := json.Unmarshal([]byte(k6SummaryRaw), &k6Summary); err != nil {
+		logger.WithError(err).Warn("Failed to unmarshal k6 summary")
+	}
+
+	// Collect benchmark results
+	clientsMetrics, err := metrics.CollectClientsMetrics(cfg, endTime, summaryPath)
+	if err != nil {
+		logger.WithError(err).Warn("Failed to collect benchmark clients metrics")
+	}
+
+	// Log summary of p99 validation
+	logP99Validation(clientsMetrics, logger)
+
+	benchmarkResults := &types.BenchmarkResult{
+		Summary:       k6Summary,
+		ClientMetrics: clientsMetrics,
+		Timestamp:     time.Now().Format(time.DateTime),
+		StartTime:     startTime.Format(time.DateTime),
+		EndTime:       endTime.Format(time.DateTime),
+		Duration:      testDuration.String(),
+		ResponsesDir:  *outputDir,
 	}
 
 	// Add system metrics to results if available
 	if systemCollector != nil {
 		avgMetrics := systemCollector.GetAverageMetrics()
 		// Add system metrics to each client
-		for _, client := range results.ClientMetrics {
+		for _, client := range benchmarkResults.ClientMetrics {
 			client.SystemMetrics = []types.SystemMetrics{avgMetrics}
 		}
 	}
 
 	// Add environment info
-	results.Environment = metrics.GetEnvironmentInfo()
+	benchmarkResults.Environment = metrics.GetEnvironmentInfo()
 
 	// Perform performance analysis
 	performanceAnalyzer := analyzer.NewPerformanceAnalyzer()
-	performanceAnalyzer.AnalyzeResults(results)
+	performanceAnalyzer.AnalyzeResults(benchmarkResults)
 
 	// Save to historic storage if enabled
 	if *enableHistoric && historicStorage != nil {
-		savedRun, err := historicStorage.SaveRun(results, cfg)
+		savedRun, err := historicStorage.SaveRun(benchmarkResults, cfg)
 		if err != nil {
 			logger.WithError(err).Error("Failed to save historic run")
 		} else {
@@ -211,91 +262,68 @@ func main() {
 
 	// Generate ultimate HTML report
 	reportPath := filepath.Join(*outputDir, "report.html")
-	if err := generator.GenerateUltimateHTMLReport(cfg, results, reportPath); err != nil {
+	if err := generator.GenerateUltimateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
 		// Fallback to enhanced report if ultimate fails
-		log.Printf("Warning: Ultimate report generation failed, falling back to enhanced report: %v", err)
-		if err := generator.GenerateEnhancedHTMLReport(cfg, results, reportPath); err != nil {
+		logger.Warnf("Ultimate report generation failed, falling back to enhanced report: %v", err)
+		if err := generator.GenerateEnhancedHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
 			// Fallback to old report generator if enhanced fails
-			log.Printf("Warning: Enhanced report generation failed, falling back to basic report: %v", err)
-			if err := generator.GenerateHTMLReport(cfg, results, reportPath); err != nil {
-				log.Fatalf("Failed to generate HTML report: %v", err)
+			logger.Warnf("Enhanced report generation failed, falling back to basic report: %v", err)
+			if err := generator.GenerateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
+				logger.Fatalf("Failed to generate HTML report: %v", err)
 			}
 		}
 	}
-	fmt.Printf("Generated HTML report at: %s\n", reportPath)
+	logger.Infof("Generated HTML report at: %s", reportPath)
 
 	// Export data in multiple formats
 	dataExporter := exporter.NewDataExporter(*outputDir)
-	if err := dataExporter.ExportAll(results); err != nil {
-		log.Printf("Warning: Failed to export data: %v", err)
+	if err := dataExporter.ExportAll(benchmarkResults); err != nil {
+		logger.Warnf("Failed to export data: %v", err)
 	} else {
-		fmt.Println("Exported data to CSV and JSON formats")
+		logger.Info("Exported data to CSV and JSON formats")
 	}
 
-	fmt.Println("Benchmark completed successfully!")
+	logger.Info("Benchmark completed")
 
-	// Run response comparison if enabled
-	if *compareResponses {
-		fmt.Println("\nStarting JSON-RPC response comparison...")
-		if err := runComparison(cfg, *outputDir, *validateSchema, *concurrency, *timeout); err != nil {
-			log.Printf("Response comparison warning: %v", err)
-		} else {
-			fmt.Println("Response comparison completed successfully!")
-		}
-	}
+	// // Run response comparison if enabled
+	// if *compareResponses {
+	// 	fmt.Println("\nStarting JSON-RPC response comparison...")
+	// 	if err := runComparison(cfg, *outputDir, *validateSchema, *concurrency, *timeout); err != nil {
+	// 		log.Printf("Response comparison warning: %v", err)
+	// 	} else {
+	// 		fmt.Println("Response comparison completed successfully!")
+	// 	}
+	// }
 }
 
-// runComparison runs a comparison of JSON-RPC responses across all clients in the config
-func runComparison(cfg *config.Config, outputDir string, validateSchema bool, concurrency, timeout int) error {
-	// Use resolved clients directly for the comparator
-	clientsList := cfg.ResolvedClients
+// logP99Validation logs a summary of p99 validation
+func logP99Validation(clientsMetrics map[string]*types.ClientMetrics, logger *logrus.Logger) {
+	totalMethods := 0
+	methodsWithP99 := 0
+	methodsWithZeroP99 := 0
 
-	// Extract methods from endpoints
-	methods := make([]string, 0, len(cfg.Endpoints))
-	for _, endpoint := range cfg.Endpoints {
-		methods = append(methods, endpoint.Method)
+	for clientName, client := range clientsMetrics {
+		for methodName, method := range client.Methods {
+			totalMethods++
+			if method.P99 > 0 {
+				methodsWithP99++
+			} else if method.Count > 0 {
+				// Only count as zero if there were actual calls
+				methodsWithZeroP99++
+				logger.Warnf("Method %s.%s has zero p99 value (count: %d, avg: %.2f)",
+					clientName, methodName, method.Count, method.Avg)
+			}
+		}
 	}
 
-	// Create comparison config
-	compConfig := &comparator.ComparisonConfig{
-		Name:                  "Benchmark Response Comparison",
-		Description:           "Comparing JSON-RPC responses across clients from benchmark config",
-		Clients:               clientsList,
-		Methods:               methods,
-		ValidateAgainstSchema: validateSchema,
-		Concurrency:           concurrency,
-		TimeoutSeconds:        timeout,
-		OutputDir:             outputDir,
+	if totalMethods > 0 {
+		p99Coverage := float64(methodsWithP99) / float64(totalMethods) * 100
+		logger.Infof("P99 validation summary: %d/%d methods have p99 values (%.1f%% coverage)",
+			methodsWithP99, totalMethods, p99Coverage)
+		if methodsWithZeroP99 > 0 {
+			logger.Warnf("%d methods with actual traffic have p99=0", methodsWithZeroP99)
+		}
 	}
-
-	// Create comparator
-	comp, err := comparator.NewComparator(compConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create comparator: %w", err)
-	}
-
-	// Run comparison
-	results, err := comp.Run()
-	if err != nil {
-		return fmt.Errorf("comparison failed: %w", err)
-	}
-	fmt.Printf("Completed comparison of %d methods\n", len(results))
-
-	// Save results to JSON file
-	jsonPath := filepath.Join(outputDir, "comparison-results.json")
-	if err := comp.SaveResults(jsonPath); err != nil {
-		return fmt.Errorf("failed to save comparison results: %w", err)
-	}
-	fmt.Printf("Comparison results saved to %s\n", jsonPath)
-
-	// Generate HTML report
-	htmlPath := filepath.Join(outputDir, "comparison-report.html")
-	if err := comp.GenerateHTMLReport(htmlPath); err != nil {
-		return fmt.Errorf("failed to generate comparison HTML report: %w", err)
-	}
-	fmt.Printf("Comparison HTML report generated at %s\n", htmlPath)
-
-	return nil
 }
 
 // runHistoricAnalysis runs historic analysis mode
@@ -343,7 +371,7 @@ func runHistoricAnalysis(cfg *config.Config, historicStorage *storage.HistoricSt
 	}
 
 	// Generate historic analysis report
-	if err := generateHistoricAnalysisReport(summary, trendData, recentRuns, outputDir); err != nil {
+	if err := generator.GenerateHistoricAnalysisReport(summary, trendData, recentRuns, outputDir); err != nil {
 		return fmt.Errorf("failed to generate historic analysis report: %w", err)
 	}
 
@@ -351,139 +379,8 @@ func runHistoricAnalysis(cfg *config.Config, historicStorage *storage.HistoricSt
 	return nil
 }
 
-// generateHistoricAnalysisReport generates an HTML report for historic analysis
-func generateHistoricAnalysisReport(summary *types.HistoricSummary, trends []*types.TrendData, recentRuns []*types.HistoricRun, outputDir string) error {
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-
-	reportPath := filepath.Join(outputDir, "historic-analysis.html")
-
-	// Simple HTML template for historic analysis
-	htmlContent := fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Historic Analysis Report - %s</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { background-color: #f4f4f4; padding: 20px; border-radius: 5px; }
-        .section { margin: 20px 0; }
-        .metrics { display: flex; flex-wrap: wrap; gap: 20px; }
-        .metric-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; min-width: 200px; }
-        .trend-improving { color: green; }
-        .trend-degrading { color: red; }
-        .trend-stable { color: orange; }
-        table { border-collapse: collapse; width: 100%%; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Historic Analysis Report</h1>
-        <h2>Test: %s</h2>
-        <p><strong>Total Runs:</strong> %d</p>
-        <p><strong>Period:</strong> %s to %s</p>
-    </div>
-    
-    <div class="section">
-        <h3>Performance Trends (Last 30 Days)</h3>
-        <div class="metrics">
-`, summary.TestName, summary.TestName, summary.TotalRuns,
-		summary.FirstRun.Format("2006-01-02"), summary.LastRun.Format("2006-01-02"))
-
-	// Add trend cards
-	for i, trend := range trends {
-		trendClass := "trend-" + trend.Direction
-		htmlContent += fmt.Sprintf(`
-            <div class="metric-card">
-                <h4>Trend %d - %s</h4>
-                <p class="%s"><strong>Direction:</strong> %s</p>
-                <p><strong>Data Points:</strong> %d</p>
-                <p><strong>Change:</strong> %.2f%%</p>
-            </div>
-`, i+1, trend.Period, trendClass, trend.Direction, len(trend.TrendPoints), trend.PercentChange)
-	}
-
-	htmlContent += `
-        </div>
-    </div>
-    
-    <div class="section">
-        <h3>Recent Runs</h3>
-        <table>
-            <tr>
-                <th>Run ID</th>
-                <th>Timestamp</th>
-                <th>Git Commit</th>
-                <th>Best Client</th>
-                <th>Avg Latency (ms)</th>
-                <th>Error Rate (%)</th>
-                <th>Total Requests</th>
-            </tr>
-`
-
-	// Add recent runs
-	for _, run := range recentRuns {
-		htmlContent += fmt.Sprintf(`
-            <tr>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%.2f</td>
-                <td>%.2f</td>
-                <td>%d</td>
-            </tr>
-`, run.ID, run.Timestamp.Format("2006-01-02 15:04:05"),
-			run.GitCommit, run.BestClient, run.AvgLatencyMs,
-			run.OverallErrorRate*100, run.TotalRequests)
-	}
-
-	htmlContent += `
-        </table>
-    </div>
-    
-    <div class="section">
-        <h3>Best and Worst Performance</h3>
-        <div class="metrics">
-            <div class="metric-card">
-                <h4>Best Run</h4>
-                <p><strong>Run ID:</strong> ` + summary.BestRun.ID + `</p>
-                <p><strong>Timestamp:</strong> ` + summary.BestRun.Timestamp.Format("2006-01-02 15:04:05") + `</p>
-                <p><strong>Avg Latency:</strong> ` + fmt.Sprintf("%.2f ms", summary.BestRun.AvgLatency) + `</p>
-                <p><strong>Error Rate:</strong> ` + fmt.Sprintf("%.2f%%", summary.BestRun.OverallErrorRate) + `</p>
-            </div>
-            <div class="metric-card">
-                <h4>Worst Run</h4>
-                <p><strong>Run ID:</strong> ` + summary.WorstRun.ID + `</p>
-                <p><strong>Timestamp:</strong> ` + summary.WorstRun.Timestamp.Format("2006-01-02 15:04:05") + `</p>
-                <p><strong>Avg Latency:</strong> ` + fmt.Sprintf("%.2f ms", summary.WorstRun.AvgLatency) + `</p>
-                <p><strong>Error Rate:</strong> ` + fmt.Sprintf("%.2f%%", summary.WorstRun.OverallErrorRate) + `</p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="section">
-        <p><em>Report generated on ` + time.Now().Format("2006-01-02 15:04:05") + `</em></p>
-    </div>
-</body>
-</html>
-`
-
-	// Write the report
-	if err := os.WriteFile(reportPath, []byte(htmlContent), 0644); err != nil {
-		return fmt.Errorf("failed to write historic analysis report: %w", err)
-	}
-
-	fmt.Printf("Historic analysis report generated at: %s\n", reportPath)
-	return nil
-}
-
 // runAPIServer runs the HTTP API server for serving historic data
-func runAPIServer(storageConfigPath string, logger *logrus.Logger) error {
+func runAPIServer(storageConfigPath string, apiAddr string, logger *logrus.Logger) error {
 	if storageConfigPath == "" {
 		return fmt.Errorf("storage configuration path is required for API server mode")
 	}
@@ -505,16 +402,16 @@ func runAPIServer(storageConfigPath string, logger *logrus.Logger) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		return fmt.Errorf("failed to ping PostgreSQL database: %w", err)
+		return fmt.Errorf("failed to ping postgres database: %w", err)
 	}
 
 	// Run migrations
-	if err := storage.RunMigrations(db); err != nil {
+	if err := storage.RunMigrations(db, logger); err != nil {
 		return fmt.Errorf("failed to run database migrations: %w", err)
 	}
 
 	// Initialize historic storage
-	historicStorage, err := storage.NewHistoricStorage(storageCfg)
+	historicStorage, err := storage.NewHistoricStorage(storageCfg, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create historic storage: %w", err)
 	}
@@ -526,6 +423,7 @@ func runAPIServer(storageConfigPath string, logger *logrus.Logger) error {
 
 	// Create API server
 	apiServer := api.NewServer(
+		apiAddr,
 		*historicStorage,
 		baselineManager,
 		trendAnalyzer,
@@ -540,10 +438,8 @@ func runAPIServer(storageConfigPath string, logger *logrus.Logger) error {
 
 	// Start API server
 	if err := apiServer.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start API server: %w", err)
+		return fmt.Errorf("failed to start api server: %w", err)
 	}
-
-	logger.Info("API server started successfully on port 8081")
 	logger.Info("Press Ctrl+C to stop the server")
 
 	// Setup signal handling for graceful shutdown

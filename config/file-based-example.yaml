@@ -9,24 +9,28 @@ clients:
   - besu_40031
 duration: "2m"
 rps: 100
-endpoints:
+methods:
   # Regular endpoint definition
-  - method: "eth_blockNumber"
+  - name: "eth_blockNumber"
+    method: "eth_blockNumber"
     params: []
-    frequency: 10%
-  
+    weight: 10
+
   # Load multiple calls from a JSON file
-  - file: "./rpc-calls/common-queries.json"
+  - name: "common-queries"
+    file: "./rpc-calls/common-queries.json"
     file_type: "json"
-    frequency: 40%
-  
+    weight: 40
+
   # Load calls from a JSONL file (one call per line)
-  - file: "./rpc-calls/historical-blocks.jsonl"
+  - name: "historical-blocks"
+    file: "./rpc-calls/historical-blocks.jsonl"
     file_type: "jsonl"
-    frequency: 30%
-  
+    weight: 30
+
   # Auto-detect file type based on extension
-  - file: "./rpc-calls/token-queries.json"
-    frequency: 20%
+  - name: "token-queries"
+    file: "./rpc-calls/token-queries.json"
+    weight: 20
 
 validate_responses: true

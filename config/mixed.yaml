@@ -16,39 +16,39 @@ clients:
   - besu_40031
 duration: "1m"
 rps: 300
-endpoints:
+methods:
   - name: "WETH Balance Check"
     method: "eth_call"
     params:
       - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
         data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"
-    frequency: 40%
+    weight: 40
   - name: "Vitalik's Balance"
     method: "eth_getBalance"
     params:
       - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
       - "latest"
-    frequency: 20%
+    weight: 20
   - name: "Current Block"
     method: "eth_blockNumber"
     params: []
-    frequency: 20%
+    weight: 20
   - name: "Vitalik's TX Count"
     method: "eth_getTransactionCount"
     params:
       - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
       - "latest"
-    frequency: 10%
+    weight: 10
   - name: "Latest Block Details"
     method: "eth_getBlockByNumber"
     params:
       - "latest"
       - false
-    frequency: 10%
-  
+    weight: 10
+
   # Example: Load RPC calls from a file
   # - file: "./rpc-calls/custom-queries.json"
   #   file_type: "json"  # or "jsonl" for JSON Lines format
-  #   frequency: 20%
+  #   weight: 20
 
 validate_responses: false

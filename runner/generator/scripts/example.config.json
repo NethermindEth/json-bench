@@ -1,0 +1,71 @@
+{
+  "options": {
+    "scenarios": {
+      "nethermind": {
+        "executor": "constant-arrival-rate",
+        "rate": 10,
+        "timeUnit": "1s",
+        "duration": "10s",
+        "preAllocatedVUs": 10,
+        "maxVUs": 100,
+        "env": {
+          "RPC_CLIENT_ENDPOINT": "http://localhost:8545"
+        },
+        "tags": {
+          "type": "nethermind"
+        }
+      },
+      "geth": {
+        "executor": "constant-arrival-rate",
+        "rate": 10,
+        "timeUnit": "1s",
+        "duration": "10s",
+        "preAllocatedVUs": 10,
+        "maxVUs": 100,
+        "env": {
+          "RPC_CLIENT_ENDPOINT": "http://localhost:8546"
+        },
+        "tags": {
+          "type": "geth"
+        }
+      }
+    },
+    "thresholds": {
+      "http_req_failed": [
+        "rate < 0.01"
+      ],
+      "http_req_duration{req_name:get_latest_block}": [
+        "p(95) < 1000"
+      ],
+      "http_req_duration{req_name:get_genesis_block}": [
+        "p(95) < 1000"
+      ],
+      "http_req_duration{req_name:get_first_block}": [
+        "p(95) < 1000"
+      ],
+      "http_req_duration{req_name:get_balance}": [
+        "p(95) < 1000"
+      ]
+    },
+    "systemTags": [
+      "scenario",
+      "status",
+      "url",
+      "check",
+      "error",
+      "error_code"
+    ],
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)",
+      "p(99)"
+    ],
+    "tags": {
+      "testid": "Test"
+    }
+  }
+}

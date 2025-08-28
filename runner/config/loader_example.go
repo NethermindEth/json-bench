@@ -36,9 +36,9 @@ func ExampleConfigLoader() {
 		fmt.Printf("  - %s: %s\n", client.Name, client.URL)
 	}
 
-	fmt.Printf("\nEndpoints:\n")
-	for _, endpoint := range config.Endpoints {
-		fmt.Printf("  - %s (%s)\n", endpoint.Method, endpoint.Frequency)
+	fmt.Printf("\nMethods:\n")
+	for _, method := range config.Methods {
+		fmt.Printf("  - %s (%d)\n", method.Method, method.Weight)
 	}
 }
 

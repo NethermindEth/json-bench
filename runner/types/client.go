@@ -1,14 +1,34 @@
 package types
 
+import (
+	"net/url"
+)
+
 // ClientConfig represents a client configuration with all necessary settings
 type ClientConfig struct {
 	Name       string            `yaml:"name" json:"name"`
+	Type       string            `yaml:"type,omitempty" json:"type,omitempty"`
 	URL        string            `yaml:"url" json:"url"`
 	Headers    map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
 	Timeout    string            `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	MaxRetries int               `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`
 	RateLimit  *RateLimitConfig  `yaml:"rate_limit,omitempty" json:"rate_limit,omitempty"`
 	Auth       *AuthConfig       `yaml:"auth,omitempty" json:"auth,omitempty"`
+}
+
+func (c *ClientConfig) GetBasicAuthURL() string {
+	if c.Auth == nil || c.Auth.Type != "basic" || c.Auth.Username == "" || c.Auth.Password == "" {
+		return c.URL
+	}
+
+	u, err := url.Parse(c.URL)
+	if err != nil {
+		return c.URL
+	}
+
+	u.User = url.UserPassword(c.Auth.Username, c.Auth.Password)
+
+	return u.String()
 }
 
 // RateLimitConfig defines rate limiting settings for a client

@@ -26,8 +26,8 @@ type HistoricStorage struct {
 }
 
 // NewHistoricStorage creates a new historic storage manager
-func NewHistoricStorage(cfg *config.StorageConfig) (*HistoricStorage, error) {
-	log := logrus.WithField("component", "historic_storage")
+func NewHistoricStorage(cfg *config.StorageConfig, logger *logrus.Logger) (*HistoricStorage, error) {
+	log := logger.WithField("component", "historic_storage")
 
 	// Create database connection
 	db, err := NewDatabase(&cfg.PostgreSQL)
@@ -127,7 +127,7 @@ func (h *HistoricStorage) SaveRun(result *types.BenchmarkResult, cfg *config.Con
 	// Convert and save time-series metrics
 	metrics := h.convertToTimeSeriesMetrics(result, run)
 	if err := h.saveMetricsToPostgreSQL(metrics); err != nil {
-		h.log.WithError(err).Error("Failed to save metrics to PostgreSQL")
+		h.log.WithError(err).Error("Failed to save metrics to postgres")
 	}
 
 	return run, nil
@@ -502,25 +502,25 @@ func (h *HistoricStorage) ListHistoricRuns(ctx context.Context, filter types.Run
 func (h *HistoricStorage) GetHistoricTrends(ctx context.Context, filter types.TrendFilter) ([]*types.TrendData, error) {
 	// Placeholder implementation - in a full implementation this would
 	// query aggregated trend data from the database
-	return []*types.TrendData{}, nil
+	return []*types.TrendData{}, fmt.Errorf("not implemented")
 }
 
 // DeleteHistoricRun deletes a historic run (placeholder implementation)
 func (h *HistoricStorage) DeleteHistoricRun(ctx context.Context, runID string) error {
 	// Placeholder implementation
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 // CompareRuns compares two historic runs (placeholder implementation)
 func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string) (*types.BaselineComparison, error) {
 	// Placeholder implementation
-	return &types.BaselineComparison{}, nil
+	return &types.BaselineComparison{}, fmt.Errorf("not implemented")
 }
 
 // GetHistoricSummary retrieves a summary of historic data (placeholder implementation)
 func (h *HistoricStorage) GetHistoricSummary(ctx context.Context, filter types.RunFilter) (*types.HistoricSummary, error) {
 	// Placeholder implementation
-	return &types.HistoricSummary{}, nil
+	return &types.HistoricSummary{}, fmt.Errorf("not implemented")
 }
 
 func calculateP99Latency(result *types.BenchmarkResult) float64 {

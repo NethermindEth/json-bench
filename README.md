@@ -20,15 +20,12 @@ This project runs predefined RPC tests derived from the official Ethereum Execut
 
 ## Project Structure
 
-```
+```dir-tree
 json-bench/
 │
-├── clients/                  # Docker Compose setups for each client
-│   ├── geth/
-│   └── nethermind/
-│
-├── config/                   # YAML test configurations
-│   ├── mixed.yaml           # Mixed workload benchmark
+├── config/                  # YAML test configurations
+│   ├── clients.yaml         # RPC clients configurations
+|   ├── mixed.yaml           # Mixed workload benchmark
 │   ├── read-heavy.yaml      # Read-heavy workload benchmark
 │   ├── storage-example.yaml # Historic storage configuration
 │   └── param_variations.yaml
@@ -47,10 +44,9 @@ json-bench/
 │   │   └── api/            # API client for backend integration
 │   └── dist/               # Built dashboard files
 │
-├── metrics/                 # Prometheus + Grafana configuration
+├── metrics/                 # Postgres + Prometheus + Grafana configuration
 │   ├── grafana-provisioning/
-│   ├── dashboards/         # Pre-built Grafana dashboards
-│   └── docker-compose.grafana.yml
+│   └── dashboards/         # Pre-built Grafana dashboards
 │
 └── cmd/                     # Additional tools
     ├── compare/            # Response comparison utilities
@@ -64,48 +60,50 @@ json-bench/
 - **Docker and Docker Compose** (for client nodes and infrastructure)
 - **Go 1.20+** (for the benchmark runner)
 - **Node.js 18+** (for the React dashboard)
-- **k6** (for load testing - install from https://k6.io/)
+- **k6** (for load testing - install from <https://k6.io/>)
 - **PostgreSQL** (for historic tracking - included in Docker Compose)
 
 ### Quick Start
 
 1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd json-bench
-   ```
 
-2. **Start the infrastructure (PostgreSQL and Prometheus):**
-   ```bash
-   # Start PostgreSQL and Prometheus for data storage
-   docker-compose -f metrics/docker-compose.grafana.yml up postgres prometheus -d
-   ```
+    ```bash
+    git clone <repository-url>
+    cd json-bench
+    ```
+
+2. **Start the infrastructure (PostgreSQL, Prometheus and Grafana):**
+
+    ```bash
+    # Start Grafana, PostgreSQL and Prometheus
+    docker-compose up grafana postgres prometheus -d
+    ```
 
 3. **Set up your client nodes:**
-   ```bash
-   # Start Ethereum client containers
-   docker-compose up -d geth nethermind
-   
-   # Or configure your own endpoints in the config files
-   ```
+
+    ```bash
+    # Configure your own endpoints in the config files
+    nano config/clients.yaml
+    ```
 
 4. **Run a benchmark:**
-   ```bash
-   # Basic benchmark (no historic tracking)
-   go run ./runner/main.go -config ./config/mixed.yaml
-   
-   # With historic tracking (requires PostgreSQL)
-   go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
-   
-   # View results
-   open results/report.html
-   ```
+
+    ```bash
+    # Basic benchmark (no historic tracking)
+    go run ./runner/main.go -config ./config/mixed.yaml
+
+    # With historic tracking (requires PostgreSQL)
+    go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
+
+    # View results
+    open results/report.html
+    ```
 
 5. **Access the services:**
+
    - **PostgreSQL**: localhost:5432 (postgres/postgres)
-   - **Prometheus**: http://localhost:9090
-   - **API Server**: http://localhost:8080 (when running with `-api` flag)
-   - **Grafana**: Manual setup required (see Grafana Integration section)
+   - **Prometheus**: <http://localhost:9090>
+   - **Grafana**: <http://localhost:3000>
 
 ## Usage
 
@@ -158,6 +156,7 @@ go run ./runner/main.go \
 ```
 
 **Available API endpoints:**
+
 - `GET /api/runs` - List historic benchmark runs
 - `GET /api/runs/:id` - Get specific run details
 - `GET /api/trends` - Get performance trend data
@@ -185,6 +184,7 @@ npm run preview
 ```
 
 **Dashboard Features:**
+
 - **Dashboard Page**: Overview of recent runs and performance trends
 - **Run Details**: Detailed analysis of individual benchmark runs
 - **Comparison View**: Side-by-side comparison of multiple runs
@@ -194,75 +194,51 @@ npm run preview
 
 ### Grafana Integration
 
-For advanced time-series analysis and alerting, you can set up Grafana manually:
+For advanced time-series analysis and alerting, you can use Grafana:
 
-1. **Install Grafana locally or use Docker:**
+1. **Setup Grafana locally or use Docker:**
+
    ```bash
-   # Using Docker
-   docker run -d --name=grafana -p 3000:3000 grafana/grafana:latest
-   
-   # Or install locally from https://grafana.com/grafana/download
+   docker compose up -d grafana
    ```
 
-2. **Open Grafana**: http://localhost:3000 (admin/admin)
+2. **Open Grafana**: <http://localhost:3000> (admin/admin)
 
-3. **Configure data sources**:
-   - **Prometheus**: 
+3. **Provisioned data sources**:
+   - **Prometheus**:
      - URL: `http://localhost:9090` (or `http://prometheus:9090` if using Docker network)
      - Access: Server (default)
    - **PostgreSQL** (for historic data):
-     - Host: `localhost:5432` (or `postgres:5432` if using Docker network) 
+     - Host: `localhost:5432` (or `postgres:5432` if using Docker network)
      - Database: `jsonrpc_bench`
      - User: `postgres`
      - Password: `postgres`
      - SSL Mode: `disable`
 
-4. **Import dashboards** from `metrics/dashboards/` (if available)
+4. **Provisioned dashboards** from `metrics/dashboards/`
 
-5. **Create custom dashboards** for:
+   - K6 Performance
    - Client performance comparison
-   - Method-specific latency trends  
+   - Method-specific latency trends
    - Error rate monitoring
    - System resource usage
    - Historic trend analysis
 
-6. **Set up alerting** for performance regressions and system issues
-
-### JSON-RPC Response Comparison
-
-Compare JSON-RPC responses across different clients to identify inconsistencies:
-
-```bash
-# Compare using YAML configuration
-go run ./cmd/compare/main.go -config ./config/compare.yaml
-
-# Compare using OpenRPC specification
-go run ./cmd/compare-openrpc/main.go \
-  -spec https://raw.githubusercontent.com/ethereum/execution-apis/main/openrpc.json \
-  -clients "geth:http://localhost:8545,nethermind:http://localhost:8546"
-
-# Compare specific methods with parameter variations
-go run ./cmd/compare-openrpc/main.go \
-  -spec https://raw.githubusercontent.com/ethereum/execution-apis/main/openrpc.json \
-  -variations ./config/param_variations.yaml \
-  -clients "geth:http://localhost:8545,nethermind:http://localhost:8546" \
-  -filter "eth_call,eth_getBalance"
-
-# View comparison results
-open comparison-results/comparison-report.html
-```
+5. **Set up alerting** for performance regressions and system issues
 
 ### Storage Configuration
 
 Configure PostgreSQL storage for historic tracking. Choose the appropriate configuration file based on your setup:
 
 **Local Development (outside Docker):**
+
 ```bash
 # Use storage-example.yaml for local PostgreSQL connection
 go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
 ```
 
 **Docker Environment:**
+
 ```bash
 # Use storage-docker.yaml when running inside Docker containers
 # (This config uses 'postgres' hostname which only exists in Docker network)
@@ -270,6 +246,7 @@ docker run ... -storage-config ./config/storage-docker.yaml
 ```
 
 **Configuration Examples:**
+
 ```yaml
 # config/storage-example.yaml (for local development)
 historic_path: "./historic"
@@ -341,10 +318,12 @@ load_test:
   duration: "5m"
   ramp_duration: "30s"
 
-endpoints:
-  - method: "eth_blockNumber"
+methods:
+  - name: "my_method_1"
+    method: "eth_blockNumber"
     weight: 20
-  - method: "eth_getBalance"
+  - name: "my_method_2"
+    method: "eth_getBalance"
     params: ["0x742d35Cc641C0532a7D4567bb19f68cE3FdD72cD", "latest"]
     weight: 40
 ```
@@ -370,12 +349,7 @@ Deploy the entire stack using Docker:
 
 ```bash
 # Full stack deployment
-docker-compose -f metrics/docker-compose.grafana.yml up -d
-
-# Build and deploy the dashboard
-cd dashboard
-docker build -t jsonrpc-bench-dashboard .
-docker run -p 3000:80 jsonrpc-bench-dashboard
+docker-compose up -d
 ```
 
 ## Environment Variables
@@ -383,16 +357,11 @@ docker run -p 3000:80 jsonrpc-bench-dashboard
 Configure the application using environment variables:
 
 ```bash
-# Database configuration
-export DATABASE_URL="postgres://user:password@localhost:5432/jsonrpc_bench"
+# Create a copy of the .env.example file
+cp .env.example .env
 
-# API configuration
-export API_PORT=8080
-export LOG_LEVEL=info
-
-# Dashboard configuration (in dashboard/.env)
-VITE_API_URL=http://localhost:8080
-VITE_WS_URL=ws://localhost:8080/api/ws
+# Edit environment configuration
+nano .env
 ```
 
 ## Monitoring and Alerting
