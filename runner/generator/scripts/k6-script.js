@@ -1,16 +1,17 @@
 import http from 'k6/http';
-import { group, check } from 'k6';
+import exec from 'k6/execution';
 import fs from 'k6/experimental/fs';
 import csv from 'k6/experimental/csv';
+import { group, check } from 'k6';
 
-// Payloads file
-const payloadsFilePath = __ENV.RPC_PAYLOADS_FILE_PATH;
-const payloadsFile = await fs.open(payloadsFilePath);
-// Using csv parser which is currently the only K6 module that supports reading a file line by line
-// Review https://grafana.com/docs/k6/latest/javascript-api/k6-experimental/ in the future for other options
-const payloadsParser = new csv.Parser(payloadsFile);
+// --- Requests files ---
+const requestsFilePath = __ENV.RPC_REQUESTS_FILE_PATH;
+const requestsFile = await fs.open(requestsFilePath);
+const requestsData = await csv.parse(requestsFile, {
+  skipFirstLine: false,
+});
 
-// Test config file
+// --- Test config file ---
 const configFilePath = __ENV.RPC_CONFIG_FILE_PATH;
 const configFile = open(configFilePath);
 const config = JSON.parse(configFile);
@@ -18,29 +19,30 @@ const config = JSON.parse(configFile);
 export const options = config["options"]
 
 export default async function () {
-  const {done, value} = await payloadsParser.next();
-  if (done) {
-    throw new Error("No more payloads found");
+  const rpcEndpoint = __ENV.RPC_CLIENT_ENDPOINT;
+  
+  const idx = exec.scenario.iterationInTest;
+  if (idx >= requestsData.length) {
+    throw new Error("No more requests found");
   }
 
-  const rpcEndpoint = __ENV.RPC_CLIENT_ENDPOINT;
+  const requestData = requestsData[idx];
 
-  const reqName = value[1];
-  const payload = JSON.parse(value[2]);
+  // const reqId = requestData[0];
+  const reqName = requestData[1];
+  const reqMethod = requestData[2];
+  const payload = requestData[3];
   try {
     const headers = {
       "Content-Type": "application/json",
     };
     const tags = {
-      "req_name": reqName,
-      "rpc_method": payload["method"],
-    }
-    if (reqName === "") {
-      tags["req_name"] = payload["method"];
+      "req_name": reqName ? reqName : reqMethod,
+      "rpc_method": reqMethod,
     }
 
     group(reqName, function() {
-      const response = http.post(rpcEndpoint, JSON.stringify(payload), {
+      const response = http.post(rpcEndpoint, payload, {
         headers: headers,
         tags: tags,
       });

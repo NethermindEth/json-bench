@@ -21,7 +21,7 @@ const (
 	K6CommandDefault   = "k6"
 	K6ScriptFilename   = "k6-script.js"
 	K6ConfigFilename   = "config.json"
-	K6PayloadsFilename = "payloads.csv"
+	K6RequestsFilename = "requests.csv"
 
 	ReqsCountThreshold = 10
 )
@@ -128,19 +128,19 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 	return absPath, nil
 }
 
-// GenerateK6Payloads generates the k6 payloads file and returns the path to the file
-func GenerateK6Payloads(cfg *config.Config, outputDir string) (string, error) {
-	payloadsPath := path.Join(outputDir, K6PayloadsFilename)
+// GenerateK6Requests generates the k6 requests file and returns the path to the file
+func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
+	requestsPath := path.Join(outputDir, K6RequestsFilename)
 
-	payloadsFile, err := os.Create(payloadsPath)
+	requestsFile, err := os.Create(requestsPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to create payloads file: %w", err)
+		return "", fmt.Errorf("failed to create requests file: %w", err)
 	}
-	defer payloadsFile.Close()
+	defer requestsFile.Close()
 
-	writer := csv.NewWriter(payloadsFile)
+	writer := csv.NewWriter(requestsFile)
 
-	// Generate payloads
+	// Generate requests
 	reqsCount := 1
 
 	duration, err := time.ParseDuration(cfg.Duration)
@@ -162,7 +162,7 @@ func GenerateK6Payloads(cfg *config.Config, outputDir string) (string, error) {
 			cumFreq += float64(method.Weight)
 			if reqRand < cumFreq {
 				id := reqsCount
-				payload := map[string]interface{}{
+				payload := map[string]any{
 					"id":      id,
 					"jsonrpc": "2.0",
 					"method":  method.Method,
@@ -172,7 +172,7 @@ func GenerateK6Payloads(cfg *config.Config, outputDir string) (string, error) {
 				if err != nil {
 					return "", fmt.Errorf("failed to marshal payload: %w", err)
 				}
-				writer.Write([]string{strconv.Itoa(id), method.Name, string(payloadJSON)})
+				writer.Write([]string{strconv.Itoa(id), method.Name, method.Method, string(payloadJSON)})
 				break
 			}
 		}
@@ -183,7 +183,7 @@ func GenerateK6Payloads(cfg *config.Config, outputDir string) (string, error) {
 	}
 	writer.Flush()
 
-	return payloadsPath, nil
+	return requestsPath, nil
 }
 
 // GenerateK6Cmd generates the k6 command and returns the command to run
@@ -192,7 +192,7 @@ func GenerateK6Cmd(
 	outputDir string,
 	scriptPath string,
 	configPath string,
-	payloadsPath string,
+	requestsPath string,
 ) (*exec.Cmd, string, error) {
 	summaryPath := filepath.Join(outputDir, "summary.json")
 	absSummaryPath, err := filepath.Abs(summaryPath)
@@ -207,7 +207,7 @@ func GenerateK6Cmd(
 	if err != nil {
 		return nil, "", err
 	}
-	absPayloadsPath, err := filepath.Abs(payloadsPath)
+	absRequestsPath, err := filepath.Abs(requestsPath)
 	if err != nil {
 		return nil, "", err
 	}
@@ -216,7 +216,7 @@ func GenerateK6Cmd(
 	k6CommandArgs := []string{
 		"run",
 		absScriptPath,
-		"--env", fmt.Sprintf("RPC_PAYLOADS_FILE_PATH=%s", absPayloadsPath),
+		"--env", fmt.Sprintf("RPC_REQUESTS_FILE_PATH=%s", absRequestsPath),
 		"--env", fmt.Sprintf("RPC_CONFIG_FILE_PATH=%s", absConfigPath),
 		"--summary-mode", "full",
 		"--summary-export", absSummaryPath,
@@ -265,14 +265,14 @@ func GenerateK6(cfg *config.Config, outputDir string) (*exec.Cmd, string, error)
 		return nil, "", fmt.Errorf("failed to generate k6 config: %w", err)
 	}
 
-	// Generate k6 payloads file
-	payloadsPath, err := GenerateK6Payloads(cfg, outputDir)
+	// Generate k6 requests file
+	requestsPath, err := GenerateK6Requests(cfg, outputDir)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to generate k6 payloads: %w", err)
+		return nil, "", fmt.Errorf("failed to generate k6 requests: %w", err)
 	}
 
 	// Generate k6 command
-	cmd, summaryPath, err := GenerateK6Cmd(cfg, outputDir, scriptPath, configPath, payloadsPath)
+	cmd, summaryPath, err := GenerateK6Cmd(cfg, outputDir, scriptPath, configPath, requestsPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate k6 command: %w", err)
 	}

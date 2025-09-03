@@ -72,6 +72,7 @@ func validateConfig(cfg *Config) error {
 	if len(cfg.Methods) == 0 {
 		return fmt.Errorf("at least one method is required")
 	}
+
 	// Validate duration
 	if cfg.Duration == "" {
 		return fmt.Errorf("duration is required")

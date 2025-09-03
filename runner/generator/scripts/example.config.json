@@ -1,7 +1,7 @@
 {
   "options": {
     "scenarios": {
-      "nethermind": {
+      "geth_40003": {
         "executor": "constant-arrival-rate",
         "rate": 10,
         "timeUnit": "1s",
@@ -12,10 +12,10 @@
           "RPC_CLIENT_ENDPOINT": "http://localhost:8545"
         },
         "tags": {
-          "type": "nethermind"
+          "client_type": "geth"
         }
       },
-      "geth": {
+      "nethermind_40010": {
         "executor": "constant-arrival-rate",
         "rate": 10,
         "timeUnit": "1s",
@@ -26,31 +26,20 @@
           "RPC_CLIENT_ENDPOINT": "http://localhost:8546"
         },
         "tags": {
-          "type": "geth"
+          "client_type": "nethermind"
         }
       }
     },
     "thresholds": {
       "http_req_failed": [
         "rate < 0.01"
-      ],
-      "http_req_duration{req_name:get_latest_block}": [
-        "p(95) < 1000"
-      ],
-      "http_req_duration{req_name:get_genesis_block}": [
-        "p(95) < 1000"
-      ],
-      "http_req_duration{req_name:get_first_block}": [
-        "p(95) < 1000"
-      ],
-      "http_req_duration{req_name:get_balance}": [
-        "p(95) < 1000"
       ]
     },
     "systemTags": [
       "scenario",
       "status",
       "url",
+      "group",
       "check",
       "error",
       "error_code"
