@@ -138,7 +138,7 @@ setup_overlay() {
     
     # Mount overlay filesystem
     echo "Mounting overlay filesystem..."
-    if mount -t overlay overlay -o lowerdir="$SNAPSHOT_PATH",upperdir="$UPPER_DIR",workdir="$WORK_DIR" "$MERGED_DIR"; then
+    if sudo mount -t overlay overlay -o lowerdir="$SNAPSHOT_PATH",upperdir="$UPPER_DIR",workdir="$WORK_DIR" "$MERGED_DIR"; then
         echo "Overlay filesystem mounted successfully at: $MERGED_DIR"
     else
         echo "Error: Failed to mount overlay filesystem"
@@ -153,7 +153,7 @@ cleanup_overlay() {
     
     # Unmount overlay if mounted
     if mountpoint -q "$MERGED_DIR"; then
-        umount "$MERGED_DIR"
+        sudo umount "$MERGED_DIR"
         echo "Unmounted overlay filesystem from: $MERGED_DIR"
     fi
     
