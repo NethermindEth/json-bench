@@ -121,7 +121,7 @@ func ExpandMethodsWithFiles(methods []Method) ([]Method, error) {
 					}
 
 					expandedMethods = append(expandedMethods, Method{
-						Name:       fmt.Sprintf("%s-%d", method.Name, i), // Add a unique name to the expanded method
+						Name:       method.Name, // Reuse the original method name
 						Method:     call.Method,
 						Params:     call.Params,
 						Weight:     callWeight,

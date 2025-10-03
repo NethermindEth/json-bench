@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 type FilterQuery struct {
@@ -19,12 +20,14 @@ type FilterQuery struct {
 }
 
 func generateFilter(filterQuery FilterQuery) map[string]any {
+	fromBlockHex := hexutil.Uint64(filterQuery.FromBlock).String()
+	toBlockHex := hexutil.Uint64(filterQuery.ToBlock).String()
 	return map[string]any{
 		"method": "eth_getLogs",
 		"params": []any{
 			map[string]any{
-				"fromBlock": filterQuery.FromBlock,
-				"toBlock":   filterQuery.ToBlock,
+				"fromBlock": fromBlockHex,
+				"toBlock":   toBlockHex,
 				"address":   filterQuery.Address,
 				"topics":    filterQuery.Topics,
 			},
