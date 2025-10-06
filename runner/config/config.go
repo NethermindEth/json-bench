@@ -15,7 +15,7 @@ type Config struct {
 	Duration          string                `yaml:"duration"`
 	RPS               int                   `yaml:"rps"`
 	VUs               int                   `yaml:"vus"`
-	Calls             []Call                `yaml:"calls"`
+	Calls             []*Call               `yaml:"calls"`
 	ValidateResponses bool                  `yaml:"validate_responses"`
 	ResolvedClients   []*types.ClientConfig `yaml:"-"`
 	Outputs           *Outputs              `yaml:"-"`

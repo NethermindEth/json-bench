@@ -35,7 +35,7 @@ func (c *Call) LoadFile() error {
 	}
 
 	c.Calls = calls
-	return err
+	return nil
 }
 
 // Sample returns a random call from the call collection or the single call if no collection is provided

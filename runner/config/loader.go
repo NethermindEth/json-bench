@@ -124,7 +124,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Clients           []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
 		Duration          string               `yaml:"duration"`
 		RPS               int                  `yaml:"rps"`
-		Calls             []Call               `yaml:"calls"`
+		Calls             []*Call              `yaml:"calls"`
 		ValidateResponses bool                 `yaml:"validate_responses"`
 	}
 
