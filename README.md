@@ -318,7 +318,7 @@ load_test:
   duration: "5m"
   ramp_duration: "30s"
 
-methods:
+calls:
   - name: "my_method_1"
     method: "eth_blockNumber"
     weight: 20

@@ -9,6 +9,7 @@ NETWORK="mainnet"
 CUSTOM_IMAGE=""
 EXTRA_ARGS=""
 RPC_PORT="8545"
+RPC_TIMEOUT="30"
 
 # Function to display usage
 usage() {
@@ -23,6 +24,7 @@ usage() {
     echo "  -i, --image IMAGE       Custom Docker image (overrides client default)"
     echo "  -a, --args ARGS         Extra arguments to pass to the client (in addition to defaults)"
     echo "  -p, --port PORT         RPC port for the client (default: 8545)"
+    echo "  -t, --timeout SECONDS   JSON RPC timeout in seconds (default: 30)"
     echo "  -h, --help              Show this help message"
     echo ""
     echo "Examples:"
@@ -40,6 +42,9 @@ usage() {
     echo ""
     echo "  # Use custom RPC port"
     echo "  $0 -s ./snapshots -c geth -p 8546"
+    echo ""
+    echo "  # Use custom timeout"
+    echo "  $0 -s ./snapshots -c nethermind -t 30"
 }
 
 # Function to download and extract snapshot
@@ -197,6 +202,7 @@ run_docker_command() {
             EL_ARGS="$EL_ARGS --Init.WebSocketsEnabled=true"
             EL_ARGS="$EL_ARGS --JsonRpc.WebSocketsPort=$RPC_PORT"
             EL_ARGS="$EL_ARGS --JsonRpc.EnabledModules=Eth,Subscribe,Trace,TxPool,Web3,Personal,Proof,Net,Parity,Health,Rpc,Debug,Admin"
+            EL_ARGS="$EL_ARGS --JsonRpc.Timeout=${RPC_TIMEOUT}000" # Convert to milliseconds
             ;;
         "geth")
             EL_IMAGE="ethereum/client-go:latest"
@@ -347,6 +353,10 @@ while [[ $# -gt 0 ]]; do
             RPC_PORT="$2"
             shift 2
             ;;
+        -t|--timeout)
+            RPC_TIMEOUT="$2"
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -373,6 +383,7 @@ fi
 echo "  Client: $CLIENT"
 echo "  Network: $NETWORK"
 echo "  RPC Port: $RPC_PORT"
+echo "  RPC Timeout: ${RPC_TIMEOUT}s"
 if [[ -n "$CUSTOM_IMAGE" ]]; then
     echo "  Custom Image: $CUSTOM_IMAGE"
 fi
