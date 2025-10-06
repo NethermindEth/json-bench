@@ -67,19 +67,19 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 
 	// Add thresholds to config
 	config.Options.Thresholds["http_req_failed"] = []string{"rate < 0.01"}
-	for _, method := range cfg.Methods {
-		if method.Thresholds != nil {
+	for _, call := range cfg.Calls {
+		if call.Thresholds != nil {
 			// If method name is empty, use the rpc method as identifier
-			identifier := method.Name
+			identifier := call.Name
 			if identifier == "" {
-				identifier = method.Method
+				identifier = call.Method
 			}
 			thresholdsTarget := fmt.Sprintf("http_req_duration{req_name:'%s'}", identifier)
 			// Avoid overriding existing thresholds
 			if existingThresholds, exists := config.Options.Thresholds[thresholdsTarget]; !exists {
-				config.Options.Thresholds[thresholdsTarget] = method.Thresholds
+				config.Options.Thresholds[thresholdsTarget] = call.Thresholds
 			} else {
-				config.Options.Thresholds[thresholdsTarget] = append(existingThresholds, method.Thresholds...)
+				config.Options.Thresholds[thresholdsTarget] = append(existingThresholds, call.Thresholds...)
 			}
 		}
 	}
@@ -149,8 +149,8 @@ func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
 	}
 
 	totalWeight := 0
-	for _, method := range cfg.Methods {
-		totalWeight += method.Weight
+	for _, call := range cfg.Calls {
+		totalWeight += call.Weight
 	}
 
 	// Calculate the number of requests to generate based on the duration and RPS
@@ -158,21 +158,27 @@ func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
 	for reqsCount <= maxRequests {
 		reqRand := rand.Float64() * float64(totalWeight)
 		cumFreq := 0.0
-		for _, method := range cfg.Methods {
-			cumFreq += float64(method.Weight)
+		for _, call := range cfg.Calls {
+			cumFreq += float64(call.Weight)
 			if reqRand < cumFreq {
 				id := reqsCount
+
+				rpcCall, err := call.Sample()
+				if err != nil {
+					return "", fmt.Errorf("failed to sample call %s: %w", call.Name, err)
+				}
+
 				payload := map[string]any{
 					"id":      id,
 					"jsonrpc": "2.0",
-					"method":  method.Method,
-					"params":  method.Params,
+					"method":  rpcCall.Method,
+					"params":  rpcCall.Params,
 				}
 				payloadJSON, err := json.Marshal(payload)
 				if err != nil {
 					return "", fmt.Errorf("failed to marshal payload: %w", err)
 				}
-				writer.Write([]string{strconv.Itoa(id), method.Name, method.Method, string(payloadJSON)})
+				writer.Write([]string{strconv.Itoa(id), call.Name, rpcCall.Method, string(payloadJSON)})
 				break
 			}
 		}

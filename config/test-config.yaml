@@ -6,7 +6,7 @@ validate_responses: true
 
 clients: ["geth", "nethermind"]
 
-methods:
+calls:
   - name: "Current Block"
     method: "eth_blockNumber"
     params: []

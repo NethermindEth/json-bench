@@ -25,12 +25,12 @@ func CollectClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath 
 }
 
 func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string) (map[string]*types.ClientMetrics, error) {
-	clientsMetrics := make(map[string]*types.ClientMetrics, len(cfg.Methods))
+	clientsMetrics := make(map[string]*types.ClientMetrics, len(cfg.Calls))
 
 	for _, client := range cfg.ResolvedClients {
 		clientsMetrics[client.Name] = &types.ClientMetrics{
 			Name:              client.Name,
-			Methods:           make(map[string]types.MetricSummary, len(cfg.Methods)),
+			Methods:           make(map[string]types.MetricSummary, len(cfg.Calls)),
 			ConnectionMetrics: types.ConnectionMetrics{},
 			ErrorTypes:        make(map[string]int64),
 			StatusCodes:       make(map[int]int64),

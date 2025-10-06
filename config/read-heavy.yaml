@@ -6,7 +6,7 @@ clients:
   - nethermind
 duration: "5m"
 rps: 200
-methods:
+calls:
   - name: "eth_call"
     method: "eth_call"
     params:

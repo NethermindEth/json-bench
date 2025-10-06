@@ -32,12 +32,14 @@ func (cl *ConfigLoader) LoadTestConfig(filename string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal test config: %w", err)
 	}
 
-	// Expand methods that reference files
-	expandedMethods, err := ExpandMethodsWithFiles(config.Methods)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based methods: %w", err)
+	// Load calls that reference files
+	for _, call := range config.Calls {
+		if call.File != "" {
+			if err := call.LoadFile(); err != nil {
+				return nil, fmt.Errorf("failed to load file for call: %w", err)
+			}
+		}
 	}
-	config.Methods = expandedMethods
 
 	// Validate the configuration
 	if err := validateConfig(&config); err != nil {
@@ -122,7 +124,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Clients           []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
 		Duration          string               `yaml:"duration"`
 		RPS               int                  `yaml:"rps"`
-		Methods           []Method             `yaml:"methods"`
+		Calls             []Call               `yaml:"calls"`
 		ValidateResponses bool                 `yaml:"validate_responses"`
 	}
 
@@ -137,7 +139,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Description:       oldConfig.Description,
 		Duration:          oldConfig.Duration,
 		RPS:               oldConfig.RPS,
-		Methods:           oldConfig.Methods,
+		Calls:             oldConfig.Calls,
 		ValidateResponses: oldConfig.ValidateResponses,
 		ClientRefs:        make([]string, 0, len(oldConfig.Clients)),
 		ResolvedClients:   make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
@@ -163,12 +165,14 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		newConfig.ResolvedClients = append(newConfig.ResolvedClients, client)
 	}
 
-	// Expand methods that reference files
-	expandedMethods, err := ExpandMethodsWithFiles(newConfig.Methods)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based methods: %w", err)
+	// Load calls that reference files
+	for _, call := range newConfig.Calls {
+		if call.File != "" {
+			if err := call.LoadFile(); err != nil {
+				return nil, fmt.Errorf("failed to load file for call: %w", err)
+			}
+		}
 	}
-	newConfig.Methods = expandedMethods
 
 	// Validate the configuration
 	if err := validateConfig(newConfig); err != nil {

@@ -13,9 +13,9 @@ func RunComparison(cfg *config.Config, outputDir string, validateSchema bool, co
 	clientsList := cfg.ResolvedClients
 
 	// Extract methods from config
-	methods := make([]string, 0, len(cfg.Methods))
-	for _, method := range cfg.Methods {
-		methods = append(methods, method.Method)
+	methods := make([]string, 0, len(cfg.Calls))
+	for _, call := range cfg.Calls {
+		methods = append(methods, call.Method)
 	}
 
 	// Create comparison config

@@ -363,8 +363,8 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 	}
 
 	// Extract methods from config
-	methods := make([]string, len(cfg.Methods))
-	for i, method := range cfg.Methods {
+	methods := make([]string, len(cfg.Calls))
+	for i, method := range cfg.Calls {
 		methods[i] = method.Name
 	}
 

@@ -37,7 +37,7 @@ func ExampleConfigLoader() {
 	}
 
 	fmt.Printf("\nMethods:\n")
-	for _, method := range config.Methods {
+	for _, method := range config.Calls {
 		fmt.Printf("  - %s (%d)\n", method.Method, method.Weight)
 	}
 }

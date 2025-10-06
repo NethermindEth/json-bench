@@ -9,7 +9,7 @@ clients:
   - besu_40031
 duration: "2m"
 rps: 100
-methods:
+calls:
   # Regular endpoint definition
   - name: "eth_blockNumber"
     method: "eth_blockNumber"

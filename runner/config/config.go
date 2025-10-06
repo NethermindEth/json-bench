@@ -2,23 +2,10 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/jsonrpc-bench/runner/types"
-	"gopkg.in/yaml.v3"
 )
-
-// Methods represents a JSON-RPC method to benchmark
-type Method struct {
-	Name       string        `yaml:"name"` // Custom name for this method
-	Method     string        `yaml:"method"`
-	Params     []interface{} `yaml:"params"`
-	Weight     int           `yaml:"weight"`
-	File       string        `yaml:"file,omitempty"`       // Optional: file containing RPC calls
-	FileType   string        `yaml:"file_type,omitempty"`  // Type of file: "json" or "jsonl"
-	Thresholds []string      `yaml:"thresholds,omitempty"` // Optional: request duration thresholds for this endpoint in the format of "p(95) < X". See https://k6.io/docs/using-k6/thresholds/
-}
 
 // Config represents the benchmark configuration
 type Config struct {
@@ -27,36 +14,10 @@ type Config struct {
 	ClientRefs        []string              `yaml:"clients"`
 	Duration          string                `yaml:"duration"`
 	RPS               int                   `yaml:"rps"`
-	Methods           []Method              `yaml:"methods"`
+	Calls             []Call                `yaml:"calls"`
 	ValidateResponses bool                  `yaml:"validate_responses"`
 	ResolvedClients   []*types.ClientConfig `yaml:"-"`
 	Outputs           *Outputs              `yaml:"-"`
-}
-
-// LoadFromFile loads a benchmark configuration from a YAML file
-func LoadFromFile(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
-	}
-
-	// Expand methods that reference files
-	expandedMethods, err := ExpandMethodsWithFiles(cfg.Methods)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based methods: %w", err)
-	}
-	cfg.Methods = expandedMethods
-
-	if err := validateConfig(&cfg); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	return &cfg, nil
 }
 
 // validateConfig performs validation on the loaded configuration
@@ -69,8 +30,20 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("at least one client is required")
 	}
 
-	if len(cfg.Methods) == 0 {
+	if len(cfg.Calls) == 0 {
 		return fmt.Errorf("at least one method is required")
+	}
+
+	for _, call := range cfg.Calls {
+		if call.Name == "" {
+			return fmt.Errorf("call name is required")
+		}
+
+		if call.File == "" {
+			if call.Method == "" || call.Params == nil {
+				return fmt.Errorf("call must have a method and params defined if no file is provided")
+			}
+		}
 	}
 
 	// Validate duration

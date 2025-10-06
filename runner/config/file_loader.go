@@ -8,12 +8,6 @@ import (
 	"path/filepath"
 )
 
-// RPCCall represents a single JSON-RPC call
-type RPCCall struct {
-	Method string        `json:"method"`
-	Params []interface{} `json:"params"`
-}
-
 // LoadCallsFromFile loads RPC calls from a file
 func LoadCallsFromFile(filePath string, fileType string) ([]RPCCall, error) {
 	if fileType == "" {
@@ -90,50 +84,4 @@ func loadCallsFromJSONL(filePath string) ([]RPCCall, error) {
 	}
 
 	return calls, nil
-}
-
-// ExpandMethodsWithFiles expands methods that reference files into individual calls
-func ExpandMethodsWithFiles(methods []Method) ([]Method, error) {
-	var expandedMethods []Method
-
-	for _, method := range methods {
-		if method.File != "" {
-			// Load calls from file
-			calls, err := LoadCallsFromFile(method.File, method.FileType)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load calls from %s: %w", method.File, err)
-			}
-
-			// Create a method for each call, distributing the weight
-			if len(calls) > 0 {
-				// Parse frequency percentage
-				totalWeight := method.Weight
-
-				// Distribute frequency among calls
-				baseWeight := totalWeight / len(calls)
-				remainder := totalWeight % len(calls)
-
-				for i, call := range calls {
-					// Add 1 to the first 'remainder' calls to handle rounding
-					callWeight := baseWeight
-					if i < remainder {
-						callWeight++
-					}
-
-					expandedMethods = append(expandedMethods, Method{
-						Name:       method.Name, // Reuse the original method name
-						Method:     call.Method,
-						Params:     call.Params,
-						Weight:     callWeight,
-						Thresholds: method.Thresholds, // Expanded methods inherit thresholds from the original method
-					})
-				}
-			}
-		} else {
-			// Regular method without file
-			expandedMethods = append(expandedMethods, method)
-		}
-	}
-
-	return expandedMethods, nil
 }
