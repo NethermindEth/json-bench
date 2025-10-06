@@ -17,6 +17,9 @@
   },
   {
     "method": "eth_getBalance",
-    "params": ["0x742d35Cc6634C0532925a3b844Bc9e7595f3574", "latest"]
+    "params": [
+      "0x0742D35Cc6634c0532925A3b844bc9e7595f3574",
+      "latest"
+    ]
   }
 ]

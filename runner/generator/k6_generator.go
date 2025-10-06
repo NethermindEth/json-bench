@@ -96,8 +96,8 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 			Rate:            cfg.RPS,
 			TimeUnit:        "1s",
 			Duration:        cfg.Duration,
-			PreAllocatedVUs: 10,
-			MaxVUs:          100,
+			PreAllocatedVUs: cfg.VUs,
+			MaxVUs:          cfg.VUs,
 			Env: map[string]string{
 				"RPC_CLIENT_ENDPOINT": client.URL,
 			},

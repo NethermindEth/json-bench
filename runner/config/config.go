@@ -14,6 +14,7 @@ type Config struct {
 	ClientRefs        []string              `yaml:"clients"`
 	Duration          string                `yaml:"duration"`
 	RPS               int                   `yaml:"rps"`
+	VUs               int                   `yaml:"vus"`
 	Calls             []Call                `yaml:"calls"`
 	ValidateResponses bool                  `yaml:"validate_responses"`
 	ResolvedClients   []*types.ClientConfig `yaml:"-"`
@@ -53,6 +54,14 @@ func validateConfig(cfg *Config) error {
 	_, err := time.ParseDuration(cfg.Duration)
 	if err != nil {
 		return fmt.Errorf("invalid duration format: %w", err)
+	}
+
+	if cfg.VUs <= 0 {
+		return fmt.Errorf("vus must be greater than 0")
+	}
+
+	if cfg.RPS <= 0 {
+		return fmt.Errorf("rps must be greater than 0")
 	}
 
 	return nil
