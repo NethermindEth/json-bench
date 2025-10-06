@@ -272,9 +272,12 @@ func GenerateK6(cfg *config.Config, outputDir string) (*exec.Cmd, string, error)
 	}
 
 	// Generate k6 requests file
-	requestsPath, err := GenerateK6Requests(cfg, outputDir)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to generate k6 requests: %w", err)
+	requestsPath := cfg.CallsFile
+	if cfg.CallsFile == "" {
+		requestsPath, err = GenerateK6Requests(cfg, outputDir)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to generate k6 requests: %w", err)
+		}
 	}
 
 	// Generate k6 command

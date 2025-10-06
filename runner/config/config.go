@@ -16,6 +16,7 @@ type Config struct {
 	RPS               int                   `yaml:"rps"`
 	VUs               int                   `yaml:"vus"`
 	Calls             []*Call               `yaml:"calls"`
+	CallsFile         string                `yaml:"calls_file"` // Optional: use file containing RPC calls instead of generating them
 	ValidateResponses bool                  `yaml:"validate_responses"`
 	ResolvedClients   []*types.ClientConfig `yaml:"-"`
 	Outputs           *Outputs              `yaml:"-"`
@@ -31,18 +32,20 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("at least one client is required")
 	}
 
-	if len(cfg.Calls) == 0 {
-		return fmt.Errorf("at least one method is required")
+	if len(cfg.Calls) == 0 && cfg.CallsFile == "" {
+		return fmt.Errorf("at least one call is required")
 	}
 
-	for _, call := range cfg.Calls {
-		if call.Name == "" {
-			return fmt.Errorf("call name is required")
-		}
+	if cfg.CallsFile == "" {
+		for _, call := range cfg.Calls {
+			if call.Name == "" {
+				return fmt.Errorf("call name is required")
+			}
 
-		if call.File == "" {
-			if call.Method == "" || call.Params == nil {
-				return fmt.Errorf("call must have a method and params defined if no file is provided")
+			if call.File == "" {
+				if call.Method == "" || call.Params == nil {
+					return fmt.Errorf("call must have a method and params defined if no file is provided")
+				}
 			}
 		}
 	}
