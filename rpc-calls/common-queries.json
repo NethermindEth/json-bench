@@ -16,10 +16,36 @@
     "params": []
   },
   {
+    "method": "eth_maxPriorityFeePerGas",
+    "params": []
+  },
+  {
+    "method": "eth_feeHistory",
+    "params": [
+      "0x5",
+      "latest",
+      [
+        50,
+        90
+      ]
+    ]
+  },
+  {
+    "method": "eth_getBlockByNumber",
+    "params": [
+      "latest",
+      true
+    ]
+  },
+  {
     "method": "eth_getBalance",
     "params": [
       "0x0742D35Cc6634c0532925A3b844bc9e7595f3574",
       "latest"
     ]
+  },
+  {
+    "method": "eth_blockNumber",
+    "params": []
   }
 ]
