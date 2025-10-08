@@ -228,51 +228,67 @@ run_docker_command() {
             EL_ARGS="$EL_ARGS --ws.port=$RPC_PORT"
             EL_ARGS="$EL_ARGS --ws.api=eth,web3,net,debug,admin"
             ;;
-        # "erigon")
-        #     case "$NETWORK" in
-        #         "mainnet")
-        #             echo "Executing Erigon Docker command for mainnet..."
-        #             echo "Docker command is running. Press Ctrl+C to stop..."
-        #             # Add your Erigon mainnet-specific Docker command here
-        #             # Example: docker run --rm -it -v "$MERGED_DIR:/data" thorax/erigon:latest --chain mainnet
-        #             ;;
-        #         *)
-        #             echo "Error: Network '$NETWORK' is not supported for Erigon client"
-        #             echo "Supported networks: mainnet"
-        #             exit 1
-        #             ;;
-        #     esac
-        #     ;;
-        # "besu")
-        #     case "$NETWORK" in
-        #         "mainnet")
-        #             echo "Executing Besu Docker command for mainnet..."
-        #             echo "Docker command is running. Press Ctrl+C to stop..."
-        #             # Add your Besu mainnet-specific Docker command here
-        #             # Example: docker run --rm -it -v "$MERGED_DIR:/data" besu/besu:latest --network=mainnet
-        #             ;;
-        #         *)
-        #             echo "Error: Network '$NETWORK' is not supported for Besu client"
-        #             echo "Supported networks: mainnet"
-        #             exit 1
-        #             ;;
-        #     esac
-        #     ;;
-        # "reth")
-        #     case "$NETWORK" in
-        #         "mainnet")
-        #             echo "Executing Reth Docker command for mainnet..."
-        #             echo "Docker command is running. Press Ctrl+C to stop..."
-        #             # Add your Reth mainnet-specific Docker command here
-        #             # Example: docker run --rm -it -v "$MERGED_DIR:/data" reth/reth:latest --chain mainnet
-        #             ;;
-        #         *)
-        #             echo "Error: Network '$NETWORK' is not supported for Reth client"
-        #             echo "Supported networks: mainnet"
-        #             exit 1
-        #             ;;
-        #     esac
-        #     ;;
+        "erigon")
+            case "$NETWORK" in
+                "mainnet")
+                    EL_ARGS="$EL_ARGS --chain=mainnet"
+                    ;;
+                *)
+                    echo "Error: Network '$NETWORK' is not supported for Erigon client"
+                    echo "Supported networks: mainnet"
+                    exit 1
+                    ;;
+            esac
+            EL_ARGS="$EL_ARGS --datadir=/execution-data"
+            EL_ARGS="$EL_ARGS --http"
+            EL_ARGS="$EL_ARGS --http.addr=0.0.0.0"
+            EL_ARGS="$EL_ARGS --http.port=$RPC_PORT"
+            EL_ARGS="$EL_ARGS --http.api=eth,erigon,engine,web3,net,debug,trace,txpool,admin"
+            EL_ARGS="$EL_ARGS --http.vhosts=*"
+            EL_ARGS="$EL_ARGS --ws"
+            EL_ARGS="$EL_ARGS --prune.mode=full"
+            EL_ARGS="$EL_ARGS --externalcl"
+            ;;
+        "besu")
+            case "$NETWORK" in
+                "mainnet")
+                    EL_ARGS="$EL_ARGS --network=mainnet"
+                    ;;
+                *)
+                    echo "Error: Network '$NETWORK' is not supported for Besu client"
+                    echo "Supported networks: mainnet"
+                    exit 1
+                    ;;
+            esac
+            EL_ARGS="$EL_ARGS --data-path=/execution-data"
+            EL_ARGS="$EL_ARGS --rpc-http-enabled"
+            EL_ARGS="$EL_ARGS --rpc-http-host=0.0.0.0"
+            EL_ARGS="$EL_ARGS --rpc-http-port=$RPC_PORT"
+            EL_ARGS="$EL_ARGS --rpc-http-cors-origins='*'"
+            EL_ARGS="$EL_ARGS --host-allowlist='*'"
+            EL_ARGS="$EL_ARGS --rpc-http-api=ADMIN,DEBUG,ETH,MINER,NET,TRACE,TXPOOL,WEB3"
+            EL_ARGS="$EL_ARGS --sync-mode=FULL"
+            EL_ARGS="$EL_ARGS --version-compatibility-protection=false"
+            ;;
+        "reth")
+            case "$NETWORK" in
+                "mainnet")
+                    EL_ARGS="$EL_ARGS --chain=mainnet"
+                    EL_ARGS="$EL_ARGS --full"
+                    ;;
+                *)
+                    echo "Error: Network '$NETWORK' is not supported for Reth client"
+                    echo "Supported networks: mainnet"
+                    exit 1
+                    ;;
+            esac
+            EL_ARGS="$EL_ARGS --datadir=/execution-data"
+            EL_ARGS="$EL_ARGS --log.file.directory=/execution-data/logs"
+            EL_ARGS="$EL_ARGS --http"
+            EL_ARGS="$EL_ARGS --http.addr=0.0.0.0"
+            EL_ARGS="$EL_ARGS --http.port=$RPC_PORT"
+            EL_ARGS="$EL_ARGS --http.api=trace,rpc,eth,net,debug,web3,admin"
+            ;;
         *)
             echo "Unknown client: $CLIENT"
             echo "Available clients: nethermind, geth"
