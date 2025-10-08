@@ -183,7 +183,7 @@ run_docker_command() {
     # Client-specific Docker commands with network configuration
     case "$CLIENT" in
         "nethermind")
-            EL_IMAGE="nethermind/nethermind:latest"
+            EL_IMAGE="ethpandaops/nethermind:performance"
             case "$NETWORK" in
                 "mainnet")
                     EL_ARGS="--config=mainnet"
@@ -205,7 +205,7 @@ run_docker_command() {
             EL_ARGS="$EL_ARGS --JsonRpc.Timeout=${RPC_TIMEOUT}000" # Convert to milliseconds
             ;;
         "geth")
-            EL_IMAGE="ethereum/client-go:latest"
+            EL_IMAGE="ethpandaops/geth:performance"
             case "$NETWORK" in
                 "mainnet")
                     EL_ARGS="--mainnet"
@@ -229,6 +229,7 @@ run_docker_command() {
             EL_ARGS="$EL_ARGS --ws.api=eth,web3,net,debug,admin"
             ;;
         "erigon")
+            EL_IMAGE="ethpandaops/erigon:performance"
             case "$NETWORK" in
                 "mainnet")
                     EL_ARGS="$EL_ARGS --chain=mainnet"
@@ -250,6 +251,7 @@ run_docker_command() {
             EL_ARGS="$EL_ARGS --externalcl"
             ;;
         "besu")
+            EL_IMAGE="ethpandaops/besu:performance"
             case "$NETWORK" in
                 "mainnet")
                     EL_ARGS="$EL_ARGS --network=mainnet"
@@ -271,6 +273,7 @@ run_docker_command() {
             EL_ARGS="$EL_ARGS --version-compatibility-protection=false"
             ;;
         "reth")
+            EL_IMAGE="ethpandaops/reth:performance"
             case "$NETWORK" in
                 "mainnet")
                     EL_ARGS="$EL_ARGS --chain=mainnet"
@@ -296,26 +299,26 @@ run_docker_command() {
             ;;
     esac
 
-    # Validate that client configuration was set
-    if [[ -z "$EL_IMAGE" ]]; then
-        echo "Error: No Docker image configured for client '$CLIENT'"
-        exit 1
-    fi
-    
-    if [[ -z "$EL_ARGS" ]]; then
-        echo "Error: No arguments configured for client '$CLIENT'"
-        exit 1
-    fi
-    
     # Use custom image if provided, otherwise use client default
     FINAL_IMAGE="${CUSTOM_IMAGE:-$EL_IMAGE}"
-    
+
     # Combine default args with extra args
     FINAL_ARGS="${EL_ARGS}"
     if [[ -n "$EXTRA_ARGS" ]]; then
         FINAL_ARGS="${FINAL_ARGS} ${EXTRA_ARGS}"
     fi
-    
+
+    # Validate that client configuration was set
+    if [[ -z "$FINAL_IMAGE" ]]; then
+        echo "Error: No Docker image configured for client '$CLIENT'"
+        exit 1
+    fi
+
+    if [[ -z "$FINAL_ARGS" ]]; then
+        echo "Error: No arguments configured for client '$CLIENT'"
+        exit 1
+    fi
+
     echo "Running Docker command for client: $CLIENT on network: $NETWORK"
     echo "Docker image: $FINAL_IMAGE"
     echo "Docker command is running. Press Ctrl+C to stop..."
