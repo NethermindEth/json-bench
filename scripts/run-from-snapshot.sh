@@ -274,6 +274,7 @@ run_docker_command() {
             ;;
         "reth")
             EL_IMAGE="ethpandaops/reth:performance"
+            EL_ARGS="node"
             case "$NETWORK" in
                 "mainnet")
                     EL_ARGS="$EL_ARGS --chain=mainnet"
