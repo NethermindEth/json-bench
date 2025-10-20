@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -23,7 +24,7 @@ const (
 	K6ConfigFilename   = "config.json"
 	K6RequestsFilename = "requests.csv"
 
-	ReqsCountThreshold = 10
+	ReqsCountThresholdFactor = 0.1
 )
 
 // K6Script is the script file content to be used for running k6 tests
@@ -154,7 +155,7 @@ func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
 	}
 
 	// Calculate the number of requests to generate based on the duration and RPS
-	maxRequests := (cfg.RPS * int(duration.Seconds())) + ReqsCountThreshold
+	maxRequests := int(math.Ceil(float64(cfg.RPS) * duration.Seconds() * (1.0 + ReqsCountThresholdFactor)))
 	for reqsCount <= maxRequests {
 		reqRand := rand.Float64() * float64(totalWeight)
 		cumFreq := 0.0
