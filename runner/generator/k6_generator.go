@@ -92,17 +92,36 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 			tags["client_type"] = client.Type
 		}
 
-		scenarios[client.Name] = types.K6Scenario{
-			Executor:        types.K6ScenarioExecutorConstantArrivalRate,
-			Rate:            cfg.RPS,
-			TimeUnit:        "1s",
-			Duration:        cfg.Duration,
-			PreAllocatedVUs: cfg.VUs,
-			MaxVUs:          cfg.VUs,
-			Env: map[string]string{
-				"RPC_CLIENT_ENDPOINT": client.URL,
-			},
-			Tags: tags,
+		if cfg.RPS > 0 {
+			scenarios[client.Name] = &types.K6ScenarioCAR{
+				K6ScenarioBase: types.K6ScenarioBase{
+					Executor: types.K6ScenarioExecutorConstantArrivalRate,
+					Env: map[string]string{
+						"RPC_CLIENT_ENDPOINT": client.URL,
+					},
+					Tags: tags,
+				},
+				Duration:        cfg.Duration,
+				Rate:            cfg.RPS,
+				PreAllocatedVUs: cfg.VUs,
+				TimeUnit:        "1s",
+				MaxVUs:          cfg.VUs,
+			}
+		} else if cfg.Iterations > 0 {
+			scenarios[client.Name] = &types.K6ScenarioSI{
+				K6ScenarioBase: types.K6ScenarioBase{
+					Executor: types.K6ScenarioExecutorSharedIterations,
+					Env: map[string]string{
+						"RPC_CLIENT_ENDPOINT": client.URL,
+					},
+					Tags: tags,
+				},
+				VUs:         cfg.VUs,
+				Iterations:  cfg.Iterations,
+				MaxDuration: cfg.Duration,
+			}
+		} else {
+			return "", fmt.Errorf("invalid scenario configuration")
 		}
 	}
 
@@ -154,8 +173,13 @@ func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
 		totalWeight += call.Weight
 	}
 
-	// Calculate the number of requests to generate based on the duration and RPS
-	maxRequests := int(math.Ceil(float64(cfg.RPS) * duration.Seconds() * (1.0 + ReqsCountThresholdFactor)))
+	// Calculate the number of requests to generate based on the duration and RPS or iterations
+	var maxRequests int
+	if cfg.RPS > 0 {
+		maxRequests = int(math.Ceil(float64(cfg.RPS) * duration.Seconds() * (1.0 + ReqsCountThresholdFactor)))
+	} else {
+		maxRequests = cfg.Iterations
+	}
 	for reqsCount <= maxRequests {
 		reqRand := rand.Float64() * float64(totalWeight)
 		cumFreq := 0.0

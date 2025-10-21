@@ -14,6 +14,7 @@ type Config struct {
 	ClientRefs        []string              `yaml:"clients"`
 	Duration          string                `yaml:"duration"`
 	RPS               int                   `yaml:"rps"`
+	Iterations        int                   `yaml:"iterations"`
 	VUs               int                   `yaml:"vus"`
 	Calls             []*Call               `yaml:"calls"`
 	CallsFile         string                `yaml:"calls_file"` // Optional: use file containing RPC calls instead of generating them
@@ -63,8 +64,12 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("vus must be greater than 0")
 	}
 
-	if cfg.RPS <= 0 {
-		return fmt.Errorf("rps must be greater than 0")
+	if cfg.Iterations > 0 && cfg.RPS > 0 {
+		return fmt.Errorf("iterations and rps cannot be used together")
+	}
+
+	if cfg.Iterations <= 0 && cfg.RPS <= 0 {
+		return fmt.Errorf("either iterations or rps must be greater than 0")
 	}
 
 	return nil
