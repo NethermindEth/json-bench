@@ -47,5 +47,17 @@
   {
     "method": "eth_blockNumber",
     "params": []
+  },
+  {
+    "method": "eth_getBlockReceipts",
+    "params": [
+      "latest"
+    ]
+  },
+  {
+    "method": "eth_getBlockTransactionCountByNumber",
+    "params": [
+      "latest"
+    ]
   }
 ]
