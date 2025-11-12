@@ -27,6 +27,14 @@ func (cl *ConfigLoader) LoadTestConfig(filename string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read test config file: %w", err)
 	}
 
+	// Substitute environment variables
+	content := string(data)
+	substituted, err := SubstituteEnvVars(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute environment variables: %w", err)
+	}
+	data = []byte(substituted)
+
 	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal test config: %w", err)
@@ -87,6 +95,14 @@ func (cl *ConfigLoader) LoadWithBackwardCompatibility(filename string) (*Config,
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
+	// Substitute environment variables
+	content := string(data)
+	substituted, err := SubstituteEnvVars(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute environment variables: %w", err)
+	}
+	data = []byte(substituted)
+
 	// First, try to unmarshal to check if it contains old-style client definitions
 	var rawConfig map[string]interface{}
 	if err := yaml.Unmarshal(data, &rawConfig); err != nil {
@@ -116,6 +132,7 @@ func (cl *ConfigLoader) LoadWithBackwardCompatibility(filename string) (*Config,
 }
 
 // loadOldStyleConfig handles configurations with embedded client definitions
+// Note: data should already have environment variables substituted
 func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 	// Define a structure that can hold both old and new style configurations
 	type oldStyleConfig struct {
@@ -124,6 +141,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Clients           []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
 		Duration          string               `yaml:"duration"`
 		RPS               int                  `yaml:"rps"`
+		VUs               int                  `yaml:"vus"`
 		Calls             []*Call              `yaml:"calls"`
 		ValidateResponses bool                 `yaml:"validate_responses"`
 	}
@@ -139,6 +157,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Description:       oldConfig.Description,
 		Duration:          oldConfig.Duration,
 		RPS:               oldConfig.RPS,
+		VUs:               oldConfig.VUs,
 		Calls:             oldConfig.Calls,
 		ValidateResponses: oldConfig.ValidateResponses,
 		ClientRefs:        make([]string, 0, len(oldConfig.Clients)),

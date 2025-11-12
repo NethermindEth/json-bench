@@ -30,6 +30,14 @@ func (cr *ClientRegistry) LoadFromFile(filename string) error {
 		return fmt.Errorf("failed to read clients config file: %w", err)
 	}
 
+	// Substitute environment variables
+	content := string(data)
+	substituted, err := SubstituteEnvVars(content)
+	if err != nil {
+		return fmt.Errorf("failed to substitute environment variables: %w", err)
+	}
+	data = []byte(substituted)
+
 	var config types.ClientsConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("failed to unmarshal clients config: %w", err)

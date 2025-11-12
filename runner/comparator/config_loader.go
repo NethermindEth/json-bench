@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/types"
 	"gopkg.in/yaml.v3"
 )
@@ -33,6 +34,14 @@ func LoadConfigFromYAML(filePath string) (*ComparisonConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
+
+	// Substitute environment variables
+	content := string(data)
+	substituted, err := config.SubstituteEnvVars(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute environment variables: %w", err)
+	}
+	data = []byte(substituted)
 
 	// Parse YAML
 	var yamlConfig ComparisonConfigYAML

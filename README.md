@@ -313,10 +313,8 @@ clients:
   - name: "nethermind"
     url: "http://localhost:8546"
 
-load_test:
-  target_rps: 500
-  duration: "5m"
-  ramp_duration: "30s"
+rps: 500
+duration: "5m"
 
 calls:
   - name: "my_method_1"
