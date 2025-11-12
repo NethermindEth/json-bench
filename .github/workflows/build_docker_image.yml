@@ -1,0 +1,31 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to build"
+        required: true
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  attestations: write
+  contents: read
+
+jobs:
+  build_public_image:
+    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@main
+    with:
+      repo_name: "nethermindeth"
+      image_name: "jsonrpc-bench-runner"
+      additional_tags: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+      push: "${{ github.event_name != 'pull_request' }}"
+      dockerfile_path: "runner/Dockerfile"
+    secrets:
+      dockerhub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
+      dockerhub_password: ${{ secrets.DOCKER_HUB_PASSWORD }}

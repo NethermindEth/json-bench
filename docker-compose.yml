@@ -17,7 +17,11 @@ services:
     networks:
       - jsonrpc-bench-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-jsonrpc_bench}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-jsonrpc_bench}",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,16 +38,20 @@ services:
       - prometheus-data:/prometheus
       - ./metrics/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
     networks:
       - jsonrpc-bench-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -69,7 +77,11 @@ services:
     networks:
       - jsonrpc-bench-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -90,6 +102,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - LOG_LEVEL=debug
+    command:
+      - -api
+      - -storage-config=/app/config/storage-docker.yaml
     depends_on:
       postgres:
         condition: service_healthy
