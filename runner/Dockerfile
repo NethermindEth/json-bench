@@ -44,5 +44,5 @@ USER appuser
 HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:8081/api/health || exit 1
 
-# Default command - start API server
-CMD ["/app/jsonrpc-bench-runner", "-api", "-storage-config", "/app/config/storage-docker.yaml"]
+# Default entrypoint
+ENTRYPOINT ["/app/jsonrpc-bench-runner"]

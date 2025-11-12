@@ -136,6 +136,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - LOG_LEVEL=debug
+    command:
+      - -api
+      - -storage-config=/app/config/storage-docker.yaml
     depends_on:
       postgres:
         condition: service_healthy
