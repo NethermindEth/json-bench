@@ -268,7 +268,7 @@ func configureOutputs(cfg *config.Config, cmd *exec.Cmd) *exec.Cmd {
 	if cfg.Outputs.PrometheusRW != nil {
 		cmd.Args = append(cmd.Args, "--out", "experimental-prometheus-rw")
 		cmd.Env = append(cmd.Env,
-			fmt.Sprintf("K6_PROMETHEUS_RW_SERVER_URL=%s", cfg.Outputs.PrometheusRW.GetRWEndpoint()),
+			fmt.Sprintf("K6_PROMETHEUS_RW_SERVER_URL=%s", cfg.Outputs.PrometheusRW.Endpoint),
 			"K6_PROMETHEUS_RW_TREND_STATS=min,max,avg,med,p(90),p(95),p(99)",
 		)
 		if cfg.Outputs.PrometheusRW.BasicAuth.Username != "" {

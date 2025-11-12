@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-run
 # Final stage - minimal runtime image with k6 (base is alpine)
 FROM grafana/k6:1.4.0
 
-# Override user to root
+# Use root user for dependencies installation
 USER root
 
 # Install runtime dependencies
@@ -41,10 +41,6 @@ RUN mkdir -p /app/results /app/historic && \
 
 # Switch to non-root user
 USER appuser
-
-# Health check with longer start period and more frequent checks
-HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
-    CMD curl -f http://localhost:8081/api/health || exit 1
 
 # Default entrypoint
 ENTRYPOINT ["/app/jsonrpc-bench-runner"]
