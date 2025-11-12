@@ -17,8 +17,11 @@ COPY config/ ./config/
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner/main.go
 
-# Final stage - minimal runtime image
-FROM alpine:latest
+# Final stage - minimal runtime image with k6 (base is alpine)
+FROM grafana/k6:1.4.0
+
+# Override user to root
+USER root
 
 # Install runtime dependencies
 RUN apk --no-cache add ca-certificates tzdata curl postgresql-client
@@ -31,7 +34,6 @@ RUN addgroup -g 1001 -S appgroup && \
 
 # Copy binary from builder
 COPY --from=builder /app/jsonrpc-bench-runner /app/jsonrpc-bench-runner
-COPY --from=builder /app/config /app/config
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/results /app/historic && \
