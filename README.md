@@ -90,10 +90,9 @@ json-bench/
 
     ```bash
     # Basic benchmark (no historic tracking)
-    go run ./runner/main.go -config ./config/mixed.yaml
-
+    go run ./runner/main.go -config ./config/mixed.yaml -clients ./config/clients.yaml
     # With historic tracking (requires PostgreSQL)
-    go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
+    go run ./runner/main.go -config ./config/mixed.yaml -clients ./config/clients.yaml -historic -storage-config ./config/storage-example.yaml
 
     # View results
     open results/report.html
@@ -111,14 +110,15 @@ json-bench/
 
 ```bash
 # Run a mixed workload benchmark
-go run ./runner/main.go -config ./config/mixed.yaml
+go run ./runner/main.go -config ./config/mixed.yaml -clients ./config/clients.yaml
 
 # Run a read-heavy benchmark
-go run ./runner/main.go -config ./config/read-heavy.yaml
+go run ./runner/main.go -config ./config/read-heavy.yaml -clients ./config/clients.yaml
 
 # Run with custom parameters
 go run ./runner/main.go \
   -config ./config/mixed.yaml \
+  -clients ./config/clients.yaml \
   -output ./custom-results \
   -concurrency 10 \
   -timeout 60
@@ -132,12 +132,14 @@ Enable historic tracking to store results in PostgreSQL and analyze trends over 
 # Run with historic tracking enabled
 go run ./runner/main.go \
   -config ./config/mixed.yaml \
+  -clients ./config/clients.yaml \
   -historic \
   -storage-config ./config/storage-example.yaml
 
 # Run in historic analysis mode (no new benchmark)
 go run ./runner/main.go \
   -config ./config/mixed.yaml \
+  -clients ./config/clients.yaml \
   -historic-mode \
   -storage-config ./config/storage-example.yaml
 ```
