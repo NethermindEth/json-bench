@@ -38,9 +38,6 @@ COPY --from=builder /app/jsonrpc-bench-runner /app/jsonrpc-bench-runner
 RUN mkdir -p /app/results /app/historic && \
     chown -R appuser:appgroup /app
 
-# Copy config files
-COPY config/ ./config/
-
 # Switch to non-root user
 USER appuser
 
