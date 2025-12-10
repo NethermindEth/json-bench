@@ -12,7 +12,6 @@ RUN go mod download
 
 # Copy source code
 COPY runner/ ./runner/
-COPY config/ ./config/
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner/main.go
@@ -38,6 +37,9 @@ COPY --from=builder /app/jsonrpc-bench-runner /app/jsonrpc-bench-runner
 # Create necessary directories and set permissions
 RUN mkdir -p /app/results /app/historic && \
     chown -R appuser:appgroup /app
+
+# Copy config files
+COPY config/ ./config/
 
 # Switch to non-root user
 USER appuser
