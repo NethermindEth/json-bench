@@ -9,8 +9,11 @@ test_name: "Mixed RPC benchmark"
 description: "Benchmark with a mix of read and state operations"
 # Client references from clients.yaml
 clients:
-  - geth
-  - nethermind
+  - geth_40003
+  - nethermind_40010
+  - reth_40017
+  - erigon_40024
+  - besu_40031
 duration: "1m"
 rps: 300
 vus: 20
