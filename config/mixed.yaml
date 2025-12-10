@@ -16,6 +16,7 @@ clients:
   - besu_40031
 duration: "1m"
 rps: 300
+vus: 20
 calls:
   - name: "WETH Balance Check"
     method: "eth_call"
