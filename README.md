@@ -76,7 +76,13 @@ json-bench/
 
     ```bash
     # Start Grafana, PostgreSQL and Prometheus
-    docker-compose up grafana postgres prometheus -d
+    docker compose up -d grafana postgres prometheus
+
+    # You can also start the runner API and the dashboard
+    docker compose up -d runner dashboard
+
+    # Or just start everything
+    docker compose up -d
     ```
 
 3. **Set up your client nodes:**
@@ -98,11 +104,16 @@ json-bench/
     open results/report.html
     ```
 
+    > [!NOTE]
+    > `storage-example.yaml` works out of the box with the docker containers deployed in the compose file.
+
 5. **Access the services:**
 
    - **PostgreSQL**: localhost:5432 (postgres/postgres)
    - **Prometheus**: <http://localhost:9090>
-   - **Grafana**: <http://localhost:3000>
+   - **Grafana**: <http://localhost:3000> (admin/admin)
+   - **RunnerAPI**: <http://localhost:8082> (if started)
+   - **Dashboard**: <http://localhost:8080> (if started)
 
 ## Usage
 

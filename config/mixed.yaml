@@ -9,13 +9,11 @@ test_name: "Mixed RPC benchmark"
 description: "Benchmark with a mix of read and state operations"
 # Client references from clients.yaml
 clients:
-  - geth_40003
-  - nethermind_40010
-  - reth_40017
-  - erigon_40024
-  - besu_40031
+  - geth
+  - nethermind
 duration: "1m"
 rps: 300
+vus: 20
 calls:
   - name: "WETH Balance Check"
     method: "eth_call"

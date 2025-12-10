@@ -30,7 +30,7 @@ func main() {
 	configPath := flag.String("config", "", "Path to YAML configuration file")
 	clientsPath := flag.String("clients", "", "Path to clients configuration file (optional)")
 	outputDir := flag.String("output", "outputs", "Directory to store outputs")
-	prometheusRWEndpoint := flag.String("prometheus-rw", "http://localhost:9090", "Prometheus remote write endpoint for metrics")
+	prometheusRWEndpoint := flag.String("prometheus-rw", "http://localhost:9090/api/v1/write", "Prometheus remote write endpoint for metrics")
 	prometheusRWUsername := flag.String("prometheus-rw-user", "", "Prometheus remote write username for basic authentication (optional)")
 	prometheusRWPassword := flag.String("prometheus-rw-pass", "", "Prometheus remote write password for basic authentication (optional)")
 	// compareResponses := flag.Bool("compare", false, "Compare JSON-RPC responses across clients")
