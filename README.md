@@ -104,8 +104,7 @@ json-bench/
     open results/report.html
     ```
 
-    > [!NOTE]
-    > `storage-example.yaml` works out of the box with the docker containers deployed in the compose file.
+    **NOTE** `storage-example.yaml` works out of the box with the docker containers deployed in the compose file.
 
 5. **Access the services:**
 
