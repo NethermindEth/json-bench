@@ -89,16 +89,16 @@ services:
       - GF_SMTP_FROM_ADDRESS=${GF_SMTP_FROM_ADDRESS:-}
       - GF_SMTP_FROM_NAME=${GF_SMTP_FROM_NAME:-JSON-RPC Bench Alerts}
       # Webhook URLs for notifications
-      - WEBHOOK_CI_URL=${WEBHOOK_CI_URL:-}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
-      - GITHUB_WEBHOOK_URL=${GITHUB_WEBHOOK_URL:-}
+      - WEBHOOK_CI_URL=${WEBHOOK_CI_URL:-http://localhost/disabled}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-http://localhost/disabled}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-http://localhost/disabled}
+      - GITHUB_WEBHOOK_URL=${GITHUB_WEBHOOK_URL:-http://localhost/disabled}
       # Authentication tokens
       - CI_WEBHOOK_TOKEN=${CI_WEBHOOK_TOKEN:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
       # Email Configuration
-      - ALERT_EMAIL_ADDRESSES=${ALERT_EMAIL_ADDRESSES:-}
+      - ALERT_EMAIL_ADDRESSES=${ALERT_EMAIL_ADDRESSES:-noreply@localhost}
     volumes:
       - grafana-storage:/var/lib/grafana
       - ./metrics/grafana-provisioning:/etc/grafana/provisioning
