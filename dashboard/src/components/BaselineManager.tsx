@@ -41,6 +41,49 @@ interface EditBaselineForm {
   newName: string
 }
 
+// Helper to safely get fields from baselines that might be HistoricRun or Baseline objects
+// NOTE: These helpers handle both camelCase and snake_case field names due to API response
+// inconsistencies. This is a defensive workaround that masks an underlying API design issue.
+// TODO: The backend API should be standardized to use a consistent naming convention
+// (either always camelCase for JavaScript/TypeScript frontends or always snake_case throughout)
+// to eliminate this complexity and potential for bugs. Once standardized, these helper
+// functions can be removed and replaced with direct field access.
+function getBaselineField(baseline: any, camelCase: string, snakeCase: string, defaultValue = ''): any {
+  return baseline[camelCase] ?? baseline[snakeCase] ?? defaultValue
+}
+
+// Helper to get metrics from baseline_metrics nested object
+function getBaselineMetric(baseline: any, metricName: string, defaultValue: number = 0): number {
+  // Try baseline_metrics (snake_case from API)
+  const metrics = baseline.baseline_metrics ?? baseline.baselineMetrics ?? {}
+  
+  // Map common metric names to their possible field names
+  const metricMappings: Record<string, string[]> = {
+    'avgLatency': ['avg_latency_ms', 'avgLatencyMs', 'avg_latency'],
+    'successRate': ['success_rate', 'successRate'],
+    'errorRate': ['overall_error_rate', 'overallErrorRate', 'error_rate', 'errorRate'],
+    'p95Latency': ['p95_latency_ms', 'p95LatencyMs', 'p95_latency'],
+    'p99Latency': ['p99_latency_ms', 'p99LatencyMs', 'p99_latency'],
+  }
+  
+  const possibleNames = metricMappings[metricName] || [metricName]
+  
+  for (const name of possibleNames) {
+    if (metrics[name] !== undefined && metrics[name] !== null) {
+      return Number(metrics[name])
+    }
+  }
+  
+  // Also check top-level fields (for HistoricRun objects used as baselines)
+  for (const name of possibleNames) {
+    if (baseline[name] !== undefined && baseline[name] !== null) {
+      return Number(baseline[name])
+    }
+  }
+  
+  return defaultValue
+}
+
 /**
  * BaselineManager component provides CRUD operations for performance baselines
  * including creation from existing runs, editing, deletion, and comparison functionality
@@ -70,25 +113,40 @@ export default function BaselineManager({
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   // Filter and sort baselines
+  // Note: baselines can be either HistoricRun[] or Baseline[] objects from the API
   const filteredBaselines = useMemo(() => {
-    const filtered = baselines.filter(baseline =>
-      baseline.baselineName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      baseline.testName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      baseline.gitBranch.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    if (!Array.isArray(baselines)) return []
+    
+    const searchLower = searchTerm.toLowerCase()
+    const filtered = baselines.filter(baseline => {
+      // Handle both camelCase (HistoricRun) and snake_case (Baseline) field names
+      const name = (baseline as any).baselineName || (baseline as any).name || ''
+      const testName = (baseline as any).testName || (baseline as any).test_name || ''
+      const gitBranch = (baseline as any).gitBranch || (baseline as any).git_branch || ''
+      
+      return name.toLowerCase().includes(searchLower) ||
+        testName.toLowerCase().includes(searchLower) ||
+        gitBranch.toLowerCase().includes(searchLower)
+    })
 
     return filtered.sort((a, b) => {
       let comparison = 0
+      const aName = (a as any).baselineName || (a as any).name || ''
+      const bName = (b as any).baselineName || (b as any).name || ''
+      const aTestName = (a as any).testName || (a as any).test_name || ''
+      const bTestName = (b as any).testName || (b as any).test_name || ''
+      const aTimestamp = (a as any).timestamp || (a as any).created_at || ''
+      const bTimestamp = (b as any).timestamp || (b as any).created_at || ''
       
       switch (sortBy) {
         case 'name':
-          comparison = (a.baselineName || '').localeCompare(b.baselineName || '')
+          comparison = aName.localeCompare(bName)
           break
         case 'timestamp':
-          comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          comparison = new Date(aTimestamp).getTime() - new Date(bTimestamp).getTime()
           break
         case 'testName':
-          comparison = a.testName.localeCompare(b.testName)
+          comparison = aTestName.localeCompare(bTestName)
           break
       }
       
@@ -169,16 +227,18 @@ export default function BaselineManager({
     }
   }
 
-  const handleDeleteBaseline = async (baselineId: string) => {
-    if (!confirm('Are you sure you want to delete this baseline? This action cannot be undone.')) {
+  const handleDeleteBaseline = async (baseline: any) => {
+    const baselineName = getBaselineField(baseline, 'baselineName', 'name')
+    if (!confirm(`Are you sure you want to delete baseline "${baselineName}"? This action cannot be undone.`)) {
       return
     }
 
-    setActionLoading(`delete-${baselineId}`)
+    setActionLoading(`delete-${baseline.id}`)
     try {
       await onUpdate({
         type: 'delete',
-        runId: baselineId,
+        runId: baseline.id,
+        baselineName: baselineName, // Pass the name for the backend
       }, null)
     } catch (error) {
       console.error('Failed to delete baseline:', error)
@@ -226,7 +286,7 @@ export default function BaselineManager({
     setEditingBaseline(baseline.id)
     setEditForm({
       baselineId: baseline.id,
-      newName: baseline.baselineName || '',
+      newName: getBaselineField(baseline, 'baselineName', 'name'),
     })
   }
 
@@ -300,12 +360,74 @@ export default function BaselineManager({
                   className="input"
                 >
                   <option value="">Choose a run...</option>
-                  {availableForBaseline.map((run) => (
-                    <option key={run.id} value={run.id}>
-                      {run.testName} - {formatTimestamp(run.timestamp)} ({run.gitBranch})
-                    </option>
-                  ))}
+                  {availableForBaseline.map((run) => {
+                    // Handle both camelCase and snake_case field names
+                    const runAny = run as any
+                    const testName = runAny.testName || runAny.test_name || 'Unnamed Test'
+                    const branch = runAny.gitBranch || runAny.git_branch || 'no branch'
+                    const latency = runAny.avgLatencyMs ?? runAny.avg_latency_ms ?? runAny.avgLatency
+                    const latencyStr = latency ? `${Number(latency).toFixed(1)}ms` : ''
+                    const rate = runAny.successRate ?? runAny.success_rate
+                    const successRateStr = rate !== undefined ? `${Number(rate).toFixed(1)}%` : ''
+                    const metrics = [latencyStr, successRateStr].filter(Boolean).join(', ')
+                    
+                    return (
+                      <option key={run.id} value={run.id}>
+                        {testName} • {formatTimestamp(run.timestamp)} • {branch}{metrics ? ` • ${metrics}` : ''}
+                      </option>
+                    )
+                  })}
                 </select>
+                
+                {/* Selected run preview */}
+                {newBaselineForm.runId && (() => {
+                  const selectedRun = availableForBaseline.find(r => r.id === newBaselineForm.runId)
+                  if (!selectedRun) return null
+                  
+                  // Handle both camelCase and snake_case field names
+                  const runAny = selectedRun as any
+                  const testName = runAny.testName || runAny.test_name || 'Unnamed'
+                  const branch = runAny.gitBranch || runAny.git_branch || 'N/A'
+                  const latency = runAny.avgLatencyMs ?? runAny.avg_latency_ms ?? runAny.avgLatency ?? 0
+                  const rate = runAny.successRate ?? runAny.success_rate
+                  const totalReqs = runAny.totalRequests ?? runAny.total_requests
+                  
+                  return (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Selected Run Details</div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-gray-500">Test:</span>
+                          <span className="ml-2 font-medium">{testName}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Branch:</span>
+                          <span className="ml-2 font-medium">{branch}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Date:</span>
+                          <span className="ml-2 font-medium">{formatTimestamp(selectedRun.timestamp)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Avg Latency:</span>
+                          <span className="ml-2 font-medium">{formatLatency(latency)}</span>
+                        </div>
+                        {rate !== undefined && (
+                          <div>
+                            <span className="text-gray-500">Success Rate:</span>
+                            <span className="ml-2 font-medium">{formatPercentage(rate)}</span>
+                          </div>
+                        )}
+                        {totalReqs !== undefined && (
+                          <div>
+                            <span className="text-gray-500">Total Requests:</span>
+                            <span className="ml-2 font-medium">{Number(totalReqs).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
 
               <div>
@@ -487,31 +609,38 @@ export default function BaselineManager({
                       ) : (
                         <div className="flex items-center space-x-2">
                           <FlagIcon className="h-4 w-4 text-warning-500" />
-                          <span className="font-medium">{baseline.baselineName}</span>
+                          <span className="font-medium">{getBaselineField(baseline, 'baselineName', 'name')}</span>
                         </div>
                       )}
                     </td>
                     <td className="table-cell">
-                      <span className="text-gray-900">{baseline.testName}</span>
+                      <span className="text-gray-900">{getBaselineField(baseline, 'testName', 'test_name')}</span>
                     </td>
                     <td className="table-cell">
-                      <span className="badge badge-info">{baseline.gitBranch}</span>
+                      <span className="badge badge-info">{getBaselineField(baseline, 'gitBranch', 'git_branch', 'N/A')}</span>
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center space-x-1 text-gray-500">
                         <CalendarIcon className="h-4 w-4" />
-                        <span className="text-sm">{formatTimestamp(baseline.timestamp)}</span>
+                        <span className="text-sm">{formatTimestamp(getBaselineField(baseline, 'timestamp', 'created_at'))}</span>
                       </div>
                     </td>
                     <td className="table-cell">
                       <div className="space-y-1 text-xs">
                         <div className="flex justify-between">
                           <span className="text-gray-500">Success:</span>
-                          <span className="font-mono">{formatPercentage(baseline.successRate)}</span>
+                          <span className="font-mono">
+                            {(() => {
+                              const errorRate = getBaselineMetric(baseline, 'errorRate')
+                              return typeof errorRate === 'number' && !isNaN(errorRate)
+                                ? formatPercentage(100 - errorRate)
+                                : 'N/A'
+                            })()}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">Latency:</span>
-                          <span className="font-mono">{formatLatency(baseline.avgLatency)}</span>
+                          <span className="font-mono">{formatLatency(getBaselineMetric(baseline, 'avgLatency', 0))}</span>
                         </div>
                       </div>
                     </td>
@@ -527,7 +656,7 @@ export default function BaselineManager({
                           </button>
                         )}
                         <button
-                          onClick={() => handleDeleteBaseline(baseline.id)}
+                          onClick={() => handleDeleteBaseline(baseline)}
                           className="p-1 text-gray-400 hover:text-danger-600"
                           title="Delete baseline"
                           disabled={actionLoading === `delete-${baseline.id}`}

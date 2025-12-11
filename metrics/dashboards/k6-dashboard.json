@@ -762,9 +762,9 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (scenario) (k6_iteration_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by (scenario) (k6_iteration_duration_avg{testid=~\"$testid\"})",
           "instant": false,
-          "legendFormat": "iteration_duration_$quantile_stat - {{scenario}}",
+          "legendFormat": "iteration_duration_avg - {{scenario}}",
           "range": true,
           "refId": "A"
         },
@@ -774,11 +774,23 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
+          "expr": "avg by (scenario) (k6_iteration_duration_p95{testid=~\"$testid\"})",
+          "instant": false,
+          "legendFormat": "iteration_duration_p95 - {{scenario}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "avg by (scenario) (k6_dropped_iterations_total{testid=~\"$testid\"})",
+          "expr": "sum by (scenario) (k6_iterations_total{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "dropped_iterations - {{scenario}}",
+          "legendFormat": "total_iterations - {{scenario}}",
           "range": true,
           "refId": "B"
         }
@@ -950,10 +962,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_p99{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "p99 - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "A"
         },
@@ -963,9 +975,22 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"true\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_p95{testid=~\"$testid\"})",
           "instant": false,
-          "legendFormat": "success_http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "p95 - {{scenario}} - {{req_name}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_avg{testid=~\"$testid\"})",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "avg - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "C"
         },
@@ -975,15 +1000,15 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"false\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_med{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "errors_http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "med - {{scenario}} - {{req_name}}",
           "range": true,
-          "refId": "B"
+          "refId": "D"
         }
       ],
-      "title": "HTTP Latency Stats",
+      "title": "HTTP Latency Stats (p99/p95/avg/med)",
       "type": "timeseries"
     },
     {
@@ -991,7 +1016,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Select a different Stat to change the query\n\n<a href=\"https://k6.io/docs/using-k6/metrics/reference/#http\" target=\"_blank\">HTTP-specific built-in metrics</a>",
+      "description": "HTTP request duration breakdown by method and scenario.\n\nNote: HTTP timing breakdown metrics (blocked, sending, waiting, receiving) are NOT exported by k6's Prometheus Remote Write output by default.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1091,10 +1116,23 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_blocked_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_min{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_blocked_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "min - {{scenario}} - {{req_name}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_avg{testid=~\"$testid\"})",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "avg - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "B"
         },
@@ -1104,10 +1142,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_tls_handshaking_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_med{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_tls_handshaking_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "med - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "C"
         },
@@ -1117,10 +1155,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_sending_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_p90{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_sending_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "p90 - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "D"
         },
@@ -1130,10 +1168,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_waiting_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_p95{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_waiting_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "p95 - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "E"
         },
@@ -1143,15 +1181,15 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_receiving_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (k6_http_req_duration_max{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
-          "legendFormat": "http_req_receiving_$quantile_stat - {{scenario}} - {{req_name}}",
+          "legendFormat": "max - {{scenario}} - {{req_name}}",
           "range": true,
           "refId": "F"
         }
       ],
-      "title": "HTTP Latency Timings",
+      "title": "HTTP Latency Distribution (min/avg/med/p90/p95/max)",
       "type": "timeseries"
     },
     {

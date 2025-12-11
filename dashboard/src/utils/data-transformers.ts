@@ -20,13 +20,18 @@ export function parseDuration(duration: string): number {
  * Extracts detailed metrics from API client_metrics or full_results JSON
  */
 export function transformHistoricRunToDetailedMetrics(run: HistoricRun, apiClientMetrics?: Record<string, APIClientMetrics>): DetailedMetrics {
-  // Parse full_results if available
+  // Parse full_results if available - handle both string and object
   let fullResults: any = {}
   if (run.full_results) {
-    try {
-      fullResults = JSON.parse(run.full_results)
-    } catch (e) {
-      console.error('Failed to parse full results:', e)
+    if (typeof run.full_results === 'string') {
+      try {
+        fullResults = JSON.parse(run.full_results)
+      } catch (e) {
+        console.warn('Failed to parse full results as JSON string:', e)
+      }
+    } else if (typeof run.full_results === 'object') {
+      // Already parsed by API
+      fullResults = run.full_results
     }
   }
   

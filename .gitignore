@@ -45,7 +45,3 @@ bin/
 # OS files
 .DS_Store
 Thumbs.db
-
-# Snapshots and data directories
-snapshots/
-json-bench-data/

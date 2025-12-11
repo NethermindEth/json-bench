@@ -44,8 +44,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Create historic_runs table if it doesn't exist
+-- Note: id is VARCHAR instead of UUID because run IDs are generated as
+-- timestamp-based strings (format: YYYYMMDD-HHMMSS-gitsha) for better readability
+-- and chronological ordering. See runner/storage/historic.go:generateRunID()
 CREATE TABLE IF NOT EXISTS historic_runs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(255) PRIMARY KEY,
     test_name VARCHAR(255) NOT NULL,
     timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     git_commit VARCHAR(255),
@@ -57,30 +60,53 @@ CREATE TABLE IF NOT EXISTS historic_runs (
     avg_latency_ms DECIMAL(10,3),
     p95_latency_ms DECIMAL(10,3),
     p99_latency_ms DECIMAL(10,3),
+    max_latency_ms DECIMAL(10,3),
     best_client VARCHAR(255),
     performance_scores JSONB,
     client_metrics JSONB,
     error_details JSONB,
+    full_results JSONB,
+    config JSONB,
+    config_hash VARCHAR(255),
+    description TEXT,
+    environment JSONB,
+    methods TEXT[],
+    clients TEXT[],
+    clients_count INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create baselines table if it doesn't exist
+-- NOTE: run_id does not have a foreign key constraint to historic_runs(id)
+-- for flexibility in data retention policies. This creates a data integrity risk
+-- where baselines can reference non-existent runs. The application should validate
+-- that run_id exists when creating baselines, and cleanup processes should handle
+-- orphaned baselines appropriately.
 CREATE TABLE IF NOT EXISTS baselines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    test_name VARCHAR(255) NOT NULL,
-    run_id UUID NOT NULL REFERENCES historic_runs(id),
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
+    test_name VARCHAR(255) NOT NULL,
+    run_id VARCHAR(255) NOT NULL,
+    git_branch VARCHAR(255),
+    git_commit VARCHAR(255),
+    created_by VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(name, test_name)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    baseline_metrics JSONB NOT NULL DEFAULT '{}'::jsonb,
+    tags JSONB DEFAULT '[]'::jsonb,
+    is_active BOOLEAN NOT NULL DEFAULT true
 );
 
 -- Create regressions table if it doesn't exist
+-- Note: Foreign key constraints on run_id and baseline_id are intentionally omitted
+-- to allow flexibility in data retention policies (e.g., keeping regressions after
+-- runs are cleaned up) and to avoid cascading delete issues.
 CREATE TABLE IF NOT EXISTS regressions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    run_id UUID NOT NULL REFERENCES historic_runs(id),
-    baseline_id UUID REFERENCES baselines(id),
+    run_id VARCHAR(255) NOT NULL,
+    baseline_id VARCHAR(255),
     client VARCHAR(255) NOT NULL,
     metric VARCHAR(255) NOT NULL,
     current_value DECIMAL(10,3),
@@ -96,7 +122,7 @@ CREATE TABLE IF NOT EXISTS regressions (
 -- Create performance_alerts table if it doesn't exist
 CREATE TABLE IF NOT EXISTS performance_alerts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    run_id UUID NOT NULL REFERENCES historic_runs(id),
+    run_id VARCHAR(255) NOT NULL,
     alert_type VARCHAR(50) NOT NULL,
     severity VARCHAR(50) NOT NULL,
     message TEXT NOT NULL,
@@ -207,8 +233,9 @@ FROM historic_runs
 ORDER BY test_name, timestamp;
 
 -- Insert some sample data if tables are empty
-INSERT INTO historic_runs (test_name, git_commit, git_branch, total_requests, total_errors, overall_error_rate, avg_latency_ms, p95_latency_ms, p99_latency_ms, best_client, performance_scores)
+INSERT INTO historic_runs (id, test_name, git_commit, git_branch, total_requests, total_errors, overall_error_rate, avg_latency_ms, p95_latency_ms, p99_latency_ms, max_latency_ms, best_client, performance_scores)
 SELECT 
+    '20250101-120000-abc123',
     'mixed',
     'abc123',
     'main',
@@ -218,21 +245,10 @@ SELECT
     150.0,
     250.0,
     350.0,
+    500.0,
     'geth',
     '{"geth": {"avg_latency": 150, "p95_latency": 250}, "nethermind": {"avg_latency": 180, "p95_latency": 280}}'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM historic_runs);
-
--- Create a sample baseline
-INSERT INTO baselines (name, test_name, run_id, description)
-SELECT 
-    'stable',
-    'mixed',
-    hr.id,
-    'Stable baseline for mixed workload tests'
-FROM historic_runs hr
-WHERE hr.test_name = 'mixed'
-AND NOT EXISTS (SELECT 1 FROM baselines WHERE name = 'stable' AND test_name = 'mixed')
-LIMIT 1;
 
 -- Grant necessary permissions
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres;
@@ -309,5 +325,5 @@ SELECT
     jsonb_build_object('component', 'database', 'action', 'initialization', 'timestamp', NOW()),
     'resolved'
 FROM historic_runs hr
-LIMIT 1
-ON CONFLICT DO NOTHING;
+WHERE NOT EXISTS (SELECT 1 FROM performance_alerts WHERE alert_type = 'system' AND message = 'Database initialized successfully')
+LIMIT 1;

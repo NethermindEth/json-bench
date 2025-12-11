@@ -318,12 +318,13 @@ class BenchmarkAPI {
    * @returns Promise resolving to array of baseline runs
    */
   async listBaselines(): Promise<HistoricRun[]> {
-    const response = await this.makeRequest<HistoricRun[]>({
+    const response = await this.makeRequest<{ baselines: HistoricRun[], count: number }>({
       method: 'GET',
       url: '/api/baselines'
     })
     
-    return response.data
+    // API returns { baselines: [...], count: N }
+    return response.data.baselines || []
   }
 
   /**
@@ -332,12 +333,15 @@ class BenchmarkAPI {
    * @param runId - The run ID to set as baseline
    * @param name - The baseline name
    * @returns Promise that resolves when baseline is set
+   * @note Uses snake_case (run_id) as required by backend API.
+   *       TODO: Backend should be standardized to accept camelCase for consistency
+   *       with JavaScript/TypeScript conventions.
    */
   async setBaseline(runId: string, name: string): Promise<void> {
     await this.makeRequest({
       method: 'POST',
       url: '/api/baselines',
-      data: { runId, name }
+      data: { run_id: runId, name }
     })
   }
 

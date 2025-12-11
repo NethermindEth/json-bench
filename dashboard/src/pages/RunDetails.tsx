@@ -1,5 +1,4 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import {
@@ -21,7 +20,7 @@ import { ExpandableSection } from '../components/ui/ExpandableSection'
 import { PerClientMetricsTable } from '../components/metrics'
 import { ExportButton } from '../components/ui'
 import type { HistoricRun, BenchmarkResult } from '../types/api'
-import { useRun, useAPI } from '../api/hooks'
+import { useRun, useSetBaseline, useRemoveBaseline, useBaselines, useRuns } from '../api/hooks'
 import { formatPercentage, formatLatency } from '../utils/metric-formatters'
 
 export default function RunDetails() {
@@ -83,17 +82,13 @@ export default function RunDetails() {
     clientResults: []
   } : null
 
-  const setBaselineMutation = useMutation({
-    mutationFn: async () => {
-      // Simulate API call to set baseline
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      return { success: true }
-    },
-    onSuccess: () => {
-      // Show success message or refresh data
-      console.log('Baseline set successfully')
-    },
-  })
+  // Use proper API hooks for baseline management
+  const setBaselineMutation = useSetBaseline()
+  const removeBaselineMutation = useRemoveBaseline()
+  
+  // Fetch baselines and available runs for the BaselineManager
+  const { data: baselines = [] } = useBaselines()
+  const { data: availableRuns = [] } = useRuns({ limit: 50 })
 
   // Helper function to toggle section expansion
   const toggleSection = (section: string) => {
@@ -629,12 +624,19 @@ export default function RunDetails() {
 
             {/* Baseline Manager */}
             <BaselineManager
-              baselines={run.is_baseline ? [run] : []}
-              availableRuns={[run]}
-              onUpdate={async (action, data) => {
-                console.log('Baseline action:', action, data)
-                if (action.type === 'create') {
-                  setBaselineMutation.mutate()
+              baselines={baselines}
+              availableRuns={availableRuns}
+              loading={setBaselineMutation.isPending || removeBaselineMutation.isPending}
+              error={setBaselineMutation.error?.message || removeBaselineMutation.error?.message || null}
+              onUpdate={async (action) => {
+                console.log('Baseline action:', action)
+                if (action.type === 'create' && action.runId && action.baselineName) {
+                  await setBaselineMutation.mutateAsync({ 
+                    runId: action.runId, 
+                    name: action.baselineName 
+                  })
+                } else if (action.type === 'delete' && action.baselineName) {
+                  await removeBaselineMutation.mutateAsync(action.baselineName)
                 }
               }}
             />

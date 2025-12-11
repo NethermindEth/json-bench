@@ -435,7 +435,7 @@ export default function Dashboard() {
               <p className="text-sm text-gray-500">Average response time over {timeRange}</p>
             </div>
             <div className="card-content">
-              {latencyTrend ? (
+              {latencyTrend?.trendPoints && latencyTrend.trendPoints.length > 0 ? (
                 <TrendChart
                   data={latencyTrend.trendPoints}
                   title="Average Latency"
@@ -444,7 +444,11 @@ export default function Dashboard() {
                 />
               ) : (
                 <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">Loading trend data...</p>
+                  <div className="text-center">
+                    <ChartBarIcon className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500">No trend data available yet</p>
+                    <p className="text-sm text-gray-400">Run some benchmarks to see trends</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -456,19 +460,42 @@ export default function Dashboard() {
               <p className="text-sm text-gray-500">Requests per second over {timeRange}</p>
             </div>
             <div className="card-content">
-              {latencyTrend ? (
-                <ThroughputChart
-                  data={latencyTrend.trendPoints.map(point => ({
-                    timestamp: point.timestamp,
-                    throughput: 1000 / point.value, // Convert latency to rough throughput
-                    totalRequests: 10000,
-                    duration: 5 * 60, // 5 minutes in seconds
-                  }))}
-                  height={300}
-                />
+              {latencyTrend?.trendPoints && latencyTrend.trendPoints.length > 0 ? (
+                <>
+                  <div className="text-xs text-gray-500 italic mb-2">
+                    Note: Throughput shown is a rough approximation derived from latency (1000/latency).
+                    This does not account for concurrency, batching, or actual request patterns.
+                    For accurate throughput metrics, please refer to the actual benchmark results.
+                  </div>
+                  <ThroughputChart
+                    data={latencyTrend.trendPoints.map(point => {
+                      // Convert latency (ms) to approximate throughput (req/s)
+                      // WARNING: This is an overly simplistic approximation that assumes
+                      // a direct inverse relationship without accounting for:
+                      // - Concurrency levels
+                      // - Request batching
+                      // - Network overhead
+                      // - Client-side processing time
+                      // Range check (1-10000ms) filters out extreme outliers
+                      const latency = point.value
+                      const throughput = (latency > 0 && latency < 10000) ? 1000 / latency : 0
+                      return {
+                        timestamp: point.timestamp,
+                        throughput: throughput,
+                        totalRequests: 10000,
+                        duration: 5 * 60, // 5 minutes in seconds
+                      }
+                    })}
+                    height={300}
+                  />
+                </>
               ) : (
                 <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">Loading throughput data...</p>
+                  <div className="text-center">
+                    <ChartBarIcon className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500">No throughput data available yet</p>
+                    <p className="text-sm text-gray-400">Run some benchmarks to see trends</p>
+                  </div>
                 </div>
               )}
             </div>

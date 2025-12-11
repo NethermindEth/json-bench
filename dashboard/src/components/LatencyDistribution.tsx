@@ -63,13 +63,30 @@ interface HistogramStats {
 }
 
 const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
+  // Handle empty buckets case
+  if (!buckets || buckets.length === 0) {
+    return {
+      mean: 0,
+      median: 0,
+      mode: 0,
+      stdDev: 0,
+      min: 0,
+      max: 0,
+      totalCount: 0,
+    }
+  }
+
   let totalCount = 0
   let sum = 0
   const values: number[] = []
 
   // Calculate values for each bucket
   buckets.forEach(bucket => {
-    const midpoint = (bucket.min + bucket.max) / 2
+    // For buckets with max = Infinity, use min as the representative value
+    // since it's the lower bound and we don't have actual data about the upper range
+    const midpoint = isFinite(bucket.max)
+      ? (bucket.min + bucket.max) / 2
+      : bucket.min
     totalCount += bucket.count
     sum += midpoint * bucket.count
     
@@ -78,6 +95,19 @@ const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
       values.push(midpoint)
     }
   })
+
+  // Handle zero totalCount case
+  if (totalCount === 0 || values.length === 0) {
+    return {
+      mean: 0,
+      median: 0,
+      mode: 0,
+      stdDev: 0,
+      min: buckets[0]?.min || 0,
+      max: buckets[buckets.length - 1]?.max || 0,
+      totalCount: 0,
+    }
+  }
 
   const mean = sum / totalCount
   
@@ -89,7 +119,11 @@ const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
   // Find mode (bucket with highest count)
   const maxBucket = buckets.reduce((max, bucket) => 
     bucket.count > max.count ? bucket : max, buckets[0])
-  const mode = (maxBucket.min + maxBucket.max) / 2
+  // For unbounded buckets (max is Infinity), use min as the mode (best known lower bound)
+  // Using min avoids arbitrary multiplication that has no basis in actual data
+  const mode = isFinite(maxBucket.max)
+    ? (maxBucket.min + maxBucket.max) / 2
+    : maxBucket.min
 
   // Estimate median
   let cumulativeCount = 0
@@ -99,7 +133,11 @@ const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
   for (const bucket of buckets) {
     cumulativeCount += bucket.count
     if (cumulativeCount >= medianPosition) {
-      median = (bucket.min + bucket.max) / 2
+      // For unbounded buckets (max is Infinity), use min as the median (best known lower bound)
+      // Using min avoids arbitrary multiplication that has no basis in actual data
+      median = isFinite(bucket.max)
+        ? (bucket.min + bucket.max) / 2
+        : bucket.min
       break
     }
   }
@@ -116,6 +154,10 @@ const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
 }
 
 const formatLatency = (value: number, unit = 'ms'): string => {
+  // Handle invalid values
+  if (!isFinite(value) || isNaN(value)) {
+    return 'N/A'
+  }
   if (unit === 'ms') {
     if (value < 1000) return `${value.toFixed(1)}ms`
     return `${(value / 1000).toFixed(2)}s`

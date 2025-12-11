@@ -461,8 +461,8 @@ export function ThroughputChart({
   return (
     <div className={`card ${className}`}>
       {/* Header */}
-      <div className="card-header flex justify-between items-center">
-        <div className="flex items-center space-x-3">
+      <div className="card-header flex justify-between items-center gap-4">
+        <div className="flex items-center space-x-3 flex-shrink-0">
           <h3 className="text-lg font-medium text-gray-900">{title}</h3>
           {trendData && (
             <div className={`flex items-center space-x-1 text-sm ${
@@ -527,26 +527,26 @@ export function ThroughputChart({
       {/* Summary statistics */}
       {stats && (
         <div className="card-footer">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-4">
-            <div className="text-center">
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-4">
+            <div className="text-center min-w-[100px]">
               <div className="text-2xl font-semibold text-gray-900">
-                {stats.avgThroughput.toLocaleString()}
+                {stats.avgThroughput.toFixed(2)}
               </div>
               <div className="text-sm text-gray-500">Avg {unit}</div>
             </div>
-            <div className="text-center">
+            <div className="text-center min-w-[100px]">
               <div className="text-2xl font-semibold text-gray-900">
-                {stats.maxThroughput.toLocaleString()}
+                {stats.maxThroughput.toFixed(2)}
               </div>
               <div className="text-sm text-gray-500">Max {unit}</div>
             </div>
-            <div className="text-center">
+            <div className="text-center min-w-[100px]">
               <div className="text-2xl font-semibold text-gray-900">
-                {stats.minThroughput.toLocaleString()}
+                {stats.minThroughput.toFixed(2)}
               </div>
               <div className="text-sm text-gray-500">Min {unit}</div>
             </div>
-            <div className="text-center">
+            <div className="text-center min-w-[100px]">
               <div className="text-2xl font-semibold text-gray-900">
                 {stats.totalRequests.toLocaleString()}
               </div>
@@ -554,13 +554,13 @@ export function ThroughputChart({
             </div>
             {targetThroughput && (
               <>
-                <div className="text-center">
+                <div className="text-center min-w-[100px]">
                   <div className="text-2xl font-semibold text-gray-900">
                     {stats.targetAchievements}
                   </div>
                   <div className="text-sm text-gray-500">Target Hits</div>
                 </div>
-                <div className="text-center">
+                <div className="text-center min-w-[100px]">
                   <div className={`text-2xl font-semibold ${
                     stats.targetAchievementRate >= 90 ? 'text-success-600' : 
                     stats.targetAchievementRate >= 70 ? 'text-warning-600' : 'text-danger-600'

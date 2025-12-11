@@ -299,13 +299,6 @@ func (pa *PerformanceAnalyzer) generateRecommendations(result *types.BenchmarkRe
 					name, client.Latency.P95))
 		}
 
-		// Connection efficiency
-		if client.ConnectionMetrics.ConnectionReuse < 50 {
-			recommendations = append(recommendations,
-				fmt.Sprintf("🔄 %s: Low connection reuse (%.1f%%). Enable connection pooling or keep-alive to improve performance.",
-					name, client.ConnectionMetrics.ConnectionReuse))
-		}
-
 		// High variability
 		var highVarMethods []string
 		for method, metrics := range client.Methods {
@@ -319,12 +312,6 @@ func (pa *PerformanceAnalyzer) generateRecommendations(result *types.BenchmarkRe
 					name, highVarMethods))
 		}
 
-		// DNS/TLS overhead
-		if client.ConnectionMetrics.DNSResolutionTime > 100 {
-			recommendations = append(recommendations,
-				fmt.Sprintf("🌐 %s: Slow DNS resolution (%.0fms). Consider using DNS caching or direct IP connections.",
-					name, client.ConnectionMetrics.DNSResolutionTime))
-		}
 	}
 
 	// System-level recommendations
