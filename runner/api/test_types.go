@@ -127,6 +127,8 @@ type Baseline struct {
 	Description string          `json:"description"`
 	TestName    string          `json:"test_name"`
 	RunID       string          `json:"run_id"`
+	GitBranch   string          `json:"git_branch"`
+	GitCommit   string          `json:"git_commit,omitempty"`
 	CreatedBy   string          `json:"created_by,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`

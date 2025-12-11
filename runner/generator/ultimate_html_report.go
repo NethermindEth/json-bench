@@ -422,12 +422,12 @@ const UltimateHTMLReportTemplate = `
                         <span class="env-value">{{printf "%.2f" (sub 100.0 $client.ErrorRate)}}%</span>
                     </div>
                     <div class="env-item">
-                        <span class="env-label">Avg Connections</span>
-                        <span class="env-value">{{$client.ConnectionMetrics.ActiveConnections}}</span>
+                        <span class="env-label">Avg Latency</span>
+                        <span class="env-value">{{printf "%.1f" $client.Latency.Avg}}ms</span>
                     </div>
                     <div class="env-item">
-                        <span class="env-label">Connection Reuse</span>
-                        <span class="env-value">{{printf "%.1f" $client.ConnectionMetrics.ConnectionReuse}}%</span>
+                        <span class="env-label">P99 Latency</span>
+                        <span class="env-value">{{printf "%.1f" $client.Latency.P99}}ms</span>
                     </div>
                 </div>
                 

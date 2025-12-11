@@ -43,6 +43,8 @@ type Baseline struct {
 	Description string    `json:"description" db:"description"`
 	TestName    string    `json:"test_name" db:"test_name"`
 	RunID       string    `json:"run_id" db:"run_id"`
+	GitBranch   string    `json:"git_branch" db:"git_branch"`
+	GitCommit   string    `json:"git_commit,omitempty" db:"git_commit"`
 	CreatedBy   string    `json:"created_by,omitempty" db:"created_by"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
@@ -209,6 +211,8 @@ func (bm *baselineManager) SetBaseline(ctx context.Context, runID, name, descrip
 		Description:     description,
 		TestName:        run.TestName,
 		RunID:           runID,
+		GitBranch:       run.GitBranch,
+		GitCommit:       run.GitCommit,
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 		BaselineMetrics: *baselineMetrics,
@@ -233,17 +237,21 @@ func (bm *baselineManager) SetBaseline(ctx context.Context, runID, name, descrip
 // GetBaseline retrieves a baseline by name
 func (bm *baselineManager) GetBaseline(ctx context.Context, name string) (*Baseline, error) {
 	query := `
-		SELECT id, name, description, test_name, run_id, created_by, created_at, updated_at,
+		SELECT id, name, description, test_name, run_id, 
+			   COALESCE(git_branch, '') as git_branch, COALESCE(git_commit, '') as git_commit,
+			   created_by, created_at, updated_at,
 			   baseline_metrics, tags, is_active
 		FROM baselines
 		WHERE name = $1 AND is_active = true`
 
 	var baseline Baseline
 	var baselineMetricsJSON, tagsJSON []byte
+	var createdBy sql.NullString
 
 	err := bm.db.QueryRowContext(ctx, query, name).Scan(
 		&baseline.ID, &baseline.Name, &baseline.Description, &baseline.TestName,
-		&baseline.RunID, &baseline.CreatedBy, &baseline.CreatedAt, &baseline.UpdatedAt,
+		&baseline.RunID, &baseline.GitBranch, &baseline.GitCommit,
+		&createdBy, &baseline.CreatedAt, &baseline.UpdatedAt,
 		&baselineMetricsJSON, &tagsJSON, &baseline.IsActive,
 	)
 
@@ -252,6 +260,11 @@ func (bm *baselineManager) GetBaseline(ctx context.Context, name string) (*Basel
 			return nil, fmt.Errorf("baseline not found: %s", name)
 		}
 		return nil, fmt.Errorf("failed to query baseline: %w", err)
+	}
+
+	// Handle nullable created_by
+	if createdBy.Valid {
+		baseline.CreatedBy = createdBy.String
 	}
 
 	// Unmarshal JSON fields
@@ -273,7 +286,9 @@ func (bm *baselineManager) ListBaselines(ctx context.Context, testName string) (
 
 	if testName != "" {
 		query = `
-			SELECT id, name, description, test_name, run_id, created_by, created_at, updated_at,
+			SELECT id, name, description, test_name, run_id, 
+				   COALESCE(git_branch, '') as git_branch, COALESCE(git_commit, '') as git_commit,
+				   created_by, created_at, updated_at,
 				   baseline_metrics, tags, is_active
 			FROM baselines
 			WHERE test_name = $1 AND is_active = true
@@ -281,7 +296,9 @@ func (bm *baselineManager) ListBaselines(ctx context.Context, testName string) (
 		args = []interface{}{testName}
 	} else {
 		query = `
-			SELECT id, name, description, test_name, run_id, created_by, created_at, updated_at,
+			SELECT id, name, description, test_name, run_id, 
+				   COALESCE(git_branch, '') as git_branch, COALESCE(git_commit, '') as git_commit,
+				   created_by, created_at, updated_at,
 				   baseline_metrics, tags, is_active
 			FROM baselines
 			WHERE is_active = true
@@ -299,14 +316,21 @@ func (bm *baselineManager) ListBaselines(ctx context.Context, testName string) (
 	for rows.Next() {
 		baseline := &Baseline{}
 		var baselineMetricsJSON, tagsJSON []byte
+		var createdBy sql.NullString
 
 		err := rows.Scan(
 			&baseline.ID, &baseline.Name, &baseline.Description, &baseline.TestName,
-			&baseline.RunID, &baseline.CreatedBy, &baseline.CreatedAt, &baseline.UpdatedAt,
+			&baseline.RunID, &baseline.GitBranch, &baseline.GitCommit,
+			&createdBy, &baseline.CreatedAt, &baseline.UpdatedAt,
 			&baselineMetricsJSON, &tagsJSON, &baseline.IsActive,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan baseline: %w", err)
+		}
+
+		// Handle nullable created_by
+		if createdBy.Valid {
+			baseline.CreatedBy = createdBy.String
 		}
 
 		// Unmarshal JSON fields
@@ -524,13 +548,16 @@ func (bm *baselineManager) GetBaselineHistory(ctx context.Context, baselineName 
 // Helper methods
 
 func (bm *baselineManager) createBaselinesTable(ctx context.Context) error {
-	query := `
+	// Create table if it doesn't exist
+	createTableQuery := `
 		CREATE TABLE IF NOT EXISTS baselines (
 			id VARCHAR(255) PRIMARY KEY,
 			name VARCHAR(255) NOT NULL UNIQUE,
 			description TEXT,
 			test_name VARCHAR(255) NOT NULL,
 			run_id VARCHAR(255) NOT NULL,
+			git_branch VARCHAR(255),
+			git_commit VARCHAR(255),
 			created_by VARCHAR(255),
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -539,33 +566,71 @@ func (bm *baselineManager) createBaselinesTable(ctx context.Context) error {
 			is_active BOOLEAN NOT NULL DEFAULT true,
 			
 			FOREIGN KEY (run_id) REFERENCES historic_runs(id) ON DELETE CASCADE
-		);
+		)`
 
-		CREATE INDEX IF NOT EXISTS idx_baselines_test_name ON baselines(test_name);
-		CREATE INDEX IF NOT EXISTS idx_baselines_active ON baselines(is_active);
-		CREATE INDEX IF NOT EXISTS idx_baselines_created_at ON baselines(created_at);`
+	if _, err := bm.db.ExecContext(ctx, createTableQuery); err != nil {
+		return fmt.Errorf("failed to create baselines table: %w", err)
+	}
 
-	_, err := bm.db.ExecContext(ctx, query)
-	return err
+	// Create indexes
+	indexQueries := []string{
+		`CREATE INDEX IF NOT EXISTS idx_baselines_test_name ON baselines(test_name)`,
+		`CREATE INDEX IF NOT EXISTS idx_baselines_active ON baselines(is_active)`,
+		`CREATE INDEX IF NOT EXISTS idx_baselines_created_at ON baselines(created_at)`,
+	}
+
+	for _, q := range indexQueries {
+		if _, err := bm.db.ExecContext(ctx, q); err != nil {
+			bm.log.WithError(err).Warn("Failed to create index")
+		}
+	}
+
+	// NOTE: Schema migrations (such as adding columns) should be handled externally 
+	// using a migration tool or versioned SQL scripts. The baselines table creation 
+	// includes git_branch and git_commit columns for new databases.
+
+	return nil
 }
 
 func (bm *baselineManager) extractBaselineMetrics(ctx context.Context, run *types.HistoricRun) (*BaselineMetrics, error) {
-	// Parse full results to get detailed client metrics
-	var fullResult types.BenchmarkResult
-	if err := json.Unmarshal(run.FullResults, &fullResult); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal full results: %w", err)
+	clientMetrics := make(map[string]ClientBaseline)
+
+	// Try to parse full results to get detailed client metrics
+	if len(run.FullResults) > 0 {
+		var fullResult types.BenchmarkResult
+		if err := json.Unmarshal(run.FullResults, &fullResult); err != nil {
+			bm.log.WithError(err).Warn("Failed to unmarshal full results, using basic metrics")
+		} else {
+			for clientName, metrics := range fullResult.ClientMetrics {
+				clientMetrics[clientName] = ClientBaseline{
+					ErrorRate:     metrics.ErrorRate,
+					AvgLatency:    metrics.Latency.Avg,
+					P95Latency:    metrics.Latency.P95,
+					P99Latency:    metrics.Latency.P99,
+					Throughput:    metrics.Latency.Throughput,
+					TotalRequests: metrics.TotalRequests,
+					TotalErrors:   metrics.TotalErrors,
+				}
+			}
+		}
 	}
 
-	clientMetrics := make(map[string]ClientBaseline)
-	for clientName, metrics := range fullResult.ClientMetrics {
-		clientMetrics[clientName] = ClientBaseline{
-			ErrorRate:     metrics.ErrorRate,
-			AvgLatency:    metrics.Latency.Avg,
-			P95Latency:    metrics.Latency.P95,
-			P99Latency:    metrics.Latency.P99,
-			Throughput:    metrics.Latency.Throughput,
-			TotalRequests: metrics.TotalRequests,
-			TotalErrors:   metrics.TotalErrors,
+	// If no client metrics from full_results, create basic entries from run.Clients
+	if len(clientMetrics) == 0 && len(run.Clients) > 0 {
+		bm.log.Info("Using basic client metrics from run data")
+		// Outer condition ensures len(run.Clients) > 0, so division is safe
+		totalRequests := run.TotalRequests / int64(len(run.Clients))
+		totalErrors := run.TotalErrors / int64(len(run.Clients))
+		for _, clientName := range run.Clients {
+			clientMetrics[clientName] = ClientBaseline{
+				ErrorRate:     run.OverallErrorRate,
+				AvgLatency:    run.AvgLatencyMs,
+				P95Latency:    run.P95LatencyMs,
+				P99Latency:    run.P99LatencyMs,
+				Throughput:    0, // Not available without full results
+				TotalRequests: totalRequests,
+				TotalErrors:   totalErrors,
+			}
 		}
 	}
 
@@ -585,12 +650,14 @@ func (bm *baselineManager) extractBaselineMetrics(ctx context.Context, run *type
 func (bm *baselineManager) saveBaseline(ctx context.Context, baseline *Baseline) error {
 	query := `
 		INSERT INTO baselines (
-			id, name, description, test_name, run_id, created_by, created_at, updated_at,
-			baseline_metrics, tags, is_active
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			id, name, description, test_name, run_id, git_branch, git_commit, 
+			created_by, created_at, updated_at, baseline_metrics, tags, is_active
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (name) DO UPDATE SET
 			description = EXCLUDED.description,
 			run_id = EXCLUDED.run_id,
+			git_branch = EXCLUDED.git_branch,
+			git_commit = EXCLUDED.git_commit,
 			updated_at = CURRENT_TIMESTAMP,
 			baseline_metrics = EXCLUDED.baseline_metrics,
 			tags = EXCLUDED.tags`
@@ -607,7 +674,8 @@ func (bm *baselineManager) saveBaseline(ctx context.Context, baseline *Baseline)
 
 	_, err = bm.db.ExecContext(ctx, query,
 		baseline.ID, baseline.Name, baseline.Description, baseline.TestName,
-		baseline.RunID, baseline.CreatedBy, baseline.CreatedAt, baseline.UpdatedAt,
+		baseline.RunID, baseline.GitBranch, baseline.GitCommit,
+		baseline.CreatedBy, baseline.CreatedAt, baseline.UpdatedAt,
 		baselineMetricsJSON, tagsJSON, baseline.IsActive,
 	)
 

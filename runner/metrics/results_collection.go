@@ -43,7 +43,7 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		}
 	}
 
-	// Parse prometheus endpoint
+	// Parse prometheus endpoint (base URL like http://host:port)
 	prometheusURL, err := url.Parse(cfg.Outputs.PrometheusRW.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("invalid prometheus endpoint: %w", err)
@@ -62,9 +62,9 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 	}
 	api := v1.NewAPI(client)
 
-	// Get benchmark metrics
+	// Get benchmark metrics (http requests and checks)
 	query, _, err := api.Query(context.Background(),
-		fmt.Sprintf(`{__name__=~"k6_http_req.+",testid="%s"}`, cfg.TestName),
+		fmt.Sprintf(`{__name__=~"k6_http_req.+|k6_checks_rate",testid="%s"}`, cfg.TestName),
 		timestamp,
 	)
 	if err != nil {
@@ -74,6 +74,10 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 	}
 
 	vector := query.(model.Vector)
+
+	// Track check pass rates per method per client
+	// Map structure: clientName -> methodName -> checkName -> passRate (0-1)
+	checkPassRates := make(map[string]map[string]map[string]float64)
 
 	// Parse prometheus metrics samples
 	for _, sample := range vector {
@@ -102,6 +106,25 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		}
 		testID, ok := sample.Metric["testid"]
 		if !ok || string(testID) != cfg.TestName { // Skip if the test ID is not found or is not the current benchmark test
+			continue
+		}
+
+		// Parse k6_checks_rate metrics - track check pass rates
+		// k6_checks_rate is a gauge (0-1) showing the pass rate for each check
+		if strings.EqualFold(string(metricName), "k6_checks_rate") {
+			checkName, hasCheck := sample.Metric["check"]
+			if !hasCheck {
+				continue
+			}
+			// Initialize maps if needed
+			if checkPassRates[string(clientName)] == nil {
+				checkPassRates[string(clientName)] = make(map[string]map[string]float64)
+			}
+			if checkPassRates[string(clientName)][string(metricMethod)] == nil {
+				checkPassRates[string(clientName)][string(metricMethod)] = make(map[string]float64)
+			}
+			// Store the pass rate (0-1)
+			checkPassRates[string(clientName)][string(metricMethod)][string(checkName)] = float64(metricValue)
 			continue
 		}
 
@@ -162,6 +185,53 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		client.Methods[string(metricMethod)] = method
 	}
 
+	// Apply check pass rates to method error counts
+	// The "has_result" check failing indicates a JSON-RPC error (HTTP 200 but no result field)
+	for clientName, methodChecks := range checkPassRates {
+		client, ok := clientsMetrics[clientName]
+		if !ok {
+			continue
+		}
+		for methodName, checks := range methodChecks {
+			method, ok := client.Methods[methodName]
+			if !ok {
+				continue
+			}
+			// Check the "has_result" pass rate to calculate failures
+			for checkName, passRate := range checks {
+				if checkName == "has_result" && passRate < 1.0 {
+					// passRate is 0-1, so failure rate is (1 - passRate)
+					// Calculate the number of failed checks based on request count
+					// NOTE: method.Count should represent total requests including all error types.
+					// If SuccessCount was already excluding some errors, this may double-count.
+					failureRate := 1.0 - passRate
+					failedCount := int64(float64(method.Count) * failureRate)
+					if failedCount > 0 {
+						// These are requests that got HTTP 200 but returned a JSON-RPC error
+						// Recalculate SuccessCount from total to avoid double-counting
+						// SuccessCount should be: total requests - all errors
+						method.ErrorCount += failedCount
+						method.SuccessCount = method.Count - method.ErrorCount
+						if method.SuccessCount < 0 {
+							// This should not happen if method.Count is truly the total
+							fmt.Printf("Warning: Success count became negative for method %s (total: %d, errors: %d)\n",
+								methodName, method.Count, method.ErrorCount)
+							method.SuccessCount = 0
+						}
+						// Recalculate rates
+						if method.Count > 0 {
+							method.ErrorRate = (float64(method.ErrorCount) / float64(method.Count)) * 100
+							method.SuccessRate = (float64(method.SuccessCount) / float64(method.Count)) * 100
+						}
+						// Track error type
+						client.ErrorTypes["json_rpc_error"] += failedCount
+					}
+				}
+			}
+			client.Methods[methodName] = method
+		}
+	}
+
 	for _, client := range clientsMetrics {
 		// Recalculate totals based on method data to ensure accuracy
 		var totalRequests int64
@@ -179,6 +249,9 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			client.TotalRequests = totalRequests
 			client.TotalErrors = totalErrors
 			client.ErrorRate = float64(totalErrors) / float64(totalRequests) * 100
+			client.SuccessRate = 100 - client.ErrorRate
+		} else {
+			client.SuccessRate = 100 // Default to 100% if no requests
 		}
 
 		// Calculate overall latency from method latencies

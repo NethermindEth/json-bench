@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+
 	"github.com/jsonrpc-bench/runner/types"
 )
 
@@ -56,6 +57,7 @@ func getClientMetricsForRun(db *sql.DB, runID string) (map[string]*types.ClientM
 			TotalRequests: int64(totalRequests),
 			TotalErrors:   int64(totalRequests * errorRate / 100.0),
 			ErrorRate:     errorRate,
+			SuccessRate:   successRate,
 			Latency: types.MetricSummary{
 				Avg:         avgLatency,
 				Min:         minLatency,
@@ -101,6 +103,7 @@ func getClientMetricsForRun(db *sql.DB, runID string) (map[string]*types.ClientM
 				)
 				if err == nil {
 					mm.Count = int64(mm.Throughput) // Approximate count from throughput
+					mm.SuccessRate = 100 - mm.ErrorRate
 					cm.Methods[method] = mm
 				}
 			}

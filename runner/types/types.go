@@ -75,6 +75,7 @@ type ClientMetrics struct {
 	TotalRequests int64                     `json:"total_requests"`
 	TotalErrors   int64                     `json:"total_errors"`
 	ErrorRate     float64                   `json:"error_rate"`
+	SuccessRate   float64                   `json:"success_rate"` // Computed as 1 - ErrorRate
 	Latency       MetricSummary             `json:"latency"`
 	Methods       map[string]MetricSummary  `json:"methods"`
 	MethodDetails map[string]*MethodMetrics `json:"method_details,omitempty"` // Method metrics with names

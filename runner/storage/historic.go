@@ -399,12 +399,16 @@ func (h *HistoricStorage) LoadRun(runID string) (*types.BenchmarkResult, error) 
 
 // Helper functions for extracting data from config and results
 func extractTestName(cfg *config.Config) string {
-	// Extract test name from config
+	if cfg.TestName != "" {
+		return cfg.TestName
+	}
 	return "default_test"
 }
 
+// extractDescription returns the description from the config.
+// Empty descriptions are acceptable and will result in an empty string.
 func extractDescription(cfg *config.Config) string {
-	return ""
+	return cfg.Description
 }
 
 func extractTags(cfg *config.Config) []string {

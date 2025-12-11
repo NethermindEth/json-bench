@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS benchmark_runs (
     tags JSONB,
     is_baseline BOOLEAN DEFAULT FALSE,
     baseline_name VARCHAR(255),
-    metadata JSONB
+    metadata JSONB,
+    full_results JSONB
 );`
 
 const GrafanaMetricsTable = `
