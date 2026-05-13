@@ -104,9 +104,10 @@ func (h *HistoricStorage) SaveRun(result *types.BenchmarkResult, cfg *config.Con
 		SuccessRate:   calculateSuccessRate(result),
 		AvgLatency:    calculateAvgLatency(result),
 		P95Latency:    calculateP95Latency(result),
-		Clients:       extractClients(result),
-		Methods:       extractMethods(result),
-		Tags:          extractTags(cfg),
+		Clients:        extractClients(result),
+		Methods:        extractMethods(result),
+		Tags:           extractTags(cfg),
+		ClientVersions: result.ClientVersions,
 
 		// Additional fields for baseline analysis
 		OverallErrorRate:  100.0 - calculateSuccessRate(result),

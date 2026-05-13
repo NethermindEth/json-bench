@@ -185,8 +185,21 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		client.Methods[string(metricMethod)] = method
 	}
 
-	// Apply check pass rates to method error counts
-	// The "has_result" check failing indicates a JSON-RPC error (HTTP 200 but no result field)
+	// Fold the "has_result" k6 check into method error counts.
+	//
+	// The check (see generator/scripts/k6-script.js) fails whenever a response is
+	// missing a JSON-RPC `result` field — which covers both transport-level errors
+	// (where r.json() throws and the check fails by definition) and HTTP 200
+	// responses carrying a JSON-RPC error body. Because k6 evaluates the check on
+	// *every* iteration, (1 - passRate) * Count is the total number of iterations
+	// that did not produce a successful JSON-RPC result.
+	//
+	// method.Count is incremented from k6_http_reqs_total for both successes and
+	// transport errors (see the parsing loop above), so it is the right
+	// denominator. method.ErrorCount at this point only holds transport errors
+	// (samples tagged with `error_code`). Setting ErrorCount = max(transport
+	// errors, has_result failures) replaces it with the more complete count
+	// without double-counting transport errors that already failed the check.
 	for clientName, methodChecks := range checkPassRates {
 		client, ok := clientsMetrics[clientName]
 		if !ok {
@@ -197,37 +210,23 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			if !ok {
 				continue
 			}
-			// Check the "has_result" pass rate to calculate failures
-			for checkName, passRate := range checks {
-				if checkName == "has_result" && passRate < 1.0 {
-					// passRate is 0-1, so failure rate is (1 - passRate)
-					// Calculate the number of failed checks based on request count
-					// NOTE: method.Count should represent total requests including all error types.
-					// If SuccessCount was already excluding some errors, this may double-count.
-					failureRate := 1.0 - passRate
-					failedCount := int64(float64(method.Count) * failureRate)
-					if failedCount > 0 {
-						// These are requests that got HTTP 200 but returned a JSON-RPC error
-						// Recalculate SuccessCount from total to avoid double-counting
-						// SuccessCount should be: total requests - all errors
-						method.ErrorCount += failedCount
-						method.SuccessCount = method.Count - method.ErrorCount
-						if method.SuccessCount < 0 {
-							// This should not happen if method.Count is truly the total
-							fmt.Printf("Warning: Success count became negative for method %s (total: %d, errors: %d)\n",
-								methodName, method.Count, method.ErrorCount)
-							method.SuccessCount = 0
-						}
-						// Recalculate rates
-						if method.Count > 0 {
-							method.ErrorRate = (float64(method.ErrorCount) / float64(method.Count)) * 100
-							method.SuccessRate = (float64(method.SuccessCount) / float64(method.Count)) * 100
-						}
-						// Track error type
-						client.ErrorTypes["json_rpc_error"] += failedCount
-					}
-				}
+			passRate, hasCheck := checks["has_result"]
+			if !hasCheck || passRate >= 1.0 {
+				continue
 			}
+			failureRate := 1.0 - passRate
+			totalFailed := int64(float64(method.Count) * failureRate)
+			if totalFailed <= method.ErrorCount {
+				continue
+			}
+			jsonRPCErrors := totalFailed - method.ErrorCount
+			method.ErrorCount = totalFailed
+			method.SuccessCount = method.Count - method.ErrorCount
+			if method.Count > 0 {
+				method.ErrorRate = (float64(method.ErrorCount) / float64(method.Count)) * 100
+				method.SuccessRate = (float64(method.SuccessCount) / float64(method.Count)) * 100
+			}
+			client.ErrorTypes["json_rpc_error"] += jsonRPCErrors
 			client.Methods[methodName] = method
 		}
 	}

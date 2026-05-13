@@ -5,7 +5,8 @@ datasources:
     type: prometheus
     access: proxy
     url: http://prometheus:9090
-    isDefault: false
+    # Default datasource for dashboards that template ${DS_PROMETHEUS}.
+    isDefault: true
     editable: true
     jsonData:
       timeInterval: "15s"
@@ -31,13 +32,11 @@ datasources:
     secureJsonData:
       password: "postgres"
       
-  - name: JSON-RPC Bench API
-    type: simplejson
-    access: proxy
-    url: http://runner:8080/api/grafana
-    isDefault: true
-    editable: true
-    jsonData:
-      timeInterval: "15s"
-      httpMethod: "POST"
-    withCredentials: false
+# The "JSON-RPC Bench API" SimpleJSON datasource and the dashboards that used
+# it (baseline-comparison, jsonrpc-benchmark, jsonrpc-benchmark-enhanced) were
+# removed: SimpleJSON is an AngularJS plugin that Grafana 13 will not load
+# (https://grafana.com/docs/grafana/latest/developers/angular_deprecation/),
+# so those dashboards could never query their data source. The React dashboard
+# at http://localhost:8080 covers the same use cases against the same backend
+# and is the canonical UI; this Grafana instance is kept only for the k6
+# real-time view backed by Prometheus.

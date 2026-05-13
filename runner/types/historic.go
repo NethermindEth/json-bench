@@ -27,6 +27,10 @@ type HistoricRun struct {
 	Tags          []string  `json:"tags" db:"tags"`
 	IsBaseline    bool      `json:"is_baseline" db:"is_baseline"`
 	BaselineName  string    `json:"baseline_name,omitempty" db:"baseline_name"`
+	// ClientVersions is the web3_clientVersion string each configured client
+	// reported at run startup. "unknown" if the call failed. Useful for
+	// attributing regressions to specific builds.
+	ClientVersions map[string]string `json:"client_versions,omitempty" db:"client_versions"`
 
 	// Additional fields for baseline analysis compatibility
 	OverallErrorRate  float64            `json:"overall_error_rate" db:"overall_error_rate"`

@@ -77,18 +77,19 @@ CREATE TABLE IF NOT EXISTS historic_runs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create baselines table if it doesn't exist
--- NOTE: run_id does not have a foreign key constraint to historic_runs(id)
--- for flexibility in data retention policies. This creates a data integrity risk
--- where baselines can reference non-existent runs. The application should validate
--- that run_id exists when creating baselines, and cleanup processes should handle
--- orphaned baselines appropriately.
+-- Create baselines table if it doesn't exist.
+--
+-- run_id deliberately has no FK at init time: actual runs live in benchmark_runs
+-- (created at runtime by runner/storage/grafana_schema.go), not historic_runs,
+-- so a FK declared here would either be wrong or unsatisfiable. The runner
+-- adds an ON DELETE SET NULL FK against benchmark_runs once that table exists
+-- (see runner/analysis/baseline.go createBaselinesTable).
 CREATE TABLE IF NOT EXISTS baselines (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     test_name VARCHAR(255) NOT NULL,
-    run_id VARCHAR(255) NOT NULL,
+    run_id VARCHAR(255),
     git_branch VARCHAR(255),
     git_commit VARCHAR(255),
     created_by VARCHAR(255),
@@ -99,14 +100,16 @@ CREATE TABLE IF NOT EXISTS baselines (
     is_active BOOLEAN NOT NULL DEFAULT true
 );
 
--- Create regressions table if it doesn't exist
--- Note: Foreign key constraints on run_id and baseline_id are intentionally omitted
--- to allow flexibility in data retention policies (e.g., keeping regressions after
--- runs are cleaned up) and to avoid cascading delete issues.
+-- Create regressions table if it doesn't exist.
+--
+-- Same situation as baselines: run_id is logically a FK to benchmark_runs but
+-- that table doesn't exist at init time. We keep the FK from baseline_id to
+-- baselines(id) since both live in this script. SET NULL on baseline deletion
+-- preserves the numeric deviation record.
 CREATE TABLE IF NOT EXISTS regressions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     run_id VARCHAR(255) NOT NULL,
-    baseline_id VARCHAR(255),
+    baseline_id VARCHAR(255) REFERENCES baselines(id) ON DELETE SET NULL,
     client VARCHAR(255) NOT NULL,
     metric VARCHAR(255) NOT NULL,
     current_value DECIMAL(10,3),
@@ -141,6 +144,24 @@ CREATE TABLE IF NOT EXISTS test_configurations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(test_name, config_hash)
 );
+
+-- Backfill the regressions.baseline_id FK on databases that pre-date it.
+-- Other FKs (baselines.run_id, regressions.run_id) target benchmark_runs and
+-- are added at runtime by the runner once that table exists; see baseline.go.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'regressions_baseline_id_fkey'
+    ) THEN
+        BEGIN
+            ALTER TABLE regressions
+                ADD CONSTRAINT regressions_baseline_id_fkey
+                FOREIGN KEY (baseline_id) REFERENCES baselines(id) ON DELETE SET NULL;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Skipped adding regressions.baseline_id FK: %', SQLERRM;
+        END;
+    END IF;
+END $$;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_historic_runs_test_name ON historic_runs(test_name);

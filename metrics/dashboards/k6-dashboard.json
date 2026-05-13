@@ -2034,10 +2034,10 @@
         "current": {
           "selected": true,
           "text": [
-            "Base Mainnet Benchmark"
+            "All"
           ],
           "value": [
-            "Base Mainnet Benchmark"
+            "$__all"
           ]
         },
         "datasource": {

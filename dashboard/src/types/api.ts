@@ -33,6 +33,10 @@ export interface HistoricRun {
   created_at: string
   notes?: string
   full_results?: string  // Contains JSON string of full benchmark results
+  // Map of client name → web3_clientVersion string at the time of the run.
+  // "unknown" if the client didn't respond. Absent on runs predating the
+  // feature.
+  client_versions?: Record<string, string>
 }
 
 export interface TimeSeriesMetric {
@@ -70,12 +74,76 @@ export interface TrendData {
   forecast?: TrendPoint[]
 }
 
+// Baseline mirrors the Go analysis.Baseline struct returned by /api/baselines.
+export interface Baseline {
+  id: string
+  name: string
+  description?: string
+  test_name: string
+  run_id: string
+  git_branch?: string
+  git_commit?: string
+  created_by?: string
+  created_at: string
+  updated_at: string
+  baseline_metrics: BaselineMetricsSnapshot
+  tags?: string[]
+  is_active: boolean
+}
+
+// BaselineMetricsSnapshot mirrors the Go analysis.BaselineMetrics struct.
+export interface BaselineMetricsSnapshot {
+  overall_error_rate: number
+  avg_latency_ms: number
+  p95_latency_ms: number
+  p99_latency_ms: number
+  max_latency_ms: number
+  total_requests: number
+  total_errors: number
+  performance_scores?: Record<string, number>
+  client_metrics?: Record<string, unknown>
+  method_metrics?: Record<string, Record<string, number>>
+}
+
+// ComparisonMetric mirrors analysis.ComparisonMetric.
+export interface ComparisonMetric {
+  baseline_value: number
+  current_value: number
+  absolute_change: number
+  percent_change: number
+  is_improvement: boolean
+  is_significant: boolean
+  confidence_level?: number
+}
+
+// ClientComparison mirrors analysis.ClientComparison.
+export interface ClientComparison {
+  client: string
+  error_rate: ComparisonMetric
+  avg_latency: ComparisonMetric
+  p95_latency: ComparisonMetric
+  p99_latency: ComparisonMetric
+  throughput: ComparisonMetric
+  overall_score: ComparisonMetric
+  status: 'improved' | 'degraded' | 'stable'
+}
+
+// BaselineComparison mirrors analysis.BaselineComparison — the response shape
+// of GET /api/baselines/{name}/compare/{runId}.
 export interface BaselineComparison {
-  baselineRun: HistoricRun
-  currentRun: BenchmarkResult
-  regressions: Regression[]
-  improvements: Improvement[]
+  run_id: string
+  baseline_name: string
+  baseline_run_id: string
+  compared_at: string
+  overall_change: ComparisonMetric
+  client_changes: Record<string, ClientComparison>
+  method_changes?: Record<string, Record<string, ComparisonMetric>>
+  regressions?: Regression[]
+  improvements?: Improvement[]
   summary: string
+  status: 'improved' | 'degraded' | 'stable' | 'mixed'
+  risk_level: 'low' | 'medium' | 'high' | 'critical'
+  recommendations?: string[]
 }
 
 export interface Improvement {
@@ -158,6 +226,7 @@ export interface RunFilter {
   client?: string
   method?: string
   testName?: string
+  search?: string
   isBaseline?: boolean
   from?: string
   to?: string
@@ -171,6 +240,7 @@ export interface TrendFilter {
   method?: string
   metric?: string
   gitBranch?: string
+  limit?: number
 }
 
 export interface MetricQuery {

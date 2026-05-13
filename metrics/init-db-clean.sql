@@ -51,13 +51,14 @@ CREATE TABLE historic_runs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create baselines table
+-- Create baselines table. See init-db.sql for the rationale: run_id targets
+-- benchmark_runs and is wired up at runtime (the table doesn't exist yet here).
 CREATE TABLE baselines (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     test_name VARCHAR(255) NOT NULL,
-    run_id VARCHAR(255) NOT NULL,
+    run_id VARCHAR(255),
     git_branch VARCHAR(255),
     git_commit VARCHAR(255),
     created_by VARCHAR(255),
@@ -68,11 +69,11 @@ CREATE TABLE baselines (
     is_active BOOLEAN NOT NULL DEFAULT true
 );
 
--- Create regressions table
+-- Create regressions table. See init-db.sql for the FK rationale.
 CREATE TABLE regressions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     run_id VARCHAR(255) NOT NULL,
-    baseline_id VARCHAR(255),
+    baseline_id VARCHAR(255) REFERENCES baselines(id) ON DELETE SET NULL,
     client VARCHAR(255) NOT NULL,
     metric VARCHAR(255) NOT NULL,
     current_value DECIMAL(10,3),

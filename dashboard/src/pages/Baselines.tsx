@@ -2,8 +2,8 @@ import { useState, FormEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { FlagIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline'
 import LoadingSpinner from '../components/LoadingSpinner'
-import type { HistoricRun } from '../types/api'
 import { createBenchmarkAPI } from '../api/client'
+import { formatLatency, formatPercentage } from '../utils/metric-formatters'
 
 // Initialize API client
 const api = createBenchmarkAPI(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082')
@@ -121,9 +121,9 @@ export default function Baselines() {
                     disabled={runsLoading}
                   >
                     <option value="">Select a run...</option>
-                    {availableRuns?.map((run) => (
+                    {availableRuns?.runs?.map((run) => (
                       <option key={run.id} value={run.id}>
-                        {run.testName} - {new Date(run.timestamp).toLocaleDateString()} ({run.gitCommit})
+                        {run.test_name} - {new Date(run.timestamp).toLocaleDateString()} ({run.git_commit})
                       </option>
                     ))}
                   </select>
@@ -205,7 +205,7 @@ export default function Baselines() {
                     <tr key={baseline.id} className="table-row">
                       <td className="table-cell">
                         <div>
-                          <div className="font-medium text-gray-900">{baseline.baselineName}</div>
+                          <div className="font-medium text-gray-900">{baseline.name}</div>
                           {baseline.description && (
                             <div className="text-sm text-gray-500">{baseline.description}</div>
                           )}
@@ -213,28 +213,28 @@ export default function Baselines() {
                       </td>
                       <td className="table-cell">
                         <div>
-                          <div className="font-medium text-gray-900">{baseline.testName}</div>
+                          <div className="font-medium text-gray-900">{baseline.test_name}</div>
                           <div className="text-sm text-gray-500 font-mono">{baseline.id}</div>
                         </div>
                       </td>
                       <td className="table-cell">
                         <div>
-                          <div className="font-mono text-gray-900">{baseline.gitCommit}</div>
-                          <div className="text-sm text-gray-500">{baseline.gitBranch}</div>
+                          <div className="font-mono text-gray-900">{baseline.git_commit || ''}</div>
+                          <div className="text-sm text-gray-500">{baseline.git_branch || ''}</div>
                         </div>
                       </td>
                       <td className="table-cell">
                         <div className="space-y-1">
                           <div className="text-sm">
-                            <span className="text-gray-500">Latency:</span> {baseline.avgLatency.toFixed(1)}ms
+                            <span className="text-gray-500">Latency:</span> {formatLatency(baseline.baseline_metrics?.avg_latency_ms ?? 0)}
                           </div>
                           <div className="text-sm">
-                            <span className="text-gray-500">Success:</span> {baseline.successRate.toFixed(1)}%
+                            <span className="text-gray-500">Success:</span> {formatPercentage(100 - (baseline.baseline_metrics?.overall_error_rate ?? 0))}
                           </div>
                         </div>
                       </td>
                       <td className="table-cell">
-                        {new Date(baseline.timestamp).toLocaleDateString()}
+                        {new Date(baseline.created_at).toLocaleDateString()}
                       </td>
                       <td className="table-cell">
                         <button

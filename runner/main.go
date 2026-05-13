@@ -17,6 +17,7 @@ import (
 	"github.com/jsonrpc-bench/runner/analysis"
 	"github.com/jsonrpc-bench/runner/analyzer"
 	"github.com/jsonrpc-bench/runner/api"
+	"github.com/jsonrpc-bench/runner/clientinfo"
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/exporter"
 	"github.com/jsonrpc-bench/runner/generator"
@@ -176,6 +177,15 @@ func main() {
 		logger.WithError(err).Fatal("Failed to create output directory")
 	}
 
+	// Capture web3_clientVersion per client *before* the benchmark starts so
+	// the resulting HistoricRun can be pinned to the exact build that
+	// produced these numbers. Failures land as "unknown" — we never block the
+	// run on metadata.
+	clientVersions := clientinfo.FetchVersions(context.Background(), cfg.ResolvedClients)
+	for name, v := range clientVersions {
+		logger.WithFields(logrus.Fields{"client": name, "version": v}).Info("Recorded client version")
+	}
+
 	// Generate k6 script
 
 	k6Cmd, summaryPath, err := generator.GenerateK6(cfg, *outputDir)
@@ -225,13 +235,14 @@ func main() {
 	logP99Validation(clientsMetrics, logger)
 
 	benchmarkResults := &types.BenchmarkResult{
-		Summary:       k6Summary,
-		ClientMetrics: clientsMetrics,
-		Timestamp:     time.Now().Format(time.DateTime),
-		StartTime:     startTime.Format(time.DateTime),
-		EndTime:       endTime.Format(time.DateTime),
-		Duration:      testDuration.String(),
-		ResponsesDir:  *outputDir,
+		Summary:        k6Summary,
+		ClientMetrics:  clientsMetrics,
+		ClientVersions: clientVersions,
+		Timestamp:      time.Now().Format(time.DateTime),
+		StartTime:      startTime.Format(time.DateTime),
+		EndTime:        endTime.Format(time.DateTime),
+		Duration:       testDuration.String(),
+		ResponsesDir:   *outputDir,
 	}
 
 	// Add system metrics to results if available
@@ -418,6 +429,9 @@ func runAPIServer(storageConfigPath string, apiAddr string, logger *logrus.Logge
 
 	// Initialize analysis components
 	baselineManager := analysis.NewBaselineManager(*historicStorage, db, logger)
+	if err := baselineManager.Start(context.Background()); err != nil {
+		return fmt.Errorf("failed to start baseline manager: %w", err)
+	}
 	trendAnalyzer := analysis.NewTrendAnalyzer(*historicStorage, db, logger)
 	regressionDetector := analysis.NewRegressionDetector(*historicStorage, baselineManager, db, logger)
 

@@ -267,8 +267,12 @@ func (w *responseWriterWrapper) WriteHeader(statusCode int) {
 func (s *server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Parse query parameters
+	// Parse query parameters. Accept both `test` (legacy) and `testName`
+	// (the dashboard's idiomatic key) so callers don't have to translate.
 	testName := r.URL.Query().Get("test")
+	if testName == "" {
+		testName = r.URL.Query().Get("testName")
+	}
 	limitStr := r.URL.Query().Get("limit")
 
 	limit := 50 // Default limit
@@ -650,11 +654,34 @@ func (s *server) handleListBaselines(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// BaselineRequest represents a request to create a baseline
+// BaselineRequest is the decoded body of POST /api/baselines. Parsing is handled
+// by UnmarshalJSON below so the JS frontend can send either snake_case
+// (run_id) or camelCase (runId); the explicit `json:"-"` tags here keep that
+// fact obvious to readers and prevent accidental marshaling round-trips from
+// emitting unexpected field names.
 type BaselineRequest struct {
-	RunID       string `json:"run_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	RunID       string `json:"-"`
+	Name        string `json:"-"`
+	Description string `json:"-"`
+}
+
+func (b *BaselineRequest) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		RunIDSnake  string `json:"run_id"`
+		RunIDCamel  string `json:"runId"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	b.RunID = raw.RunIDSnake
+	if b.RunID == "" {
+		b.RunID = raw.RunIDCamel
+	}
+	b.Name = raw.Name
+	b.Description = raw.Description
+	return nil
 }
 
 // handleCreateBaseline creates a new baseline
@@ -1032,32 +1059,25 @@ func (s *server) handleGetGlobalTrends(w http.ResponseWriter, r *http.Request) {
 	// Query trend data from benchmark_runs
 	since := time.Now().AddDate(0, 0, -days)
 
-	// Map metric name to database column using a whitelist to prevent SQL injection
-	validMetricColumns := map[string]string{
+	metricExpressions := map[string]string{
 		"avg_latency":  "avg_latency",
 		"p95_latency":  "p95_latency",
-		"p99_latency":  "p99_latency",
 		"error_rate":   "(100.0 - success_rate)",
-		"throughput":   "throughput",
+		"throughput":   "CASE WHEN EXTRACT(EPOCH FROM duration) > 0 THEN total_requests::float8 / EXTRACT(EPOCH FROM duration) ELSE 0 END",
 		"success_rate": "success_rate",
 	}
-
-	metricColumn, valid := validMetricColumns[metric]
-	if !valid {
-		// Default to avg_latency if metric not recognized
-		metricColumn = "avg_latency"
+	metricExpression, ok := metricExpressions[metric]
+	if !ok {
+		metricExpression = metricExpressions["avg_latency"]
 	}
 
 	query := fmt.Sprintf(`
-		SELECT 
-			timestamp,
-			test_name,
-			%s as value
+		SELECT id, timestamp, %s AS value
 		FROM benchmark_runs
 		WHERE timestamp >= $1
 		ORDER BY timestamp DESC
 		LIMIT $2
-	`, metricColumn)
+	`, metricExpression)
 
 	rows, err := s.db.QueryContext(ctx, query, since, limit)
 	if err != nil {
@@ -1070,20 +1090,22 @@ func (s *server) handleGetGlobalTrends(w http.ResponseWriter, r *http.Request) {
 	type TrendPoint struct {
 		Timestamp time.Time `json:"timestamp"`
 		Value     float64   `json:"value"`
+		RunID     string    `json:"runId"`
 	}
 
 	var points []TrendPoint
 	for rows.Next() {
+		var id string
 		var timestamp time.Time
-		var testName string
 		var value float64
-		if err := rows.Scan(&timestamp, &testName, &value); err != nil {
+		if err := rows.Scan(&id, &timestamp, &value); err != nil {
 			s.log.WithError(err).Warn("Failed to scan trend point")
 			continue
 		}
 		points = append(points, TrendPoint{
 			Timestamp: timestamp,
 			Value:     value,
+			RunID:     id,
 		})
 	}
 

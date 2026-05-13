@@ -11,12 +11,12 @@ import {
   ArrowsRightLeftIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
-import { HistoricRun } from '../types/api'
+import { Baseline, HistoricRun } from '../types/api'
 import LoadingSpinner from './LoadingSpinner'
 import { formatPercentage, formatLatency } from '../utils/metric-formatters'
 
 export interface BaselineManagerProps {
-  baselines: HistoricRun[]
+  baselines: Baseline[]
   availableRuns: HistoricRun[]
   onUpdate: (action: BaselineAction, data: any) => Promise<void>
   loading?: boolean
@@ -27,6 +27,7 @@ export interface BaselineManagerProps {
 export interface BaselineAction {
   type: 'create' | 'update' | 'delete' | 'compare'
   runId?: string
+  baselineId?: string
   baselineName?: string
   newName?: string
 }
@@ -39,49 +40,6 @@ interface NewBaselineForm {
 interface EditBaselineForm {
   baselineId: string
   newName: string
-}
-
-// Helper to safely get fields from baselines that might be HistoricRun or Baseline objects
-// NOTE: These helpers handle both camelCase and snake_case field names due to API response
-// inconsistencies. This is a defensive workaround that masks an underlying API design issue.
-// TODO: The backend API should be standardized to use a consistent naming convention
-// (either always camelCase for JavaScript/TypeScript frontends or always snake_case throughout)
-// to eliminate this complexity and potential for bugs. Once standardized, these helper
-// functions can be removed and replaced with direct field access.
-function getBaselineField(baseline: any, camelCase: string, snakeCase: string, defaultValue = ''): any {
-  return baseline[camelCase] ?? baseline[snakeCase] ?? defaultValue
-}
-
-// Helper to get metrics from baseline_metrics nested object
-function getBaselineMetric(baseline: any, metricName: string, defaultValue: number = 0): number {
-  // Try baseline_metrics (snake_case from API)
-  const metrics = baseline.baseline_metrics ?? baseline.baselineMetrics ?? {}
-  
-  // Map common metric names to their possible field names
-  const metricMappings: Record<string, string[]> = {
-    'avgLatency': ['avg_latency_ms', 'avgLatencyMs', 'avg_latency'],
-    'successRate': ['success_rate', 'successRate'],
-    'errorRate': ['overall_error_rate', 'overallErrorRate', 'error_rate', 'errorRate'],
-    'p95Latency': ['p95_latency_ms', 'p95LatencyMs', 'p95_latency'],
-    'p99Latency': ['p99_latency_ms', 'p99LatencyMs', 'p99_latency'],
-  }
-  
-  const possibleNames = metricMappings[metricName] || [metricName]
-  
-  for (const name of possibleNames) {
-    if (metrics[name] !== undefined && metrics[name] !== null) {
-      return Number(metrics[name])
-    }
-  }
-  
-  // Also check top-level fields (for HistoricRun objects used as baselines)
-  for (const name of possibleNames) {
-    if (baseline[name] !== undefined && baseline[name] !== null) {
-      return Number(baseline[name])
-    }
-  }
-  
-  return defaultValue
 }
 
 /**
@@ -112,51 +70,34 @@ export default function BaselineManager({
   })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  // Filter and sort baselines
-  // Note: baselines can be either HistoricRun[] or Baseline[] objects from the API
   const filteredBaselines = useMemo(() => {
-    if (!Array.isArray(baselines)) return []
-    
     const searchLower = searchTerm.toLowerCase()
-    const filtered = baselines.filter(baseline => {
-      // Handle both camelCase (HistoricRun) and snake_case (Baseline) field names
-      const name = (baseline as any).baselineName || (baseline as any).name || ''
-      const testName = (baseline as any).testName || (baseline as any).test_name || ''
-      const gitBranch = (baseline as any).gitBranch || (baseline as any).git_branch || ''
-      
-      return name.toLowerCase().includes(searchLower) ||
-        testName.toLowerCase().includes(searchLower) ||
-        gitBranch.toLowerCase().includes(searchLower)
-    })
+    const filtered = baselines.filter(baseline =>
+      baseline.name.toLowerCase().includes(searchLower) ||
+      baseline.test_name.toLowerCase().includes(searchLower) ||
+      (baseline.git_branch || '').toLowerCase().includes(searchLower)
+    )
 
     return filtered.sort((a, b) => {
       let comparison = 0
-      const aName = (a as any).baselineName || (a as any).name || ''
-      const bName = (b as any).baselineName || (b as any).name || ''
-      const aTestName = (a as any).testName || (a as any).test_name || ''
-      const bTestName = (b as any).testName || (b as any).test_name || ''
-      const aTimestamp = (a as any).timestamp || (a as any).created_at || ''
-      const bTimestamp = (b as any).timestamp || (b as any).created_at || ''
-      
       switch (sortBy) {
         case 'name':
-          comparison = aName.localeCompare(bName)
+          comparison = a.name.localeCompare(b.name)
           break
         case 'timestamp':
-          comparison = new Date(aTimestamp).getTime() - new Date(bTimestamp).getTime()
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           break
         case 'testName':
-          comparison = aTestName.localeCompare(bTestName)
+          comparison = a.test_name.localeCompare(b.test_name)
           break
       }
-      
       return sortOrder === 'desc' ? -comparison : comparison
     })
   }, [baselines, searchTerm, sortBy, sortOrder])
 
   // Filter available runs (excluding those already baselines)
   const availableForBaseline = useMemo(() => {
-    const baselineRunIds = new Set(baselines.map(b => b.id))
+    const baselineRunIds = new Set(baselines.map(b => b.run_id))
     return availableRuns.filter(run => !baselineRunIds.has(run.id))
   }, [availableRuns, baselines])
 
@@ -214,7 +155,7 @@ export default function BaselineManager({
     try {
       await onUpdate({
         type: 'update',
-        runId: editForm.baselineId,
+        baselineId: editForm.baselineId,
         newName: editForm.newName.trim(),
       }, null)
 
@@ -227,9 +168,8 @@ export default function BaselineManager({
     }
   }
 
-  const handleDeleteBaseline = async (baseline: any) => {
-    const baselineName = getBaselineField(baseline, 'baselineName', 'name')
-    if (!confirm(`Are you sure you want to delete baseline "${baselineName}"? This action cannot be undone.`)) {
+  const handleDeleteBaseline = async (baseline: Baseline) => {
+    if (!confirm(`Are you sure you want to delete baseline "${baseline.name}"? This action cannot be undone.`)) {
       return
     }
 
@@ -237,8 +177,8 @@ export default function BaselineManager({
     try {
       await onUpdate({
         type: 'delete',
-        runId: baseline.id,
-        baselineName: baselineName, // Pass the name for the backend
+        baselineId: baseline.id,
+        baselineName: baseline.name,
       }, null)
     } catch (error) {
       console.error('Failed to delete baseline:', error)
@@ -257,12 +197,17 @@ export default function BaselineManager({
 
     setActionLoading('delete-multiple')
     try {
-      for (const baselineId of selectedBaselines) {
-        await onUpdate({
+      const baselinesById = new Map(baselines.map(baseline => [baseline.id, baseline]))
+      const actions = Array.from(selectedBaselines)
+        .map(baselineId => baselinesById.get(baselineId))
+        .filter((baseline): baseline is Baseline => Boolean(baseline))
+        .map(baseline => onUpdate({
           type: 'delete',
-          runId: baselineId,
-        }, null)
-      }
+          baselineId: baseline.id,
+          baselineName: baseline.name,
+        }, null))
+
+      await Promise.all(actions)
       setSelectedBaselines(new Set())
     } catch (error) {
       console.error('Failed to delete baselines:', error)
@@ -282,11 +227,11 @@ export default function BaselineManager({
     }, null)
   }
 
-  const startEditing = (baseline: HistoricRun) => {
+  const startEditing = (baseline: Baseline) => {
     setEditingBaseline(baseline.id)
     setEditForm({
       baselineId: baseline.id,
-      newName: getBaselineField(baseline, 'baselineName', 'name'),
+      newName: baseline.name,
     })
   }
 
@@ -304,7 +249,7 @@ export default function BaselineManager({
       <div className={`card ${className}`}>
         <div className="card-content">
           <LoadingSpinner size="lg" className="py-8" />
-          <p className="text-center text-gray-500 mt-4">Loading baselines...</p>
+          <p className="text-center text-gray-500 dark:text-slate-400 mt-4">Loading baselines...</p>
         </div>
       </div>
     )
@@ -318,7 +263,7 @@ export default function BaselineManager({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <FlagIcon className="h-6 w-6 text-primary-600" />
-              <h2 className="text-xl font-bold text-gray-900">Baseline Management</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">Baseline Management</h2>
               <span className="badge badge-info">{baselines.length}</span>
             </div>
             <button
@@ -347,7 +292,7 @@ export default function BaselineManager({
       {showCreateForm && (
         <div className="card">
           <div className="card-header">
-            <h3 className="text-lg font-semibold text-gray-900">Create New Baseline</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Create New Baseline</h3>
           </div>
           <div className="card-content">
             <div className="space-y-4">
@@ -361,16 +306,12 @@ export default function BaselineManager({
                 >
                   <option value="">Choose a run...</option>
                   {availableForBaseline.map((run) => {
-                    // Handle both camelCase and snake_case field names
-                    const runAny = run as any
-                    const testName = runAny.testName || runAny.test_name || 'Unnamed Test'
-                    const branch = runAny.gitBranch || runAny.git_branch || 'no branch'
-                    const latency = runAny.avgLatencyMs ?? runAny.avg_latency_ms ?? runAny.avgLatency
-                    const latencyStr = latency ? `${Number(latency).toFixed(1)}ms` : ''
-                    const rate = runAny.successRate ?? runAny.success_rate
-                    const successRateStr = rate !== undefined ? `${Number(rate).toFixed(1)}%` : ''
+                    const testName = run.test_name || 'Unnamed Test'
+                    const branch = run.git_branch || 'no branch'
+                    const latencyStr = run.avg_latency_ms ? formatLatency(run.avg_latency_ms) : ''
+                    const successRateStr = run.success_rate !== undefined ? formatPercentage(run.success_rate) : ''
                     const metrics = [latencyStr, successRateStr].filter(Boolean).join(', ')
-                    
+
                     return (
                       <option key={run.id} value={run.id}>
                         {testName} • {formatTimestamp(run.timestamp)} • {branch}{metrics ? ` • ${metrics}` : ''}
@@ -383,45 +324,37 @@ export default function BaselineManager({
                 {newBaselineForm.runId && (() => {
                   const selectedRun = availableForBaseline.find(r => r.id === newBaselineForm.runId)
                   if (!selectedRun) return null
-                  
-                  // Handle both camelCase and snake_case field names
-                  const runAny = selectedRun as any
-                  const testName = runAny.testName || runAny.test_name || 'Unnamed'
-                  const branch = runAny.gitBranch || runAny.git_branch || 'N/A'
-                  const latency = runAny.avgLatencyMs ?? runAny.avg_latency_ms ?? runAny.avgLatency ?? 0
-                  const rate = runAny.successRate ?? runAny.success_rate
-                  const totalReqs = runAny.totalRequests ?? runAny.total_requests
-                  
+
                   return (
-                    <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="text-sm font-medium text-gray-700 mb-2">Selected Run Details</div>
+                    <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-900/60 rounded-lg border border-gray-200 dark:border-slate-700">
+                      <div className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Selected Run Details</div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
-                          <span className="text-gray-500">Test:</span>
-                          <span className="ml-2 font-medium">{testName}</span>
+                          <span className="text-gray-500 dark:text-slate-400">Test:</span>
+                          <span className="ml-2 font-medium">{selectedRun.test_name || 'Unnamed'}</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Branch:</span>
-                          <span className="ml-2 font-medium">{branch}</span>
+                          <span className="text-gray-500 dark:text-slate-400">Branch:</span>
+                          <span className="ml-2 font-medium">{selectedRun.git_branch || 'N/A'}</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Date:</span>
+                          <span className="text-gray-500 dark:text-slate-400">Date:</span>
                           <span className="ml-2 font-medium">{formatTimestamp(selectedRun.timestamp)}</span>
                         </div>
                         <div>
-                          <span className="text-gray-500">Avg Latency:</span>
-                          <span className="ml-2 font-medium">{formatLatency(latency)}</span>
+                          <span className="text-gray-500 dark:text-slate-400">Avg Latency:</span>
+                          <span className="ml-2 font-medium">{formatLatency(selectedRun.avg_latency_ms ?? 0)}</span>
                         </div>
-                        {rate !== undefined && (
+                        {selectedRun.success_rate !== undefined && (
                           <div>
-                            <span className="text-gray-500">Success Rate:</span>
-                            <span className="ml-2 font-medium">{formatPercentage(rate)}</span>
+                            <span className="text-gray-500 dark:text-slate-400">Success Rate:</span>
+                            <span className="ml-2 font-medium">{formatPercentage(selectedRun.success_rate)}</span>
                           </div>
                         )}
-                        {totalReqs !== undefined && (
+                        {selectedRun.total_requests !== undefined && (
                           <div>
-                            <span className="text-gray-500">Total Requests:</span>
-                            <span className="ml-2 font-medium">{Number(totalReqs).toLocaleString()}</span>
+                            <span className="text-gray-500 dark:text-slate-400">Total Requests:</span>
+                            <span className="ml-2 font-medium">{selectedRun.total_requests.toLocaleString()}</span>
                           </div>
                         )}
                       </div>
@@ -474,7 +407,7 @@ export default function BaselineManager({
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             {/* Search */}
             <div className="relative flex-1 max-w-md">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-500" />
               <input
                 type="text"
                 placeholder="Search baselines..."
@@ -486,7 +419,7 @@ export default function BaselineManager({
 
             {/* Sort Controls */}
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">Sort by:</span>
+              <span className="text-sm text-gray-500 dark:text-slate-400">Sort by:</span>
               {(['name', 'timestamp', 'testName'] as const).map((option) => (
                 <button
                   key={option}
@@ -494,7 +427,7 @@ export default function BaselineManager({
                   className={`text-sm px-3 py-1 rounded ${
                     sortBy === option
                       ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-500 hover:text-gray-700'
+                      : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'
                   }`}
                 >
                   {option === 'timestamp' ? 'Date' : option.charAt(0).toUpperCase() + option.slice(1)}
@@ -552,7 +485,7 @@ export default function BaselineManager({
                       type="checkbox"
                       checked={selectedBaselines.size === filteredBaselines.length && filteredBaselines.length > 0}
                       onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      className="rounded border-gray-300 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                     />
                   </th>
                   <th className="table-header-cell">Name</th>
@@ -563,7 +496,7 @@ export default function BaselineManager({
                   <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                 {filteredBaselines.map((baseline) => (
                   <tr key={baseline.id} className="table-row">
                     <td className="table-cell">
@@ -571,7 +504,7 @@ export default function BaselineManager({
                         type="checkbox"
                         checked={selectedBaselines.has(baseline.id)}
                         onChange={() => handleSelectBaseline(baseline.id)}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        className="rounded border-gray-300 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                       />
                     </td>
                     <td className="table-cell">
@@ -599,7 +532,7 @@ export default function BaselineManager({
                           </button>
                           <button
                             onClick={cancelEditing}
-                            className="p-1 text-gray-400 hover:text-gray-600"
+                            className="p-1 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300"
                             title="Cancel edit"
                             aria-label="Cancel edit"
                           >
@@ -609,29 +542,29 @@ export default function BaselineManager({
                       ) : (
                         <div className="flex items-center space-x-2">
                           <FlagIcon className="h-4 w-4 text-warning-500" />
-                          <span className="font-medium">{getBaselineField(baseline, 'baselineName', 'name')}</span>
+                          <span className="font-medium">{baseline.name}</span>
                         </div>
                       )}
                     </td>
                     <td className="table-cell">
-                      <span className="text-gray-900">{getBaselineField(baseline, 'testName', 'test_name')}</span>
+                      <span className="text-gray-900 dark:text-slate-100">{baseline.test_name}</span>
                     </td>
                     <td className="table-cell">
-                      <span className="badge badge-info">{getBaselineField(baseline, 'gitBranch', 'git_branch', 'N/A')}</span>
+                      <span className="badge badge-info">{baseline.git_branch || 'N/A'}</span>
                     </td>
                     <td className="table-cell">
-                      <div className="flex items-center space-x-1 text-gray-500">
+                      <div className="flex items-center space-x-1 text-gray-500 dark:text-slate-400">
                         <CalendarIcon className="h-4 w-4" />
-                        <span className="text-sm">{formatTimestamp(getBaselineField(baseline, 'timestamp', 'created_at'))}</span>
+                        <span className="text-sm">{formatTimestamp(baseline.created_at)}</span>
                       </div>
                     </td>
                     <td className="table-cell">
                       <div className="space-y-1 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Success:</span>
+                          <span className="text-gray-500 dark:text-slate-400">Success:</span>
                           <span className="font-mono">
                             {(() => {
-                              const errorRate = getBaselineMetric(baseline, 'errorRate')
+                              const errorRate = baseline.baseline_metrics?.overall_error_rate
                               return typeof errorRate === 'number' && !isNaN(errorRate)
                                 ? formatPercentage(100 - errorRate)
                                 : 'N/A'
@@ -639,8 +572,8 @@ export default function BaselineManager({
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Latency:</span>
-                          <span className="font-mono">{formatLatency(getBaselineMetric(baseline, 'avgLatency', 0))}</span>
+                          <span className="text-gray-500 dark:text-slate-400">Latency:</span>
+                          <span className="font-mono">{formatLatency(baseline.baseline_metrics?.avg_latency_ms ?? 0)}</span>
                         </div>
                       </div>
                     </td>
@@ -649,7 +582,7 @@ export default function BaselineManager({
                         {editingBaseline !== baseline.id && (
                           <button
                             onClick={() => startEditing(baseline)}
-                            className="p-1 text-gray-400 hover:text-gray-600"
+                            className="p-1 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300"
                             title="Edit baseline"
                           >
                             <PencilIcon className="h-4 w-4" />
@@ -657,7 +590,7 @@ export default function BaselineManager({
                         )}
                         <button
                           onClick={() => handleDeleteBaseline(baseline)}
-                          className="p-1 text-gray-400 hover:text-danger-600"
+                          className="p-1 text-gray-400 dark:text-slate-500 hover:text-danger-600"
                           title="Delete baseline"
                           disabled={actionLoading === `delete-${baseline.id}`}
                         >
@@ -678,15 +611,15 @@ export default function BaselineManager({
           <div className="card-content text-center py-12">
             {searchTerm ? (
               <div>
-                <MagnifyingGlassIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No matching baselines</h3>
-                <p className="text-gray-500">Try adjusting your search terms.</p>
+                <MagnifyingGlassIcon className="h-12 w-12 text-gray-400 dark:text-slate-500 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No matching baselines</h3>
+                <p className="text-gray-500 dark:text-slate-400">Try adjusting your search terms.</p>
               </div>
             ) : (
               <div>
-                <FlagIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No baselines created</h3>
-                <p className="text-gray-500 mb-4">
+                <FlagIcon className="h-12 w-12 text-gray-400 dark:text-slate-500 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No baselines created</h3>
+                <p className="text-gray-500 dark:text-slate-400 mb-4">
                   Create your first baseline to track performance over time.
                 </p>
                 <button
