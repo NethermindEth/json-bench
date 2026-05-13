@@ -49,8 +49,11 @@ var migrations = []Migration{
 	{Version: 2, SQL: GrafanaMetricsTable},
 	{Version: 3, SQL: CreateIndices()},
 	{Version: 4, SQL: CreateHypertable}, // Optional: for TimescaleDB
-	// v5: backfill client_versions on databases created before that column existed.
-	{Version: 5, SQL: `ALTER TABLE benchmark_runs ADD COLUMN IF NOT EXISTS client_versions JSONB`},
+	// v5: backfill columns on databases created before these columns existed.
+	{Version: 5, SQL: `
+		ALTER TABLE benchmark_runs ADD COLUMN IF NOT EXISTS client_versions JSONB;
+		ALTER TABLE benchmark_runs ADD COLUMN IF NOT EXISTS full_results JSONB;
+	`},
 }
 
 // CreateIndices returns SQL for creating performance indices
