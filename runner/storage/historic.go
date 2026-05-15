@@ -195,23 +195,46 @@ func (h *HistoricStorage) generateRunID() string {
 	return fmt.Sprintf("%s-%s", now.Format("20060102-150405"), commit)
 }
 
-// getGitInfo retrieves current git commit and branch
+// getGitInfo retrieves current git commit and branch.
+//
+// Resolution order:
+//  1. GIT_COMMIT / GIT_BRANCH environment variables, if set. This is the
+//     supported way to pass git info to a runner running inside a docker
+//     container that has no `git` binary and no source checkout — e.g.
+//     CI pipelines and the official `json-bench-runner` Docker image.
+//  2. Otherwise, shell out to `git rev-parse` from the CWD (works when the
+//     runner is invoked from a source checkout with `git` on PATH).
 func (h *HistoricStorage) getGitInfo() (commit, branch string) {
-	if !h.gitEnabled {
-		return "", ""
+	// 1. Environment variables take precedence — they're explicit and
+	// container-friendly.
+	if v := strings.TrimSpace(os.Getenv("GIT_COMMIT")); v != "" {
+		commit = v
+	}
+	if v := strings.TrimSpace(os.Getenv("GIT_BRANCH")); v != "" {
+		branch = v
+	}
+	if commit != "" && branch != "" {
+		return commit, branch
 	}
 
-	// Get commit hash
-	if cmd := exec.Command("git", "rev-parse", "HEAD"); cmd != nil {
-		if output, err := cmd.Output(); err == nil {
-			commit = strings.TrimSpace(string(output))
+	// 2. Fall back to `git rev-parse` for whatever's still missing.
+	if !h.gitEnabled {
+		return commit, branch
+	}
+
+	if commit == "" {
+		if cmd := exec.Command("git", "rev-parse", "HEAD"); cmd != nil {
+			if output, err := cmd.Output(); err == nil {
+				commit = strings.TrimSpace(string(output))
+			}
 		}
 	}
 
-	// Get branch name
-	if cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD"); cmd != nil {
-		if output, err := cmd.Output(); err == nil {
-			branch = strings.TrimSpace(string(output))
+	if branch == "" {
+		if cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD"); cmd != nil {
+			if output, err := cmd.Output(); err == nil {
+				branch = strings.TrimSpace(string(output))
+			}
 		}
 	}
 
