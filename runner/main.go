@@ -228,7 +228,31 @@ func main() {
 	// Collect benchmark results
 	clientsMetrics, err := metrics.CollectClientsMetrics(cfg, endTime, summaryPath)
 	if err != nil {
-		logger.WithError(err).Warn("Failed to collect benchmark clients metrics")
+		logger.WithError(err).Error("Failed to collect benchmark clients metrics")
+	}
+
+	// Fail loud on zero-data collection when historic storage is requested.
+	// Without this check the run "succeeds" with total_requests=0,
+	// avg_latency_ms=0, methods=[], and the dashboard shows nothing.
+	// Common causes: -prometheus-rw unset or unreachable; Prometheus didn't
+	// receive remote-write from k6 (e.g., missing K6_PROMETHEUS_RW_*
+	// environment); the test_name doesn't match the testid label that k6
+	// stamps onto its metrics. All of these silently produce a misleading
+	// "successful" save absent this check.
+	if *enableHistoric {
+		hasMetrics := false
+		for _, cm := range clientsMetrics {
+			if cm != nil && cm.TotalRequests > 0 {
+				hasMetrics = true
+				break
+			}
+		}
+		if !hasMetrics {
+			logger.Fatal("No client metrics collected — refusing to save a zero-data historic run. " +
+				"Pass -prometheus-rw=<reachable URL> so k6's remote-write metrics are queryable, " +
+				"or omit -historic to skip persistence. (Saving anyway would produce a row where " +
+				"every per-client and per-method aggregate is 0, masking the real failure.)")
+		}
 	}
 
 	// Log summary of p99 validation
