@@ -232,8 +232,13 @@ export default function RunDetails() {
       <div className="p-6">
         <Breadcrumb items={[
           { label: 'Dashboard', href: '/' },
-          { label: 'Run Details' },
-          { label: run?.id.substring(0, 8) + '...' || 'Loading...' },
+          // Link back to the test detail page so users can jump to other runs
+          // of the same scenario without back-button gymnastics. Omitted while
+          // the run is still loading.
+          ...(run?.test_name
+            ? [{ label: run.test_name, href: `/tests/${encodeURIComponent(run.test_name)}` }]
+            : []),
+          { label: run ? run.id.substring(0, 8) + '...' : 'Loading...' },
         ]} />
         
         {/* Detailed Metrics Error Warning */}
