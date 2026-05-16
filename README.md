@@ -101,7 +101,7 @@ json-bench/
     go run ./runner/main.go -config ./config/mixed.yaml -clients ./config/clients.yaml -historic -storage-config ./config/storage-example.yaml
 
     # View results
-    open results/report.html
+    open outputs/report.html
     ```
 
     **NOTE:** `storage-example.yaml` works out of the box with the docker containers deployed in the compose file.

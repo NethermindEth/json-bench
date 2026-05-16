@@ -169,6 +169,9 @@ func (s *server) setupRoutes() *mux.Router {
 	api.HandleFunc("/tests/{testName}/clients/{client}/trends", s.handleGetClientTrends).Methods("GET", "OPTIONS")
 	api.HandleFunc("/tests/{testName}/methods/{method}/trends", s.handleGetMethodTrends).Methods("GET", "OPTIONS")
 
+	// Global trends endpoint (for dashboard)
+	api.HandleFunc("/trends", s.handleGetGlobalTrends).Methods("GET", "OPTIONS")
+
 	// WebSocket endpoint for real-time updates
 	api.HandleFunc("/ws", s.handleWebSocket)
 
@@ -264,8 +267,12 @@ func (w *responseWriterWrapper) WriteHeader(statusCode int) {
 func (s *server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Parse query parameters
+	// Parse query parameters. Accept both `test` (legacy) and `testName`
+	// (the dashboard's idiomatic key) so callers don't have to translate.
 	testName := r.URL.Query().Get("test")
+	if testName == "" {
+		testName = r.URL.Query().Get("testName")
+	}
 	limitStr := r.URL.Query().Get("limit")
 
 	limit := 50 // Default limit
@@ -647,11 +654,34 @@ func (s *server) handleListBaselines(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// BaselineRequest represents a request to create a baseline
+// BaselineRequest is the decoded body of POST /api/baselines. Parsing is handled
+// by UnmarshalJSON below so the JS frontend can send either snake_case
+// (run_id) or camelCase (runId); the explicit `json:"-"` tags here keep that
+// fact obvious to readers and prevent accidental marshaling round-trips from
+// emitting unexpected field names.
 type BaselineRequest struct {
-	RunID       string `json:"run_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	RunID       string `json:"-"`
+	Name        string `json:"-"`
+	Description string `json:"-"`
+}
+
+func (b *BaselineRequest) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		RunIDSnake  string `json:"run_id"`
+		RunIDCamel  string `json:"runId"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	b.RunID = raw.RunIDSnake
+	if b.RunID == "" {
+		b.RunID = raw.RunIDCamel
+	}
+	b.Name = raw.Name
+	b.Description = raw.Description
+	return nil
 }
 
 // handleCreateBaseline creates a new baseline
@@ -994,6 +1024,126 @@ func (s *server) handleGetMethodTrends(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSONResponse(w, http.StatusOK, trends)
+}
+
+// handleGetGlobalTrends provides global trend data for the dashboard
+func (s *server) handleGetGlobalTrends(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Parse query parameters
+	metric := r.URL.Query().Get("metric")
+	period := r.URL.Query().Get("period")
+	limitStr := r.URL.Query().Get("limit")
+
+	// Default values
+	if metric == "" {
+		metric = "avg_latency"
+	}
+
+	// Parse period (e.g., "7d", "30d")
+	days := 7
+	if period != "" {
+		period = strings.TrimSuffix(period, "d")
+		if parsed, err := strconv.Atoi(period); err == nil && parsed > 0 {
+			days = parsed
+		}
+	}
+
+	limit := 30
+	if limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	// Query trend data from benchmark_runs
+	since := time.Now().AddDate(0, 0, -days)
+
+	metricExpressions := map[string]string{
+		"avg_latency":  "avg_latency",
+		"p95_latency":  "p95_latency",
+		"error_rate":   "(100.0 - success_rate)",
+		"throughput":   "CASE WHEN EXTRACT(EPOCH FROM duration) > 0 THEN total_requests::float8 / EXTRACT(EPOCH FROM duration) ELSE 0 END",
+		"success_rate": "success_rate",
+	}
+	metricExpression, ok := metricExpressions[metric]
+	if !ok {
+		metricExpression = metricExpressions["avg_latency"]
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, timestamp, %s AS value
+		FROM benchmark_runs
+		WHERE timestamp >= $1
+		ORDER BY timestamp DESC
+		LIMIT $2
+	`, metricExpression)
+
+	rows, err := s.db.QueryContext(ctx, query, since, limit)
+	if err != nil {
+		s.log.WithError(err).Error("Failed to query global trends")
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve trends")
+		return
+	}
+	defer rows.Close()
+
+	type TrendPoint struct {
+		Timestamp time.Time `json:"timestamp"`
+		Value     float64   `json:"value"`
+		RunID     string    `json:"runId"`
+	}
+
+	var points []TrendPoint
+	for rows.Next() {
+		var id string
+		var timestamp time.Time
+		var value float64
+		if err := rows.Scan(&id, &timestamp, &value); err != nil {
+			s.log.WithError(err).Warn("Failed to scan trend point")
+			continue
+		}
+		points = append(points, TrendPoint{
+			Timestamp: timestamp,
+			Value:     value,
+			RunID:     id,
+		})
+	}
+
+	// Ensure points is never nil (empty slice instead)
+	if points == nil {
+		points = []TrendPoint{}
+	}
+
+	// Sort points by timestamp ascending for proper trend display
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp.Before(points[j].Timestamp)
+	})
+
+	// Calculate trend direction based on first and last values
+	direction := "stable"
+	percentChange := 0.0
+	if len(points) >= 2 {
+		first := points[0].Value
+		last := points[len(points)-1].Value
+		if first > 0 {
+			percentChange = ((last - first) / first) * 100
+			if percentChange < -5 {
+				direction = "improving" // Lower latency is better
+			} else if percentChange > 5 {
+				direction = "degrading" // Higher latency is worse
+			}
+		}
+	}
+
+	// Return format matching TrendData interface expected by frontend
+	response := map[string]interface{}{
+		"period":        fmt.Sprintf("%dd", days),
+		"trendPoints":   points,
+		"direction":     direction,
+		"percentChange": percentChange,
+	}
+
+	s.writeJSONResponse(w, http.StatusOK, response)
 }
 
 // WebSocket Handler

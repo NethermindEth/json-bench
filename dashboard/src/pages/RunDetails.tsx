@@ -1,5 +1,4 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import {
@@ -11,17 +10,18 @@ import {
 } from '@heroicons/react/24/outline'
 import {
   LoadingSpinner,
-  LatencyDistribution,
   ErrorRateChart,
   BaselineManager
 } from '../components'
+import PerClientPercentilesChart from '../components/PerClientPercentilesChart'
+import BaselineComparisonView from '../components/BaselineComparisonView'
 import Breadcrumb from '../components/Breadcrumb'
 import { useDetailedMetrics } from '../hooks/useDetailedMetrics'
 import { ExpandableSection } from '../components/ui/ExpandableSection'
 import { PerClientMetricsTable } from '../components/metrics'
 import { ExportButton } from '../components/ui'
 import type { HistoricRun, BenchmarkResult } from '../types/api'
-import { useRun, useAPI } from '../api/hooks'
+import { useRun, useSetBaseline, useRemoveBaseline, useBaselines, useRuns, useBaselineComparison } from '../api/hooks'
 import { formatPercentage, formatLatency } from '../utils/metric-formatters'
 
 export default function RunDetails() {
@@ -41,6 +41,7 @@ export default function RunDetails() {
   // State management for filters and expansions
   const [expandedSections, setExpandedSections] = useState<string[]>(['overview'])
   const [clientFilter, setClientFilter] = useState<string>('')
+  const [selectedBaselineName, setSelectedBaselineName] = useState<string>('')
   
   // Log errors for debugging
   useEffect(() => {
@@ -83,17 +84,25 @@ export default function RunDetails() {
     clientResults: []
   } : null
 
-  const setBaselineMutation = useMutation({
-    mutationFn: async () => {
-      // Simulate API call to set baseline
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      return { success: true }
-    },
-    onSuccess: () => {
-      // Show success message or refresh data
-      console.log('Baseline set successfully')
-    },
-  })
+  // Use proper API hooks for baseline management
+  const setBaselineMutation = useSetBaseline()
+  const removeBaselineMutation = useRemoveBaseline()
+
+  // Fetch baselines and available runs for the BaselineManager
+  const { data: baselines = [] } = useBaselines()
+  const { data: availableRuns = [] } = useRuns({ limit: 50 })
+
+  // Baselines applicable to this run's test (the backend only allows comparing
+  // a run to a baseline with the same test name).
+  const baselinesForThisTest = run
+    ? baselines.filter(b => b.test_name === run.test_name)
+    : []
+
+  const {
+    data: baselineComparison,
+    isFetching: comparisonLoading,
+    error: comparisonError,
+  } = useBaselineComparison(id || '', selectedBaselineName, !!id && !!selectedBaselineName)
 
   // Helper function to toggle section expansion
   const toggleSection = (section: string) => {
@@ -118,7 +127,7 @@ export default function RunDetails() {
       <select
         value={selected}
         onChange={(e) => onChange(e.target.value)}
-        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-slate-600 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
       >
         <option value="">All Clients</option>
         {clients.map(client => (
@@ -167,8 +176,8 @@ export default function RunDetails() {
     return (
       <div className="p-6">
         <div className="card p-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Run Not Found</h1>
-          <p className="text-gray-600 mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-2">Run Not Found</h1>
+          <p className="text-gray-600 dark:text-slate-300 mb-4">
             The benchmark run "{id}" could not be found.
           </p>
           <Link to="/" className="btn-primary">
@@ -223,8 +232,13 @@ export default function RunDetails() {
       <div className="p-6">
         <Breadcrumb items={[
           { label: 'Dashboard', href: '/' },
-          { label: 'Run Details' },
-          { label: run?.id.substring(0, 8) + '...' || 'Loading...' },
+          // Link back to the test detail page so users can jump to other runs
+          // of the same scenario without back-button gymnastics. Omitted while
+          // the run is still loading.
+          ...(run?.test_name
+            ? [{ label: run.test_name, href: `/tests/${encodeURIComponent(run.test_name)}` }]
+            : []),
+          { label: run ? run.id.substring(0, 8) + '...' : 'Loading...' },
         ]} />
         
         {/* Detailed Metrics Error Warning */}
@@ -256,7 +270,7 @@ export default function RunDetails() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">{run.test_name}</h1>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">{run.test_name}</h1>
                 {run.is_baseline && (
                   <span className="badge badge-info">
                     <FlagIcon className="h-4 w-4 mr-1" />
@@ -265,7 +279,7 @@ export default function RunDetails() {
                 )}
               </div>
               <div className="space-y-1">
-                <p className="text-gray-600">
+                <p className="text-gray-600 dark:text-slate-300">
                   Run ID: 
                   <button
                     onClick={() => copyToClipboard(run.id)}
@@ -275,7 +289,7 @@ export default function RunDetails() {
                     {run.id}
                   </button>
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-slate-400">
                   Executed on {new Date(run.timestamp).toLocaleDateString()} at {new Date(run.timestamp).toLocaleTimeString()}
                 </p>
               </div>
@@ -325,20 +339,20 @@ export default function RunDetails() {
         <div className="mb-6 flex flex-wrap items-center gap-2 text-sm">
           <button
             onClick={() => copyToClipboard(run.git_commit)}
-            className="inline-flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+            className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:bg-slate-700 rounded transition-colors"
             title="Copy commit hash"
           >
             <ClipboardDocumentIcon className="h-3 w-3 mr-1" />
             {run.git_commit}
           </button>
-          <span className="text-gray-400">on</span>
+          <span className="text-gray-400 dark:text-slate-500">on</span>
           <span className="px-2 py-1 bg-primary-100 text-primary-700 rounded">
             {run.git_branch}
           </span>
           {run.description && (
             <>
-              <span className="text-gray-400">•</span>
-              <span className="text-gray-600">{run.description}</span>
+              <span className="text-gray-400 dark:text-slate-500">•</span>
+              <span className="text-gray-600 dark:text-slate-300">{run.description}</span>
             </>
           )}
         </div>
@@ -346,38 +360,38 @@ export default function RunDetails() {
         {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="card p-6">
-            <h3 className="text-sm font-medium text-gray-500">Duration</h3>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{run.duration}</p>
-            <p className="text-xs text-gray-400 mt-1">Test execution time</p>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-slate-400">Duration</h3>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100 mt-1">{run.duration}</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Test execution time</p>
           </div>
           <div className="card p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Requests</h3>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{run.total_requests.toLocaleString()}</p>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-slate-400">Total Requests</h3>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100 mt-1">{run.total_requests.toLocaleString()}</p>
             {detailedResults && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                 {detailedResults.throughput.toFixed(1)} req/s
               </p>
             )}
           </div>
           <div className="card p-6">
-            <h3 className="text-sm font-medium text-gray-500">Success Rate</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-slate-400">Success Rate</h3>
             <p className={`text-2xl font-bold mt-1 ${
               run.success_rate >= 99 ? 'text-success-600' :
               run.success_rate >= 95 ? 'text-warning-600' : 'text-danger-600'
             }`}>{formatPercentage(run.success_rate)}</p>
             {detailedResults && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                 {detailedResults.failedRequests.toLocaleString()} failed
               </p>
             )}
           </div>
           <div className="card p-6">
-            <h3 className="text-sm font-medium text-gray-500">Avg Latency</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-slate-400">Avg Latency</h3>
             <p className={`text-2xl font-bold mt-1 ${
               run.avg_latency_ms > 300 ? 'text-danger-600' :
               run.avg_latency_ms > 200 ? 'text-warning-600' : 'text-success-600'
             }`}>{formatLatency(run.avg_latency_ms)}</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
               p95: {run.p95_latency_ms}ms
             </p>
           </div>
@@ -418,10 +432,11 @@ export default function RunDetails() {
             onToggle={() => toggleSection('client-performance')}
           >
             {detailedMetrics && (
-              <PerClientMetricsTable 
+              <PerClientMetricsTable
                 data={detailedMetrics}
                 onClientSelect={setClientFilter}
                 clientFilter={clientFilter}
+                clientVersions={run?.client_versions}
               />
             )}
           </ExpandableSection>
@@ -433,31 +448,31 @@ export default function RunDetails() {
         {/* Run Information */}
         <div className="card">
           <div className="card-header">
-            <h2 className="text-lg font-semibold text-gray-900">Run Information</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Run Information</h2>
           </div>
           <div className="card-content">
             <dl className="space-y-4">
               <div>
-                <dt className="text-sm font-medium text-gray-500">Timestamp</dt>
-                <dd className="text-sm text-gray-900 mt-1">
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Timestamp</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1">
                   {new Date(run.timestamp).toLocaleString()}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Git Commit</dt>
-                <dd className="text-sm text-gray-900 mt-1 font-mono">{run.git_commit}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Git Commit</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1 font-mono">{run.git_commit}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Git Branch</dt>
-                <dd className="text-sm text-gray-900 mt-1">{run.git_branch}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Git Branch</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1">{run.git_branch}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Description</dt>
-                <dd className="text-sm text-gray-900 mt-1">{run.description}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Description</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1">{run.description}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Config Hash</dt>
-                <dd className="text-sm text-gray-900 mt-1 font-mono break-all">{run.config_hash}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Config Hash</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1 font-mono break-all">{run.config_hash}</dd>
               </div>
             </dl>
           </div>
@@ -466,25 +481,25 @@ export default function RunDetails() {
         {/* Performance Metrics */}
         <div className="card">
           <div className="card-header">
-            <h2 className="text-lg font-semibold text-gray-900">Performance Metrics</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Performance Metrics</h2>
           </div>
           <div className="card-content">
             <dl className="space-y-4">
               <div>
-                <dt className="text-sm font-medium text-gray-500">Average Latency</dt>
-                <dd className="text-sm text-gray-900 mt-1">{formatLatency(run.avg_latency_ms)}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Average Latency</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1">{formatLatency(run.avg_latency_ms)}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">95th Percentile Latency</dt>
-                <dd className="text-sm text-gray-900 mt-1">{run.p95_latency_ms}ms</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">95th Percentile Latency</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1">{run.p95_latency_ms}ms</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Success Rate</dt>
-                <dd className="text-sm text-gray-900 mt-1">{formatPercentage(run.success_rate)}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Success Rate</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1">{formatPercentage(run.success_rate)}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Total Requests</dt>
-                <dd className="text-sm text-gray-900 mt-1">{run.total_requests.toLocaleString()}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-slate-400">Total Requests</dt>
+                <dd className="text-sm text-gray-900 dark:text-slate-100 mt-1">{run.total_requests.toLocaleString()}</dd>
               </div>
             </dl>
           </div>
@@ -493,7 +508,7 @@ export default function RunDetails() {
         {/* Clients Tested */}
         <div className="card">
           <div className="card-header">
-            <h2 className="text-lg font-semibold text-gray-900">Clients Tested</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Clients Tested</h2>
           </div>
           <div className="card-content">
             <div className="flex flex-wrap gap-2">
@@ -509,12 +524,12 @@ export default function RunDetails() {
         {/* Methods Tested */}
         <div className="card">
           <div className="card-header">
-            <h2 className="text-lg font-semibold text-gray-900">Methods Tested</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Methods Tested</h2>
           </div>
           <div className="card-content">
             <div className="space-y-2">
               {run.methods.map((method) => (
-                <div key={method} className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
+                <div key={method} className="text-sm font-mono text-gray-900 dark:text-slate-100 bg-gray-50 dark:bg-slate-900/60 px-2 py-1 rounded">
                   {method}
                 </div>
               ))}
@@ -529,20 +544,24 @@ export default function RunDetails() {
             {/* Latency Distribution */}
             <div className="card">
               <div className="card-header">
-                <h2 className="text-lg font-semibold text-gray-900">Latency Distribution</h2>
-                <p className="text-sm text-gray-500">Response time percentiles</p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Latency Percentiles by Client</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400">Real per-client p50 / p95 / p99 / max. Click a bar to filter the table below.</p>
               </div>
               <div className="card-content">
-                <LatencyDistribution
-                  data={[
-                    { min: 0, max: 50, count: Math.floor(detailedResults.totalRequests * 0.1), percentage: 10 },
-                    { min: 50, max: 100, count: Math.floor(detailedResults.totalRequests * 0.2), percentage: 20 },
-                    { min: 100, max: 200, count: Math.floor(detailedResults.totalRequests * 0.3), percentage: 30 },
-                    { min: 200, max: 500, count: Math.floor(detailedResults.totalRequests * 0.25), percentage: 25 },
-                    { min: 500, max: Infinity, count: Math.floor(detailedResults.totalRequests * 0.15), percentage: 15 },
-                  ]}
-                  title="Response Time Distribution"
-                />
+                {detailedMetrics?.clientMetrics && detailedMetrics.clientMetrics.length > 0 ? (
+                  <PerClientPercentilesChart
+                    clientMetrics={detailedMetrics.clientMetrics}
+                    onClientClick={(name) => setClientFilter(name === clientFilter ? '' : name)}
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Per-client latency data not available for this run.</p>
+                )}
+                {clientFilter && (
+                  <div className="mt-3 text-xs text-gray-500 dark:text-slate-400">
+                    Filtering subsequent tables to client: <span className="font-mono text-gray-900 dark:text-slate-100">{clientFilter}</span>
+                    <button onClick={() => setClientFilter('')} className="ml-2 text-primary-600 hover:underline">clear</button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -550,8 +569,8 @@ export default function RunDetails() {
             {detailedResults.errors.length > 0 && (
               <div className="card">
                 <div className="card-header">
-                  <h2 className="text-lg font-semibold text-gray-900">Error Analysis</h2>
-                  <p className="text-sm text-gray-500">Error distribution and trends</p>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Error Analysis</h2>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Error distribution and trends</p>
                 </div>
                 <div className="card-content">
                   <ErrorRateChart
@@ -571,8 +590,8 @@ export default function RunDetails() {
             {detailedResults.clientResults.length > 1 && (
               <div className="card">
                 <div className="card-header">
-                  <h2 className="text-lg font-semibold text-gray-900">Client Performance</h2>
-                  <p className="text-sm text-gray-500">Performance by client implementation</p>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Client Performance</h2>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Performance by client implementation</p>
                 </div>
                 <div className="card-content">
                   <div className="overflow-x-auto">
@@ -587,10 +606,10 @@ export default function RunDetails() {
                           <th className="table-header-cell">Errors</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white divide-y divide-gray-200 dark:divide-slate-700">
                         {detailedResults.clientResults.map((client) => (
                           <tr key={client.client} className="table-row">
-                            <td className="table-cell font-medium text-gray-900">
+                            <td className="table-cell font-medium text-gray-900 dark:text-slate-100">
                               {client.client}
                             </td>
                             <td className="table-cell">
@@ -627,14 +646,77 @@ export default function RunDetails() {
               </div>
             )}
 
+            {/* Compare against a saved baseline */}
+            <div className="card" data-testid="baseline-comparison-card">
+              <div className="card-header">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Compare against baseline</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400">
+                  Pick a baseline saved for this test to see overall and per-client deltas.
+                </p>
+              </div>
+              <div className="card-content space-y-3">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="baseline-compare-select" className="text-sm text-gray-700 dark:text-slate-300">Baseline:</label>
+                  <select
+                    id="baseline-compare-select"
+                    className="input max-w-md"
+                    value={selectedBaselineName}
+                    onChange={(e) => setSelectedBaselineName(e.target.value)}
+                  >
+                    <option value="">— Select a baseline —</option>
+                    {baselinesForThisTest.map(b => (
+                      <option key={b.id} value={b.name}>
+                        {b.name}{b.git_branch ? ` (${b.git_branch})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedBaselineName && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBaselineName('')}
+                      className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {!selectedBaselineName && baselinesForThisTest.length === 0 && (
+                  <p className="text-sm text-gray-500 dark:text-slate-400">
+                    No baselines exist for this test yet — create one below.
+                  </p>
+                )}
+
+                {selectedBaselineName && comparisonLoading && (
+                  <LoadingSpinner size="md" />
+                )}
+
+                {selectedBaselineName && comparisonError && (
+                  <div className="rounded border border-danger-200 bg-danger-50 p-3 text-sm text-danger-700">
+                    Failed to load comparison: {(comparisonError as Error).message}
+                  </div>
+                )}
+
+                {selectedBaselineName && !comparisonLoading && baselineComparison && (
+                  <BaselineComparisonView comparison={baselineComparison} />
+                )}
+              </div>
+            </div>
+
             {/* Baseline Manager */}
             <BaselineManager
-              baselines={run.is_baseline ? [run] : []}
-              availableRuns={[run]}
-              onUpdate={async (action, data) => {
-                console.log('Baseline action:', action, data)
-                if (action.type === 'create') {
-                  setBaselineMutation.mutate()
+              baselines={baselines}
+              availableRuns={availableRuns}
+              loading={setBaselineMutation.isPending || removeBaselineMutation.isPending}
+              error={setBaselineMutation.error?.message || removeBaselineMutation.error?.message || null}
+              onUpdate={async (action) => {
+                if (action.type === 'create' && action.runId && action.baselineName) {
+                  await setBaselineMutation.mutateAsync({ 
+                    runId: action.runId, 
+                    name: action.baselineName 
+                  })
+                } else if (action.type === 'delete' && action.baselineName) {
+                  await removeBaselineMutation.mutateAsync(action.baselineName)
                 }
               }}
             />

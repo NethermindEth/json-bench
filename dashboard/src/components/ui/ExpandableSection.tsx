@@ -22,31 +22,31 @@ const getVariantStyles = (variant: ExpandableSectionProps['variant'] = 'default'
   switch (variant) {
     case 'success':
       return {
-        header: 'bg-success-50 border-success-200',
-        title: 'text-success-700',
-        subtitle: 'text-success-600',
-        icon: 'text-success-600',
+        header: 'bg-success-50 border-success-200 dark:bg-success-900/30 dark:border-success-800',
+        title: 'text-success-700 dark:text-success-300',
+        subtitle: 'text-success-600 dark:text-success-400',
+        icon: 'text-success-600 dark:text-success-300',
       }
     case 'warning':
       return {
-        header: 'bg-warning-50 border-warning-200',
-        title: 'text-warning-700',
-        subtitle: 'text-warning-600',
-        icon: 'text-warning-600',
+        header: 'bg-warning-50 border-warning-200 dark:bg-warning-900/30 dark:border-warning-800',
+        title: 'text-warning-700 dark:text-warning-300',
+        subtitle: 'text-warning-600 dark:text-warning-400',
+        icon: 'text-warning-600 dark:text-warning-300',
       }
     case 'danger':
       return {
-        header: 'bg-danger-50 border-danger-200',
-        title: 'text-danger-700',
-        subtitle: 'text-danger-600',
-        icon: 'text-danger-600',
+        header: 'bg-danger-50 border-danger-200 dark:bg-danger-900/30 dark:border-danger-800',
+        title: 'text-danger-700 dark:text-danger-300',
+        subtitle: 'text-danger-600 dark:text-danger-400',
+        icon: 'text-danger-600 dark:text-danger-300',
       }
     default:
       return {
-        header: 'bg-gray-50 border-gray-200',
-        title: 'text-gray-900',
-        subtitle: 'text-gray-600',
-        icon: 'text-gray-500',
+        header: 'bg-gray-50 border-gray-200 dark:bg-slate-900/60 dark:border-slate-700',
+        title: 'text-gray-900 dark:text-slate-100',
+        subtitle: 'text-gray-600 dark:text-slate-400',
+        icon: 'text-gray-500 dark:text-slate-400',
       }
   }
 }
@@ -162,9 +162,16 @@ export function ExpandableSection({
               </div>
             )}
 
-            {/* Header actions */}
+            {/* Header actions — interactive controls live here, so we have to
+                stop click/keydown from bubbling up to the toggle. Without
+                this, opening a <select> or clicking an Export button also
+                collapses the section. */}
             {headerActions && (
-              <div className="flex items-center space-x-2">
+              <div
+                className="flex items-center space-x-2"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
                 {headerActions}
               </div>
             )}

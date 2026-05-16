@@ -25,6 +25,16 @@ export interface PerClientMetricsTableProps {
   filterable?: boolean
   exportable?: boolean
   onClientSelect?: (client: string) => void
+  /**
+   * When set, restrict the table + summary tiles to just this client. Empty
+   * string (the dropdown's "All Clients" option) means show all.
+   */
+  clientFilter?: string
+  /**
+   * Map of clientName → web3_clientVersion string captured at run start.
+   * Rendered under each client name when present.
+   */
+  clientVersions?: Record<string, string>
 }
 
 export function PerClientMetricsTable({
@@ -32,7 +42,9 @@ export function PerClientMetricsTable({
   sortable = true,
   filterable = true,
   exportable = true,
-  onClientSelect
+  onClientSelect,
+  clientFilter = '',
+  clientVersions,
 }: PerClientMetricsTableProps) {
   const [selectedClient, setSelectedClient] = useState<string | null>(null)
   const [contextMenuOpen, setContextMenuOpen] = useState<{ client: string; x: number; y: number } | null>(null)
@@ -45,8 +57,11 @@ export function PerClientMetricsTable({
     return data.clientMetrics
   }, [data.clientMetrics])
 
-  // Use all client metrics without filtering
-  const filteredMetrics = clientMetrics
+  // Apply the client filter from the parent. Empty string means no filter.
+  const filteredMetrics = useMemo<ClientMetrics[]>(() => {
+    if (!clientFilter) return clientMetrics
+    return clientMetrics.filter(c => c.clientName === clientFilter)
+  }, [clientMetrics, clientFilter])
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -75,15 +90,27 @@ export function PerClientMetricsTable({
     onClientSelect?.(client.clientName)
   }, [onClientSelect])
 
-  // Handle context menu
+  // Anchor the menu to the kebab button so the popup is predictable and stays
+  // on-screen regardless of where the table is scrolled. We also stop event
+  // propagation so the row's onClick (which toggles selection) doesn't fire.
   const handleContextMenu = useCallback((e: React.MouseEvent, client: ClientMetrics) => {
     e.preventDefault()
     e.stopPropagation()
-    setContextMenuOpen({
-      client: client.clientName,
-      x: e.clientX,
-      y: e.clientY
-    })
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const MENU_W = 220
+    const MENU_H = 140
+    // Default: drop the menu just below the button, aligned to its right edge.
+    let x = rect.right - MENU_W
+    let y = rect.bottom + 4
+    // Clamp horizontally so it can't run off the right or left.
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1024
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 768
+    if (x + MENU_W > vw - 8) x = vw - MENU_W - 8
+    if (x < 8) x = 8
+    // Flip above the button if we'd run off the bottom.
+    if (y + MENU_H > vh - 8) y = rect.top - MENU_H - 4
+    if (y < 8) y = 8
+    setContextMenuOpen({ client: client.clientName, x, y })
   }, [])
 
   // Close context menu
@@ -157,24 +184,43 @@ export function PerClientMetricsTable({
       accessor: 'clientName',
       sortable: true,
       filterable: true,
-      render: (value, client) => (
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleClientExpansion(client.clientName)
-            }}
-            className="p-1 hover:bg-gray-200 rounded"
-          >
-            {expandedClients.has(client.clientName) ? (
-              <ChevronDownIcon className="h-4 w-4 text-gray-500" />
-            ) : (
-              <ChevronRightIcon className="h-4 w-4 text-gray-500" />
-            )}
-          </button>
-          <span className="font-medium text-gray-900">{value}</span>
-        </div>
-      )
+      render: (value, client) => {
+        const version = clientVersions?.[client.clientName]
+        const showVersion = version && version !== 'unknown'
+        return (
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleClientExpansion(client.clientName)
+              }}
+              className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded"
+            >
+              {expandedClients.has(client.clientName) ? (
+                <ChevronDownIcon className="h-4 w-4 text-gray-500 dark:text-slate-400" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4 text-gray-500 dark:text-slate-400" />
+              )}
+            </button>
+            <div className="flex flex-col leading-tight min-w-0">
+              <span className="font-medium text-gray-900 dark:text-slate-100">{value}</span>
+              {showVersion && (
+                <span
+                  className="text-[10px] font-mono text-gray-500 dark:text-slate-400 truncate max-w-[16rem]"
+                  title={version}
+                >
+                  {version}
+                </span>
+              )}
+              {version === 'unknown' && (
+                <span className="text-[10px] font-mono text-gray-400 dark:text-slate-500 italic" title="web3_clientVersion did not respond">
+                  version unknown
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      }
     },
     {
       id: 'totalRequests',
@@ -204,7 +250,7 @@ export function PerClientMetricsTable({
       accessor: (client) => client.latencyPercentiles.p50,
       sortable: true,
       render: (value) => (
-        <span className={`font-mono text-sm ${value !== null && value !== undefined ? getLatencyColor(value) : 'text-gray-400 italic'}`}>
+        <span className={`font-mono text-sm ${value !== null && value !== undefined ? getLatencyColor(value) : 'text-gray-400 dark:text-slate-500 italic'}`}>
           {formatLatencyValue(value)}
         </span>
       )
@@ -215,7 +261,7 @@ export function PerClientMetricsTable({
       accessor: (client) => client.latencyPercentiles.p95,
       sortable: true,
       render: (value) => (
-        <span className={`font-mono text-sm ${value !== null && value !== undefined ? getLatencyColor(value) : 'text-gray-400 italic'}`}>
+        <span className={`font-mono text-sm ${value !== null && value !== undefined ? getLatencyColor(value) : 'text-gray-400 dark:text-slate-500 italic'}`}>
           {formatLatencyValue(value)}
         </span>
       )
@@ -226,7 +272,7 @@ export function PerClientMetricsTable({
       accessor: (client) => client.latencyPercentiles.p99,
       sortable: true,
       render: (value) => (
-        <span className={`font-mono text-sm ${value !== null && value !== undefined ? getLatencyColor(value) : 'text-gray-400 italic'}`}>
+        <span className={`font-mono text-sm ${value !== null && value !== undefined ? getLatencyColor(value) : 'text-gray-400 dark:text-slate-500 italic'}`}>
           {formatLatencyValue(value)}
         </span>
       )
@@ -262,10 +308,13 @@ export function PerClientMetricsTable({
       filterable: false,
       render: (_, client) => (
         <button
+          type="button"
+          aria-haspopup="menu"
+          aria-label={`Actions for ${client.clientName}`}
           onClick={(e) => handleContextMenu(e, client)}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="rounded p-1 hover:bg-gray-100 dark:hover:bg-slate-700"
         >
-          <EllipsisVerticalIcon className="h-4 w-4 text-gray-500" />
+          <EllipsisVerticalIcon className="h-4 w-4 text-gray-500 dark:text-slate-400" />
         </button>
       )
     }
@@ -348,21 +397,21 @@ export function PerClientMetricsTable({
 
   // Method Performance Dropdown Component
   const MethodPerformanceDropdown = ({ methods, clientName }: { methods: MethodMetrics[]; clientName: string }) => (
-    <div className="px-6 py-4 bg-gray-50">
-      <h4 className="font-medium text-sm text-gray-700 mb-3">Method Performance for {clientName}</h4>
+    <div className="px-6 py-4 bg-gray-50 dark:bg-slate-900/60">
+      <h4 className="font-medium text-sm text-gray-700 dark:text-slate-300 mb-3">Method Performance for {clientName}</h4>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-100">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+          <thead className="bg-gray-100 dark:bg-slate-800">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Requests</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Success Rate</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">P50</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">P95</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">P99</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Method</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Requests</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">Success Rate</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">P50</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">P95</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase">P99</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-900 dark:divide-slate-700">
             {methods.map((method) => {
               // Calculate success rate for this method
               const successRate = method.errorsByClient[clientName] 
@@ -371,25 +420,25 @@ export function PerClientMetricsTable({
               
               return (
                 <tr key={method.methodName}>
-                  <td className="px-4 py-2 text-sm font-medium text-gray-900">{method.methodName}</td>
-                  <td className="px-4 py-2 text-sm text-gray-600 font-mono">{formatNumber(method.requestCount)}</td>
+                  <td className="px-4 py-2 text-sm font-medium text-gray-900 dark:text-slate-100">{method.methodName}</td>
+                  <td className="px-4 py-2 text-sm text-gray-600 dark:text-slate-300 font-mono">{formatNumber(method.requestCount)}</td>
                   <td className="px-4 py-2 text-sm font-mono">
                     <span className={getSuccessRateColor(successRate)}>
                       {formatPercentage(successRate)}
                     </span>
                   </td>
                   <td className="px-4 py-2 text-sm font-mono">
-                    <span className={method.latencyPercentiles.p50 !== null && method.latencyPercentiles.p50 !== undefined ? getLatencyColor(method.latencyPercentiles.p50) : 'text-gray-400 italic'}>
+                    <span className={method.latencyPercentiles.p50 !== null && method.latencyPercentiles.p50 !== undefined ? getLatencyColor(method.latencyPercentiles.p50) : 'text-gray-400 dark:text-slate-500 italic'}>
                       {formatLatencyValue(method.latencyPercentiles.p50)}
                     </span>
                   </td>
                   <td className="px-4 py-2 text-sm font-mono">
-                    <span className={method.latencyPercentiles.p95 !== null && method.latencyPercentiles.p95 !== undefined ? getLatencyColor(method.latencyPercentiles.p95) : 'text-gray-400 italic'}>
+                    <span className={method.latencyPercentiles.p95 !== null && method.latencyPercentiles.p95 !== undefined ? getLatencyColor(method.latencyPercentiles.p95) : 'text-gray-400 dark:text-slate-500 italic'}>
                       {formatLatencyValue(method.latencyPercentiles.p95)}
                     </span>
                   </td>
                   <td className="px-4 py-2 text-sm font-mono">
-                    <span className={method.latencyPercentiles.p99 !== null && method.latencyPercentiles.p99 !== undefined ? getLatencyColor(method.latencyPercentiles.p99) : 'text-gray-400 italic'}>
+                    <span className={method.latencyPercentiles.p99 !== null && method.latencyPercentiles.p99 !== undefined ? getLatencyColor(method.latencyPercentiles.p99) : 'text-gray-400 dark:text-slate-500 italic'}>
                       {formatLatencyValue(method.latencyPercentiles.p99)}
                     </span>
                   </td>
@@ -410,8 +459,8 @@ export function PerClientMetricsTable({
           <div className="card-body">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Clients</p>
-                <p className="text-2xl font-bold text-gray-900">{summaryStats.totalClients}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Total Clients</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{summaryStats.totalClients}</p>
               </div>
               <ServerIcon className="h-8 w-8 text-blue-600" />
             </div>
@@ -422,7 +471,7 @@ export function PerClientMetricsTable({
           <div className="card-body">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg Success Rate</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Avg Success Rate</p>
                 <p className={`text-2xl font-bold ${getSuccessRateColor(summaryStats.avgSuccessRate)}`}>
                   {formatPercentage(summaryStats.avgSuccessRate)}
                 </p>
@@ -436,8 +485,8 @@ export function PerClientMetricsTable({
           <div className="card-body">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg P95 Latency</p>
-                <p className={`text-2xl font-bold ${summaryStats.avgLatency !== null && summaryStats.avgLatency !== undefined ? getLatencyColor(summaryStats.avgLatency) : 'text-gray-400 italic'}`}>
+                <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Avg P95 Latency</p>
+                <p className={`text-2xl font-bold ${summaryStats.avgLatency !== null && summaryStats.avgLatency !== undefined ? getLatencyColor(summaryStats.avgLatency) : 'text-gray-400 dark:text-slate-500 italic'}`}>
                   {formatLatencyValue(summaryStats.avgLatency)}
                 </p>
               </div>
@@ -450,7 +499,7 @@ export function PerClientMetricsTable({
           <div className="card-body">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Avg Throughput</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Avg Throughput</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {formatThroughput(summaryStats.avgThroughput)}
                 </p>
@@ -466,8 +515,8 @@ export function PerClientMetricsTable({
         <div className="card-header">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Per-Client Metrics</h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Per-Client Metrics</h3>
+              <p className="text-sm text-gray-600 dark:text-slate-300 mt-1">
                 Detailed performance metrics for each client ({filteredMetrics.length} clients)
               </p>
             </div>
@@ -485,7 +534,7 @@ export function PerClientMetricsTable({
         
         <div 
           ref={tableContainerRef} 
-          className="relative border border-gray-200 rounded-b-lg shadow-inner"
+          className="relative border border-gray-200 dark:border-slate-700 rounded-b-lg shadow-inner"
           style={{ 
             height: '60vh',
             maxHeight: '800px',
@@ -498,13 +547,13 @@ export function PerClientMetricsTable({
           }}
         >
           <table className="table relative">
-            <thead className="table-header" style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'white', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+            <thead className="table-header sticky top-0 z-10 shadow-sm bg-gray-50 dark:bg-slate-900/80">
               <tr>
                 {columns.map((column) => (
                   <th
                     key={column.id}
                     className={`table-header-cell ${column.headerClassName || ''} ${
-                      sortable && column.sortable !== false ? 'cursor-pointer hover:bg-gray-100' : ''
+                      sortable && column.sortable !== false ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700' : ''
                     }`}
                     style={{
                       width: column.width,
@@ -517,15 +566,15 @@ export function PerClientMetricsTable({
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200 dark:bg-slate-900 dark:divide-slate-700">
               {filteredMetrics.map((row, index) => (
                 <React.Fragment key={row.clientName}>
                   <tr
                     className={`
                       table-row cursor-pointer
-                      ${index % 2 === 0 ? 'bg-gray-50' : ''}
-                      ${selectedClient === row.clientName ? 'bg-blue-50' : ''}
-                      hover:bg-blue-50
+                      ${index % 2 === 0 ? 'bg-gray-50 dark:bg-slate-900/60' : ''}
+                      ${selectedClient === row.clientName ? 'bg-blue-50 dark:bg-primary-900/40' : ''}
+                      hover:bg-blue-50 dark:hover:bg-primary-900/30
                     `}
                     onClick={() => handleRowClick(row)}
                   >
@@ -550,7 +599,7 @@ export function PerClientMetricsTable({
                       })}
                   </tr>
                   {expandedClients.has(row.clientName) && (
-                    <tr className="bg-gray-50">
+                    <tr className="bg-gray-50 dark:bg-slate-900/60">
                       <td colSpan={columns.length} className="p-0 relative">
                         <div className="relative z-0">
                           <MethodPerformanceDropdown
@@ -572,44 +621,64 @@ export function PerClientMetricsTable({
       {contextMenuOpen && (
         <div
           ref={contextMenuRef}
-          className="fixed z-50 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[200px]"
+          role="menu"
+          className="fixed z-50 min-w-[200px] rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
           style={{
             left: contextMenuOpen.x,
             top: contextMenuOpen.y,
           }}
         >
           <button
+            role="menuitem"
             onClick={() => {
+              // "View Details" toggles the row's per-method drilldown — the
+              // same drawer that opens when you click the row itself — and
+              // also marks this client as the selected one. Previously this
+              // only called onClientSelect, which duplicated the header
+              // dropdown and looked like a no-op.
+              toggleClientExpansion(contextMenuOpen.client)
               onClientSelect?.(contextMenuOpen.client)
               closeContextMenu()
             }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+            className="flex w-full items-center px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            <ChartBarIcon className="h-4 w-4 mr-2" />
-            View Details
+            <ChartBarIcon className="mr-2 h-4 w-4" />
+            {expandedClients.has(contextMenuOpen.client) ? 'Hide method details' : 'View method details'}
           </button>
-          
+
           <button
+            role="menuitem"
             onClick={() => {
               exportClientData(contextMenuOpen.client)
               closeContextMenu()
             }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+            className="flex w-full items-center px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+            <DocumentArrowDownIcon className="mr-2 h-4 w-4" />
             Export Data
           </button>
-          
-          <hr className="my-1" />
-          
+
+          <hr className="my-1 border-gray-200 dark:border-slate-700" />
+
           <button
+            role="menuitem"
             onClick={() => {
-              // Could implement comparison functionality here
+              // Scroll the page's baseline-comparison panel into view rather
+              // than fake a comparison from this row. The panel has the
+              // baseline picker the user can drive directly.
               closeContextMenu()
+              const target = document.querySelector('[data-testid="baseline-comparison-card"]')
+              if (target instanceof HTMLElement) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                const select = target.querySelector<HTMLSelectElement>('#baseline-compare-select')
+                if (select) {
+                  select.focus()
+                }
+              }
             }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+            className="flex w-full items-center px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            <ArrowTrendingUpIcon className="h-4 w-4 mr-2" />
+            <ArrowTrendingUpIcon className="mr-2 h-4 w-4" />
             Compare with Baseline
           </button>
         </div>

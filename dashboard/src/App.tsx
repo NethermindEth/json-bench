@@ -10,6 +10,7 @@ import { lazy } from 'react'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const RunDetails = lazy(() => import('./pages/RunDetails'))
+const TestDetail = lazy(() => import('./pages/TestDetail'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 function App() {
@@ -45,6 +46,7 @@ function App() {
           <Suspense fallback={<LoadingSpinner />}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/tests/:name" element={<TestDetail />} />
               <Route path="/runs/:id" element={<RunDetails />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

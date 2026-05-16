@@ -104,9 +104,10 @@ func (h *HistoricStorage) SaveRun(result *types.BenchmarkResult, cfg *config.Con
 		SuccessRate:   calculateSuccessRate(result),
 		AvgLatency:    calculateAvgLatency(result),
 		P95Latency:    calculateP95Latency(result),
-		Clients:       extractClients(result),
-		Methods:       extractMethods(result),
-		Tags:          extractTags(cfg),
+		Clients:        extractClients(result),
+		Methods:        extractMethods(result),
+		Tags:           extractTags(cfg),
+		ClientVersions: result.ClientVersions,
 
 		// Additional fields for baseline analysis
 		OverallErrorRate:  100.0 - calculateSuccessRate(result),
@@ -194,23 +195,46 @@ func (h *HistoricStorage) generateRunID() string {
 	return fmt.Sprintf("%s-%s", now.Format("20060102-150405"), commit)
 }
 
-// getGitInfo retrieves current git commit and branch
+// getGitInfo retrieves current git commit and branch.
+//
+// Resolution order:
+//  1. GIT_COMMIT / GIT_BRANCH environment variables, if set. This is the
+//     supported way to pass git info to a runner running inside a docker
+//     container that has no `git` binary and no source checkout — e.g.
+//     CI pipelines and the official `json-bench-runner` Docker image.
+//  2. Otherwise, shell out to `git rev-parse` from the CWD (works when the
+//     runner is invoked from a source checkout with `git` on PATH).
 func (h *HistoricStorage) getGitInfo() (commit, branch string) {
-	if !h.gitEnabled {
-		return "", ""
+	// 1. Environment variables take precedence — they're explicit and
+	// container-friendly.
+	if v := strings.TrimSpace(os.Getenv("GIT_COMMIT")); v != "" {
+		commit = v
+	}
+	if v := strings.TrimSpace(os.Getenv("GIT_BRANCH")); v != "" {
+		branch = v
+	}
+	if commit != "" && branch != "" {
+		return commit, branch
 	}
 
-	// Get commit hash
-	if cmd := exec.Command("git", "rev-parse", "HEAD"); cmd != nil {
-		if output, err := cmd.Output(); err == nil {
-			commit = strings.TrimSpace(string(output))
+	// 2. Fall back to `git rev-parse` for whatever's still missing.
+	if !h.gitEnabled {
+		return commit, branch
+	}
+
+	if commit == "" {
+		if cmd := exec.Command("git", "rev-parse", "HEAD"); cmd != nil {
+			if output, err := cmd.Output(); err == nil {
+				commit = strings.TrimSpace(string(output))
+			}
 		}
 	}
 
-	// Get branch name
-	if cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD"); cmd != nil {
-		if output, err := cmd.Output(); err == nil {
-			branch = strings.TrimSpace(string(output))
+	if branch == "" {
+		if cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD"); cmd != nil {
+			if output, err := cmd.Output(); err == nil {
+				branch = strings.TrimSpace(string(output))
+			}
 		}
 	}
 
@@ -399,12 +423,16 @@ func (h *HistoricStorage) LoadRun(runID string) (*types.BenchmarkResult, error) 
 
 // Helper functions for extracting data from config and results
 func extractTestName(cfg *config.Config) string {
-	// Extract test name from config
+	if cfg.TestName != "" {
+		return cfg.TestName
+	}
 	return "default_test"
 }
 
+// extractDescription returns the description from the config.
+// Empty descriptions are acceptable and will result in an empty string.
 func extractDescription(cfg *config.Config) string {
-	return ""
+	return cfg.Description
 }
 
 func extractTags(cfg *config.Config) []string {
@@ -517,10 +545,52 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	return &types.BaselineComparison{}, fmt.Errorf("not implemented")
 }
 
-// GetHistoricSummary retrieves a summary of historic data (placeholder implementation)
+// GetHistoricSummary retrieves a summary of historic data for a test, used by
+// the dashboard's /api/tests/{name}/summary endpoint. Aggregates runs from
+// the storage backend and picks the best/worst by p95 latency. Trends,
+// regressions, and improvements remain unset — those belong to higher-level
+// analyzers that consume this summary as input.
 func (h *HistoricStorage) GetHistoricSummary(ctx context.Context, filter types.RunFilter) (*types.HistoricSummary, error) {
-	// Placeholder implementation
-	return &types.HistoricSummary{}, fmt.Errorf("not implemented")
+	runs, err := h.db.ListRuns(filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+
+	summary := &types.HistoricSummary{
+		TestName:   filter.TestName,
+		TotalRuns:  len(runs),
+		RecentRuns: runs,
+	}
+
+	if len(runs) == 0 {
+		return summary, nil
+	}
+
+	// Single pass: oldest/newest timestamp + best/worst by p95.
+	oldest, newest := runs[0].Timestamp, runs[0].Timestamp
+	best, worst := runs[0], runs[0]
+	for _, r := range runs {
+		if r.Timestamp.Before(oldest) {
+			oldest = r.Timestamp
+		}
+		if r.Timestamp.After(newest) {
+			newest = r.Timestamp
+		}
+		// "Best" = lowest p95 latency (fastest); skip zero-success runs so
+		// a reverting test doesn't masquerade as the fastest.
+		if r.SuccessRate >= 50.0 && r.P95Latency > 0 && (r.P95Latency < best.P95Latency || best.P95Latency == 0) {
+			best = r
+		}
+		if r.P95Latency > worst.P95Latency {
+			worst = r
+		}
+	}
+	summary.FirstRun = oldest
+	summary.LastRun = newest
+	summary.BestRun = best
+	summary.WorstRun = worst
+
+	return summary, nil
 }
 
 func calculateP99Latency(result *types.BenchmarkResult) float64 {

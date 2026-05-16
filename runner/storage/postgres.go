@@ -60,22 +60,41 @@ func (d *Database) InsertRun(run *types.HistoricRun) error {
 		INSERT INTO benchmark_runs (
 			id, timestamp, git_commit, git_branch, test_name, description,
 			config_hash, result_path, duration, total_requests, success_rate,
-			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name,
+			full_results, client_versions
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 		ON CONFLICT (id) DO UPDATE SET
 			success_rate = EXCLUDED.success_rate,
 			avg_latency = EXCLUDED.avg_latency,
-			p95_latency = EXCLUDED.p95_latency`
+			p95_latency = EXCLUDED.p95_latency,
+			full_results = EXCLUDED.full_results,
+			client_versions = EXCLUDED.client_versions`
 
-	clientsJSON, _ := json.Marshal(run.Clients)
-	methodsJSON, _ := json.Marshal(run.Methods)
-	tagsJSON, _ := json.Marshal(run.Tags)
+	clientsJSON, err := json.Marshal(run.Clients)
+	if err != nil {
+		return fmt.Errorf("marshal clients: %w", err)
+	}
+	methodsJSON, err := json.Marshal(run.Methods)
+	if err != nil {
+		return fmt.Errorf("marshal methods: %w", err)
+	}
+	tagsJSON, err := json.Marshal(run.Tags)
+	if err != nil {
+		return fmt.Errorf("marshal tags: %w", err)
+	}
+	// Always store a non-nil JSON value so queries downstream can rely on
+	// `client_versions ?| array[...]` and friends.
+	versionsJSON, err := json.Marshal(run.ClientVersions)
+	if err != nil {
+		return fmt.Errorf("marshal client_versions: %w", err)
+	}
 
-	_, err := d.db.Exec(query,
+	_, err = d.db.Exec(query,
 		run.ID, run.Timestamp, run.GitCommit, run.GitBranch, run.TestName,
 		run.Description, run.ConfigHash, run.ResultPath, run.Duration,
 		run.TotalRequests, run.SuccessRate, run.AvgLatency, run.P95Latency,
 		clientsJSON, methodsJSON, tagsJSON, run.IsBaseline, run.BaselineName,
+		run.FullResults, versionsJSON,
 	)
 
 	if err != nil {
@@ -124,11 +143,14 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 	query := `
 		SELECT id, timestamp, git_commit, git_branch, test_name, description,
 			config_hash, result_path, duration, total_requests, success_rate,
-			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name
+			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name,
+			full_results, client_versions
 		FROM benchmark_runs WHERE id = $1`
 
 	var run types.HistoricRun
 	var clientsJSON, methodsJSON, tagsJSON []byte
+	var fullResultsJSON []byte
+	var versionsJSON []byte
 
 	err := d.db.QueryRow(query, id).Scan(
 		&run.ID, &run.Timestamp, &run.GitCommit, &run.GitBranch,
@@ -136,6 +158,7 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 		&run.Duration, &run.TotalRequests, &run.SuccessRate,
 		&run.AvgLatency, &run.P95Latency, &clientsJSON, &methodsJSON,
 		&tagsJSON, &run.IsBaseline, &run.BaselineName,
+		&fullResultsJSON, &versionsJSON,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -147,6 +170,14 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 	json.Unmarshal(clientsJSON, &run.Clients)
 	json.Unmarshal(methodsJSON, &run.Methods)
 	json.Unmarshal(tagsJSON, &run.Tags)
+	if len(versionsJSON) > 0 {
+		_ = json.Unmarshal(versionsJSON, &run.ClientVersions)
+	}
+
+	// Copy full_results if present
+	if fullResultsJSON != nil {
+		run.FullResults = fullResultsJSON
+	}
 
 	// Populate the millisecond fields from the base fields
 	// since the database only stores avg_latency, not avg_latency_ms
@@ -163,7 +194,8 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 // ListRuns lists runs with filtering
 func (d *Database) ListRuns(filter types.RunFilter) ([]*types.HistoricRun, error) {
 	query := `SELECT id, timestamp, git_commit, git_branch, test_name, description,
-		total_requests, success_rate, avg_latency, p95_latency, is_baseline, baseline_name
+		total_requests, success_rate, avg_latency, p95_latency, is_baseline, baseline_name,
+		clients, methods, client_versions
 		FROM benchmark_runs WHERE 1=1`
 
 	args := []interface{}{}
@@ -212,14 +244,21 @@ func (d *Database) ListRuns(filter types.RunFilter) ([]*types.HistoricRun, error
 	var runs []*types.HistoricRun
 	for rows.Next() {
 		run := &types.HistoricRun{}
+		var clientsJSON, methodsJSON, versionsJSON []byte
 		err := rows.Scan(
 			&run.ID, &run.Timestamp, &run.GitCommit, &run.GitBranch,
 			&run.TestName, &run.Description, &run.TotalRequests,
 			&run.SuccessRate, &run.AvgLatency, &run.P95Latency,
 			&run.IsBaseline, &run.BaselineName,
+			&clientsJSON, &methodsJSON, &versionsJSON,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan run: %w", err)
+		}
+		_ = json.Unmarshal(clientsJSON, &run.Clients)
+		_ = json.Unmarshal(methodsJSON, &run.Methods)
+		if len(versionsJSON) > 0 {
+			_ = json.Unmarshal(versionsJSON, &run.ClientVersions)
 		}
 
 		// Populate the millisecond fields from the base fields

@@ -43,6 +43,8 @@ type Baseline struct {
 	Description string    `json:"description" db:"description"`
 	TestName    string    `json:"test_name" db:"test_name"`
 	RunID       string    `json:"run_id" db:"run_id"`
+	GitBranch   string    `json:"git_branch" db:"git_branch"`
+	GitCommit   string    `json:"git_commit,omitempty" db:"git_commit"`
 	CreatedBy   string    `json:"created_by,omitempty" db:"created_by"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
@@ -209,6 +211,8 @@ func (bm *baselineManager) SetBaseline(ctx context.Context, runID, name, descrip
 		Description:     description,
 		TestName:        run.TestName,
 		RunID:           runID,
+		GitBranch:       run.GitBranch,
+		GitCommit:       run.GitCommit,
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 		BaselineMetrics: *baselineMetrics,
@@ -233,17 +237,21 @@ func (bm *baselineManager) SetBaseline(ctx context.Context, runID, name, descrip
 // GetBaseline retrieves a baseline by name
 func (bm *baselineManager) GetBaseline(ctx context.Context, name string) (*Baseline, error) {
 	query := `
-		SELECT id, name, description, test_name, run_id, created_by, created_at, updated_at,
+		SELECT id, name, description, test_name, COALESCE(run_id, '') as run_id,
+			   COALESCE(git_branch, '') as git_branch, COALESCE(git_commit, '') as git_commit,
+			   created_by, created_at, updated_at,
 			   baseline_metrics, tags, is_active
 		FROM baselines
 		WHERE name = $1 AND is_active = true`
 
 	var baseline Baseline
 	var baselineMetricsJSON, tagsJSON []byte
+	var createdBy sql.NullString
 
 	err := bm.db.QueryRowContext(ctx, query, name).Scan(
 		&baseline.ID, &baseline.Name, &baseline.Description, &baseline.TestName,
-		&baseline.RunID, &baseline.CreatedBy, &baseline.CreatedAt, &baseline.UpdatedAt,
+		&baseline.RunID, &baseline.GitBranch, &baseline.GitCommit,
+		&createdBy, &baseline.CreatedAt, &baseline.UpdatedAt,
 		&baselineMetricsJSON, &tagsJSON, &baseline.IsActive,
 	)
 
@@ -252,6 +260,11 @@ func (bm *baselineManager) GetBaseline(ctx context.Context, name string) (*Basel
 			return nil, fmt.Errorf("baseline not found: %s", name)
 		}
 		return nil, fmt.Errorf("failed to query baseline: %w", err)
+	}
+
+	// Handle nullable created_by
+	if createdBy.Valid {
+		baseline.CreatedBy = createdBy.String
 	}
 
 	// Unmarshal JSON fields
@@ -271,9 +284,15 @@ func (bm *baselineManager) ListBaselines(ctx context.Context, testName string) (
 	var query string
 	var args []interface{}
 
+	// run_id is nullable: the FK to benchmark_runs is ON DELETE SET NULL so the
+	// baseline survives source-run deletion. COALESCE keeps the Go scan happy
+	// (Baseline.RunID is a plain string) and the JSON field will be "" once the
+	// source run is gone.
 	if testName != "" {
 		query = `
-			SELECT id, name, description, test_name, run_id, created_by, created_at, updated_at,
+			SELECT id, name, description, test_name, COALESCE(run_id, '') as run_id,
+				   COALESCE(git_branch, '') as git_branch, COALESCE(git_commit, '') as git_commit,
+				   created_by, created_at, updated_at,
 				   baseline_metrics, tags, is_active
 			FROM baselines
 			WHERE test_name = $1 AND is_active = true
@@ -281,7 +300,9 @@ func (bm *baselineManager) ListBaselines(ctx context.Context, testName string) (
 		args = []interface{}{testName}
 	} else {
 		query = `
-			SELECT id, name, description, test_name, run_id, created_by, created_at, updated_at,
+			SELECT id, name, description, test_name, COALESCE(run_id, '') as run_id,
+				   COALESCE(git_branch, '') as git_branch, COALESCE(git_commit, '') as git_commit,
+				   created_by, created_at, updated_at,
 				   baseline_metrics, tags, is_active
 			FROM baselines
 			WHERE is_active = true
@@ -299,14 +320,21 @@ func (bm *baselineManager) ListBaselines(ctx context.Context, testName string) (
 	for rows.Next() {
 		baseline := &Baseline{}
 		var baselineMetricsJSON, tagsJSON []byte
+		var createdBy sql.NullString
 
 		err := rows.Scan(
 			&baseline.ID, &baseline.Name, &baseline.Description, &baseline.TestName,
-			&baseline.RunID, &baseline.CreatedBy, &baseline.CreatedAt, &baseline.UpdatedAt,
+			&baseline.RunID, &baseline.GitBranch, &baseline.GitCommit,
+			&createdBy, &baseline.CreatedAt, &baseline.UpdatedAt,
 			&baselineMetricsJSON, &tagsJSON, &baseline.IsActive,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan baseline: %w", err)
+		}
+
+		// Handle nullable created_by
+		if createdBy.Valid {
+			baseline.CreatedBy = createdBy.String
 		}
 
 		// Unmarshal JSON fields
@@ -524,48 +552,155 @@ func (bm *baselineManager) GetBaselineHistory(ctx context.Context, baselineName 
 // Helper methods
 
 func (bm *baselineManager) createBaselinesTable(ctx context.Context) error {
-	query := `
+	// Create table if it doesn't exist. run_id references benchmark_runs because
+	// that is the table the storage layer (runner/storage/postgres.go) actually
+	// inserts runs into; historic_runs in init-db.sql is a legacy schema kept
+	// for older queries. ON DELETE SET NULL so a baseline survives the deletion
+	// of its source run — the baseline carries its own metric snapshot in
+	// baseline_metrics.
+	createTableQuery := `
 		CREATE TABLE IF NOT EXISTS baselines (
 			id VARCHAR(255) PRIMARY KEY,
 			name VARCHAR(255) NOT NULL UNIQUE,
 			description TEXT,
 			test_name VARCHAR(255) NOT NULL,
-			run_id VARCHAR(255) NOT NULL,
+			run_id VARCHAR(255) REFERENCES benchmark_runs(id) ON DELETE SET NULL,
+			git_branch VARCHAR(255),
+			git_commit VARCHAR(255),
 			created_by VARCHAR(255),
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			baseline_metrics JSONB NOT NULL,
 			tags JSONB DEFAULT '[]',
-			is_active BOOLEAN NOT NULL DEFAULT true,
-			
-			FOREIGN KEY (run_id) REFERENCES historic_runs(id) ON DELETE CASCADE
-		);
+			is_active BOOLEAN NOT NULL DEFAULT true
+		)`
 
-		CREATE INDEX IF NOT EXISTS idx_baselines_test_name ON baselines(test_name);
-		CREATE INDEX IF NOT EXISTS idx_baselines_active ON baselines(is_active);
-		CREATE INDEX IF NOT EXISTS idx_baselines_created_at ON baselines(created_at);`
+	if _, err := bm.db.ExecContext(ctx, createTableQuery); err != nil {
+		return fmt.Errorf("failed to create baselines table: %w", err)
+	}
 
-	_, err := bm.db.ExecContext(ctx, query)
-	return err
+	// Create indexes
+	indexQueries := []string{
+		`CREATE INDEX IF NOT EXISTS idx_baselines_test_name ON baselines(test_name)`,
+		`CREATE INDEX IF NOT EXISTS idx_baselines_active ON baselines(is_active)`,
+		`CREATE INDEX IF NOT EXISTS idx_baselines_created_at ON baselines(created_at)`,
+	}
+
+	for _, q := range indexQueries {
+		if _, err := bm.db.ExecContext(ctx, q); err != nil {
+			bm.log.WithError(err).Warn("Failed to create index")
+		}
+	}
+
+	// Lightweight in-place migrations for databases that pre-date the git tracking
+	// columns. PostgreSQL's ADD COLUMN IF NOT EXISTS makes this safe to re-run.
+	alterColumnQueries := []string{
+		`ALTER TABLE baselines ADD COLUMN IF NOT EXISTS git_branch VARCHAR(255)`,
+		`ALTER TABLE baselines ADD COLUMN IF NOT EXISTS git_commit VARCHAR(255)`,
+	}
+	for _, q := range alterColumnQueries {
+		if _, err := bm.db.ExecContext(ctx, q); err != nil {
+			bm.log.WithError(err).WithField("query", q).Warn("Failed to apply baselines column migration")
+		}
+	}
+
+	// Reconcile the run_id foreign key only when databases still have the legacy
+	// historic_runs CASCADE FK or are missing the canonical benchmark_runs FK.
+	const ensureFK = `
+		DO $$
+		DECLARE
+			has_correct_fk boolean;
+		BEGIN
+			IF to_regclass('benchmark_runs') IS NULL THEN
+				RAISE NOTICE 'Skipped baselines.run_id FK: benchmark_runs does not exist';
+				RETURN;
+			END IF;
+
+			SELECT EXISTS (
+				SELECT 1
+				FROM pg_constraint c
+				JOIN pg_class t ON t.oid = c.conrelid
+				JOIN pg_class r ON r.oid = c.confrelid
+				WHERE t.relname = 'baselines'
+					AND c.contype = 'f'
+					AND c.conname = 'baselines_run_id_fkey'
+					AND r.relname = 'benchmark_runs'
+					AND c.confdeltype = 'n'
+			) INTO has_correct_fk;
+
+			IF NOT has_correct_fk THEN
+				IF EXISTS (
+					SELECT 1 FROM pg_constraint c
+					JOIN pg_class t ON t.oid = c.conrelid
+					WHERE t.relname = 'baselines' AND c.contype = 'f' AND c.conname = 'baselines_run_id_fkey'
+				) THEN
+					ALTER TABLE baselines DROP CONSTRAINT baselines_run_id_fkey;
+				END IF;
+
+				-- Self-heal orphan baselines so ADD CONSTRAINT below doesn't
+				-- fail on databases that pre-date this FK and accumulated
+				-- baselines whose run_id no longer exists in benchmark_runs.
+				UPDATE baselines
+				SET run_id = NULL
+				WHERE run_id IS NOT NULL
+					AND run_id NOT IN (SELECT id FROM benchmark_runs);
+
+				ALTER TABLE baselines
+					ADD CONSTRAINT baselines_run_id_fkey
+					FOREIGN KEY (run_id) REFERENCES benchmark_runs(id) ON DELETE SET NULL;
+			END IF;
+		END $$;`
+	if _, err := bm.db.ExecContext(ctx, ensureFK); err != nil {
+		bm.log.WithError(err).Warn("Failed to ensure baselines.run_id foreign key")
+	}
+
+	return nil
 }
 
 func (bm *baselineManager) extractBaselineMetrics(ctx context.Context, run *types.HistoricRun) (*BaselineMetrics, error) {
-	// Parse full results to get detailed client metrics
-	var fullResult types.BenchmarkResult
-	if err := json.Unmarshal(run.FullResults, &fullResult); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal full results: %w", err)
+	clientMetrics := make(map[string]ClientBaseline)
+
+	// Try to parse full results to get detailed client metrics
+	if len(run.FullResults) > 0 {
+		var fullResult types.BenchmarkResult
+		if err := json.Unmarshal(run.FullResults, &fullResult); err != nil {
+			bm.log.WithError(err).Warn("Failed to unmarshal full results, using basic metrics")
+		} else {
+			for clientName, metrics := range fullResult.ClientMetrics {
+				clientMetrics[clientName] = ClientBaseline{
+					ErrorRate:     metrics.ErrorRate,
+					AvgLatency:    metrics.Latency.Avg,
+					P95Latency:    metrics.Latency.P95,
+					P99Latency:    metrics.Latency.P99,
+					Throughput:    metrics.Latency.Throughput,
+					TotalRequests: metrics.TotalRequests,
+					TotalErrors:   metrics.TotalErrors,
+				}
+			}
+		}
 	}
 
-	clientMetrics := make(map[string]ClientBaseline)
-	for clientName, metrics := range fullResult.ClientMetrics {
-		clientMetrics[clientName] = ClientBaseline{
-			ErrorRate:     metrics.ErrorRate,
-			AvgLatency:    metrics.Latency.Avg,
-			P95Latency:    metrics.Latency.P95,
-			P99Latency:    metrics.Latency.P99,
-			Throughput:    metrics.Latency.Throughput,
-			TotalRequests: metrics.TotalRequests,
-			TotalErrors:   metrics.TotalErrors,
+	// Fallback: when full_results is missing or unparseable we still want to record a
+	// baseline so the run can be referenced from the dashboard. We do not have real
+	// per-client numbers in that case, so we evenly split the run-level totals across
+	// the configured clients and copy the run-level rates verbatim. This is an
+	// approximation only — any client that handled more or less load than the others
+	// will be misrepresented. Always prefer full_results when it is available.
+	if len(clientMetrics) == 0 && len(run.Clients) > 0 {
+		bm.log.WithField("clients", len(run.Clients)).
+			Info("full_results unavailable; using even-split fallback for per-client baseline metrics")
+		totalRequests := run.TotalRequests / int64(len(run.Clients))
+		totalErrors := run.TotalErrors / int64(len(run.Clients))
+		for _, clientName := range run.Clients {
+			clientMetrics[clientName] = ClientBaseline{
+				ErrorRate:     run.OverallErrorRate,
+				AvgLatency:    run.AvgLatencyMs,
+				P95Latency:    run.P95LatencyMs,
+				P99Latency:    run.P99LatencyMs,
+				Throughput:    0,
+				TotalRequests: totalRequests,
+				TotalErrors:   totalErrors,
+			}
 		}
 	}
 
@@ -585,12 +720,14 @@ func (bm *baselineManager) extractBaselineMetrics(ctx context.Context, run *type
 func (bm *baselineManager) saveBaseline(ctx context.Context, baseline *Baseline) error {
 	query := `
 		INSERT INTO baselines (
-			id, name, description, test_name, run_id, created_by, created_at, updated_at,
-			baseline_metrics, tags, is_active
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			id, name, description, test_name, run_id, git_branch, git_commit, 
+			created_by, created_at, updated_at, baseline_metrics, tags, is_active
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (name) DO UPDATE SET
 			description = EXCLUDED.description,
 			run_id = EXCLUDED.run_id,
+			git_branch = EXCLUDED.git_branch,
+			git_commit = EXCLUDED.git_commit,
 			updated_at = CURRENT_TIMESTAMP,
 			baseline_metrics = EXCLUDED.baseline_metrics,
 			tags = EXCLUDED.tags`
@@ -607,7 +744,8 @@ func (bm *baselineManager) saveBaseline(ctx context.Context, baseline *Baseline)
 
 	_, err = bm.db.ExecContext(ctx, query,
 		baseline.ID, baseline.Name, baseline.Description, baseline.TestName,
-		baseline.RunID, baseline.CreatedBy, baseline.CreatedAt, baseline.UpdatedAt,
+		baseline.RunID, baseline.GitBranch, baseline.GitCommit,
+		baseline.CreatedBy, baseline.CreatedAt, baseline.UpdatedAt,
 		baselineMetricsJSON, tagsJSON, baseline.IsActive,
 	)
 
@@ -715,14 +853,39 @@ func (bm *baselineManager) compareClientMetrics(current *types.ClientMetrics, ba
 		IsSignificant:  math.Abs(calculatePercentChange(baselineScore, currentScore)) > 3.0,
 	}
 
-	// Determine client status
-	status := "stable"
-	if overallScoreChange.IsSignificant {
-		if overallScoreChange.IsImprovement {
-			status = "improved"
-		} else {
-			status = "degraded"
+	// Determine client status by inspecting each significant metric individually.
+	// The composite overall_score smoothed out big real regressions (a 47% latency
+	// hit could land at "stable"), so this logic instead flips to "degraded" as
+	// soon as any latency percentile or error rate gets significantly worse, and
+	// to "improved" only when nothing got worse and at least one metric got
+	// significantly better.
+	// IsImprovement is already set per metric with the right polarity
+	// (smaller-is-better for latency/error, larger-is-better for throughput),
+	// so we can collapse all five signals into the same counter.
+	signals := []ComparisonMetric{
+		errorRateChange,
+		avgLatencyChange,
+		p95LatencyChange,
+		p99LatencyChange,
+		throughputChange,
+	}
+	worse, better := 0, 0
+	for _, m := range signals {
+		if !m.IsSignificant {
+			continue
 		}
+		if m.IsImprovement {
+			better++
+		} else {
+			worse++
+		}
+	}
+	status := "stable"
+	switch {
+	case worse > 0:
+		status = "degraded"
+	case better > 0:
+		status = "improved"
 	}
 
 	return ClientComparison{

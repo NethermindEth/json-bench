@@ -1,6 +1,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import {
   HistoricRun,
+  Baseline,
+  BaselineComparison,
   BenchmarkResult,
   TrendData,
   TrendPoint,
@@ -16,8 +18,7 @@ import {
   MetricQuery,
   TimeSeriesMetric,
   MethodMetricsData,
-  RunDetailsResponse,
-  ClientMetrics
+  RunDetailsResponse
 } from '../types/api'
 
 /**
@@ -317,21 +318,19 @@ class BenchmarkAPI {
    * 
    * @returns Promise resolving to array of baseline runs
    */
-  async listBaselines(): Promise<HistoricRun[]> {
-    const response = await this.makeRequest<HistoricRun[]>({
+  async listBaselines(): Promise<Baseline[]> {
+    const response = await this.makeRequest<{ baselines: Baseline[], count: number }>({
       method: 'GET',
       url: '/api/baselines'
     })
-    
-    return response.data
+
+    return response.data.baselines || []
   }
 
   /**
-   * Sets a run as a baseline with a given name
-   * 
-   * @param runId - The run ID to set as baseline
-   * @param name - The baseline name
-   * @returns Promise that resolves when baseline is set
+   * Sets a run as a baseline with a given name. The backend accepts both
+   * camelCase and snake_case for the run id; we send camelCase to match
+   * the rest of the JS API surface.
    */
   async setBaseline(runId: string, name: string): Promise<void> {
     await this.makeRequest({
@@ -342,15 +341,12 @@ class BenchmarkAPI {
   }
 
   /**
-   * Removes a baseline
-   * 
-   * @param runId - The baseline run ID to remove
-   * @returns Promise that resolves when baseline is removed
+   * Removes a baseline by name.
    */
-  async removeBaseline(runId: string): Promise<void> {
+  async removeBaseline(baselineName: string): Promise<void> {
     await this.makeRequest({
       method: 'DELETE',
-      url: `/api/baselines/${encodeURIComponent(runId)}`
+      url: `/api/baselines/${encodeURIComponent(baselineName)}`
     })
   }
 
@@ -368,7 +364,19 @@ class BenchmarkAPI {
       method: 'GET',
       url: `/api/compare?run1=${encodeURIComponent(runId1)}&run2=${encodeURIComponent(runId2)}`
     })
-    
+
+    return response.data
+  }
+
+  /**
+   * Compares a run against a saved baseline. The backend returns deltas for
+   * overall + per-client metrics, plus a roll-up status and risk level.
+   */
+  async compareToBaseline(runId: string, baselineName: string): Promise<BaselineComparison> {
+    const response = await this.makeRequest<BaselineComparison>({
+      method: 'GET',
+      url: `/api/baselines/${encodeURIComponent(baselineName)}/compare/${encodeURIComponent(runId)}`,
+    })
     return response.data
   }
 

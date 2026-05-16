@@ -75,6 +75,7 @@ type ClientMetrics struct {
 	TotalRequests int64                     `json:"total_requests"`
 	TotalErrors   int64                     `json:"total_errors"`
 	ErrorRate     float64                   `json:"error_rate"`
+	SuccessRate   float64                   `json:"success_rate"` // Computed as 1 - ErrorRate
 	Latency       MetricSummary             `json:"latency"`
 	Methods       map[string]MetricSummary  `json:"methods"`
 	MethodDetails map[string]*MethodMetrics `json:"method_details,omitempty"` // Method metrics with names
@@ -103,15 +104,16 @@ type ConnectionMetrics struct {
 
 // BenchmarkResult represents the results of a benchmark run
 type BenchmarkResult struct {
-	Config        interface{}               `json:"config"`
-	Summary       map[string]interface{}    `json:"summary"`
-	ClientMetrics map[string]*ClientMetrics `json:"client_metrics"`
-	ResponseDiff  map[string]interface{}    `json:"response_diff,omitempty"`
-	Timestamp     string                    `json:"timestamp"`
-	ResponsesDir  string                    `json:"responses_dir,omitempty"`
-	StartTime     string                    `json:"start_time"`
-	EndTime       string                    `json:"end_time"`
-	Duration      string                    `json:"duration"`
+	Config         interface{}               `json:"config"`
+	Summary        map[string]interface{}    `json:"summary"`
+	ClientMetrics  map[string]*ClientMetrics `json:"client_metrics"`
+	ClientVersions map[string]string         `json:"client_versions,omitempty"`
+	ResponseDiff   map[string]interface{}    `json:"response_diff,omitempty"`
+	Timestamp      string                    `json:"timestamp"`
+	ResponsesDir   string                    `json:"responses_dir,omitempty"`
+	StartTime      string                    `json:"start_time"`
+	EndTime        string                    `json:"end_time"`
+	Duration       string                    `json:"duration"`
 
 	// Advanced analysis
 	Comparison       *ComparisonResult  `json:"comparison,omitempty"`

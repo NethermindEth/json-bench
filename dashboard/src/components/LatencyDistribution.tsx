@@ -63,33 +63,61 @@ interface HistogramStats {
 }
 
 const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
+  // Handle empty buckets case
+  if (!buckets || buckets.length === 0) {
+    return {
+      mean: 0,
+      median: 0,
+      mode: 0,
+      stdDev: 0,
+      min: 0,
+      max: 0,
+      totalCount: 0,
+    }
+  }
+
   let totalCount = 0
   let sum = 0
-  const values: number[] = []
+  let sumSquares = 0
 
-  // Calculate values for each bucket
+  // For unbounded buckets (max === Infinity) we have no upper bound for the values
+  // they contain. Using bucket.min as the representative value is a known underestimate:
+  // any sample in that bucket is by definition >= min, so mean/median/mode/stdDev will
+  // skew low whenever the tail bucket holds significant population. Prefer fixed-width
+  // bucketing upstream if accuracy in the tail matters.
   buckets.forEach(bucket => {
-    const midpoint = (bucket.min + bucket.max) / 2
+    const midpoint = isFinite(bucket.max)
+      ? (bucket.min + bucket.max) / 2
+      : bucket.min
     totalCount += bucket.count
     sum += midpoint * bucket.count
-    
-    // Add midpoint values for standard deviation calculation
-    for (let i = 0; i < bucket.count; i++) {
-      values.push(midpoint)
-    }
+    sumSquares += midpoint * midpoint * bucket.count
   })
 
+  if (totalCount === 0) {
+    return {
+      mean: 0,
+      median: 0,
+      mode: 0,
+      stdDev: 0,
+      min: buckets[0]?.min || 0,
+      max: buckets[buckets.length - 1]?.max || 0,
+      totalCount: 0,
+    }
+  }
+
   const mean = sum / totalCount
-  
-  // Calculate standard deviation
-  const squaredDiffs = values.map(value => Math.pow(value - mean, 2))
-  const avgSquaredDiff = squaredDiffs.reduce((sum, value) => sum + value, 0) / values.length
-  const stdDev = Math.sqrt(avgSquaredDiff)
+  const variance = Math.max((sumSquares / totalCount) - (mean * mean), 0)
+  const stdDev = Math.sqrt(variance)
 
   // Find mode (bucket with highest count)
   const maxBucket = buckets.reduce((max, bucket) => 
     bucket.count > max.count ? bucket : max, buckets[0])
-  const mode = (maxBucket.min + maxBucket.max) / 2
+  // For unbounded buckets (max is Infinity), use min as the mode (best known lower bound)
+  // Using min avoids arbitrary multiplication that has no basis in actual data
+  const mode = isFinite(maxBucket.max)
+    ? (maxBucket.min + maxBucket.max) / 2
+    : maxBucket.min
 
   // Estimate median
   let cumulativeCount = 0
@@ -99,7 +127,11 @@ const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
   for (const bucket of buckets) {
     cumulativeCount += bucket.count
     if (cumulativeCount >= medianPosition) {
-      median = (bucket.min + bucket.max) / 2
+      // For unbounded buckets (max is Infinity), use min as the median (best known lower bound)
+      // Using min avoids arbitrary multiplication that has no basis in actual data
+      median = isFinite(bucket.max)
+        ? (bucket.min + bucket.max) / 2
+        : bucket.min
       break
     }
   }
@@ -116,6 +148,10 @@ const calculateStatistics = (buckets: LatencyBucket[]): HistogramStats => {
 }
 
 const formatLatency = (value: number, unit = 'ms'): string => {
+  // Handle invalid values
+  if (!isFinite(value) || isNaN(value)) {
+    return 'N/A'
+  }
   if (unit === 'ms') {
     if (value < 1000) return `${value.toFixed(1)}ms`
     return `${(value / 1000).toFixed(2)}s`
@@ -292,7 +328,7 @@ export function LatencyDistribution({
         <div className="card-content flex items-center justify-center h-full">
           <div className="text-center">
             <div className="text-danger-600 text-lg font-medium mb-2">Error loading distribution</div>
-            <div className="text-gray-500">{error}</div>
+            <div className="text-gray-500 dark:text-slate-400">{error}</div>
           </div>
         </div>
       </div>
@@ -304,8 +340,8 @@ export function LatencyDistribution({
       <div className={`card ${className}`} style={{ height }}>
         <div className="card-content flex items-center justify-center h-full">
           <div className="text-center">
-            <div className="text-gray-500 text-lg font-medium mb-2">No distribution data</div>
-            <div className="text-gray-400">No latency data available for the selected time range</div>
+            <div className="text-gray-500 dark:text-slate-400 text-lg font-medium mb-2">No distribution data</div>
+            <div className="text-gray-400 dark:text-slate-500">No latency data available for the selected time range</div>
           </div>
         </div>
       </div>
@@ -316,10 +352,10 @@ export function LatencyDistribution({
     <div className={`card ${className}`}>
       {/* Header */}
       <div className="card-header flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100">{title}</h3>
         <div className="flex items-center space-x-2">
           {bucketSize && (
-            <div className="flex items-center text-sm text-gray-500">
+            <div className="flex items-center text-sm text-gray-500 dark:text-slate-400">
               <InformationCircleIcon className="h-4 w-4 mr-1" />
               Bucket size: {formatLatency(bucketSize, unit)}
             </div>
@@ -353,50 +389,50 @@ export function LatencyDistribution({
             {showStatistics && (
               <>
                 <div className="text-center">
-                  <div className="text-2xl font-semibold text-gray-900">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
                     {formatLatency(stats.mean, unit)}
                   </div>
-                  <div className="text-sm text-gray-500">Mean</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Mean</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-semibold text-gray-900">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
                     {formatLatency(stats.median, unit)}
                   </div>
-                  <div className="text-sm text-gray-500">Median</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Median</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-semibold text-gray-900">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
                     {formatLatency(stats.stdDev, unit)}
                   </div>
-                  <div className="text-sm text-gray-500">Std Dev</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Std Dev</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-semibold text-gray-900">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
                     {stats.totalCount.toLocaleString()}
                   </div>
-                  <div className="text-sm text-gray-500">Total Requests</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Total Requests</div>
                 </div>
               </>
             )}
           </div>
 
           {showPercentiles && percentiles && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
               <div className="grid grid-cols-4 gap-4">
                 {Object.entries(percentiles).map(([key, value]) => (
                   <div key={key} className="text-center">
-                    <div className="text-lg font-medium text-gray-900">
+                    <div className="text-lg font-medium text-gray-900 dark:text-slate-100">
                       {formatLatency(value, unit)}
                     </div>
-                    <div className="text-xs text-gray-500">{key.toUpperCase()}</div>
+                    <div className="text-xs text-gray-500 dark:text-slate-400">{key.toUpperCase()}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="mt-4 text-xs text-gray-400 text-center">
-            Click bars for detailed breakdown • Hover for percentages
+          <div className="mt-4 text-xs text-gray-400 dark:text-slate-500 text-center">
+            {onBucketClick ? 'Click bars for detailed breakdown • Hover for percentages' : 'Hover for percentages'}
           </div>
         </div>
       )}

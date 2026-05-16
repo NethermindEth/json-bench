@@ -29,17 +29,21 @@ export function useDetailedMetrics(runId: string, enabled: boolean = true) {
         try {
           const methodData: MethodMetricsData = await api.getRunMethods(runId)
           
-          if (methodData && methodData.methods_by_client) {
+          if (methodData && methodData.methods_by_client && typeof methodData.methods_by_client === 'object') {
             // New response format with per-client method metrics
             clientMethodMetrics = methodData.methods_by_client
-            
+
             // Also create aggregate method metrics for backward compatibility
             const aggregateMethodMetrics = new Map<string, any>()
-            
-            Object.entries(methodData.methods_by_client).forEach(([client, methods]) => {
+
+            Object.entries(methodData.methods_by_client).forEach(([, methods]) => {
+              if (!methods || typeof methods !== 'object') return
               Object.entries(methods).forEach(([methodName, metrics]: [string, any]) => {
-                if (!aggregateMethodMetrics.has(methodName)) {
-                  aggregateMethodMetrics.set(methodName, {
+                if (!metrics || typeof metrics !== 'object') return
+
+                let agg = aggregateMethodMetrics.get(methodName)
+                if (!agg) {
+                  agg = {
                     name: methodName,
                     total_requests: 0,
                     success_rate: 0,
@@ -51,11 +55,11 @@ export function useDetailedMetrics(runId: string, enabled: boolean = true) {
                     max_latency: 0,
                     error_rate: 0,
                     throughput: 0,
-                    count: 0
-                  })
+                    count: 0,
+                  }
+                  aggregateMethodMetrics.set(methodName, agg)
                 }
-                
-                const agg = aggregateMethodMetrics.get(methodName)
+
                 agg.total_requests += metrics.total_requests || 0
                 agg.success_rate += metrics.success_rate || 0
                 agg.avg_latency += metrics.avg_latency || 0
@@ -69,9 +73,8 @@ export function useDetailedMetrics(runId: string, enabled: boolean = true) {
                 agg.count++
               })
             })
-            
-            // Average the aggregated values
-            const methodArray = Array.from(aggregateMethodMetrics.values()).map(agg => ({
+
+            ;(run as any).method_metrics = Array.from(aggregateMethodMetrics.values()).map(agg => ({
               name: agg.name,
               total_requests: agg.total_requests,
               success_rate: agg.count > 0 ? agg.success_rate / agg.count : 0,
@@ -83,13 +86,11 @@ export function useDetailedMetrics(runId: string, enabled: boolean = true) {
               max_latency: agg.max_latency,
               error_rate: agg.count > 0 ? agg.error_rate / agg.count : 0,
               throughput: agg.throughput,
-              std_dev: 0
+              std_dev: 0,
             }))
-            
-            (run as any).method_metrics = methodArray
           } else if (methodData && methodData.methods) {
             // Old response format - single client or aggregate
-            (run as any).method_metrics = Object.entries(methodData.methods).map(([name, metrics]) => ({
+            ;(run as any).method_metrics = Object.entries(methodData.methods).map(([name, metrics]) => ({
               name,
               total_requests: metrics.total_requests ?? 1000,
               success_rate: metrics.success_rate ?? 100,

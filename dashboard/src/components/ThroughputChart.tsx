@@ -438,7 +438,7 @@ export function ThroughputChart({
         <div className="card-content flex items-center justify-center h-full">
           <div className="text-center">
             <div className="text-danger-600 text-lg font-medium mb-2">Error loading chart</div>
-            <div className="text-gray-500">{error}</div>
+            <div className="text-gray-500 dark:text-slate-400">{error}</div>
           </div>
         </div>
       </div>
@@ -450,8 +450,8 @@ export function ThroughputChart({
       <div className={`card ${className}`} style={{ height }}>
         <div className="card-content flex items-center justify-center h-full">
           <div className="text-center">
-            <div className="text-gray-500 text-lg font-medium mb-2">No throughput data</div>
-            <div className="text-gray-400">No throughput data available for the selected time range</div>
+            <div className="text-gray-500 dark:text-slate-400 text-lg font-medium mb-2">No throughput data</div>
+            <div className="text-gray-400 dark:text-slate-500">No throughput data available for the selected time range</div>
           </div>
         </div>
       </div>
@@ -461,13 +461,13 @@ export function ThroughputChart({
   return (
     <div className={`card ${className}`}>
       {/* Header */}
-      <div className="card-header flex justify-between items-center">
-        <div className="flex items-center space-x-3">
-          <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+      <div className="card-header flex justify-between items-center gap-4">
+        <div className="flex items-center space-x-3 flex-shrink-0">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100">{title}</h3>
           {trendData && (
             <div className={`flex items-center space-x-1 text-sm ${
               trendData.direction === 'up' ? 'text-success-600' : 
-              trendData.direction === 'down' ? 'text-danger-600' : 'text-gray-500'
+              trendData.direction === 'down' ? 'text-danger-600' : 'text-gray-500 dark:text-slate-400'
             }`}>
               {trendData.direction === 'up' ? (
                 <ArrowTrendingUpIcon className="h-4 w-4" />
@@ -527,54 +527,54 @@ export function ThroughputChart({
       {/* Summary statistics */}
       {stats && (
         <div className="card-footer">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-4">
-            <div className="text-center">
-              <div className="text-2xl font-semibold text-gray-900">
-                {stats.avgThroughput.toLocaleString()}
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-4">
+            <div className="text-center min-w-[100px]">
+              <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                {stats.avgThroughput.toFixed(2)}
               </div>
-              <div className="text-sm text-gray-500">Avg {unit}</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">Avg {unit}</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-semibold text-gray-900">
-                {stats.maxThroughput.toLocaleString()}
+            <div className="text-center min-w-[100px]">
+              <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                {stats.maxThroughput.toFixed(2)}
               </div>
-              <div className="text-sm text-gray-500">Max {unit}</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">Max {unit}</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-semibold text-gray-900">
-                {stats.minThroughput.toLocaleString()}
+            <div className="text-center min-w-[100px]">
+              <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                {stats.minThroughput.toFixed(2)}
               </div>
-              <div className="text-sm text-gray-500">Min {unit}</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">Min {unit}</div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-semibold text-gray-900">
+            <div className="text-center min-w-[100px]">
+              <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
                 {stats.totalRequests.toLocaleString()}
               </div>
-              <div className="text-sm text-gray-500">Total Requests</div>
+              <div className="text-sm text-gray-500 dark:text-slate-400">Total Requests</div>
             </div>
             {targetThroughput && (
               <>
-                <div className="text-center">
-                  <div className="text-2xl font-semibold text-gray-900">
+                <div className="text-center min-w-[100px]">
+                  <div className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
                     {stats.targetAchievements}
                   </div>
-                  <div className="text-sm text-gray-500">Target Hits</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Target Hits</div>
                 </div>
-                <div className="text-center">
+                <div className="text-center min-w-[100px]">
                   <div className={`text-2xl font-semibold ${
                     stats.targetAchievementRate >= 90 ? 'text-success-600' : 
                     stats.targetAchievementRate >= 70 ? 'text-warning-600' : 'text-danger-600'
                   }`}>
                     {stats.targetAchievementRate.toFixed(1)}%
                   </div>
-                  <div className="text-sm text-gray-500">Target Rate</div>
+                  <div className="text-sm text-gray-500 dark:text-slate-400">Target Rate</div>
                 </div>
               </>
             )}
           </div>
           
-          <div className="text-xs text-gray-400 text-center">
-            Drag to pan • Scroll to zoom • Click bars for details
+          <div className="text-xs text-gray-400 dark:text-slate-500 text-center">
+            Drag to pan • Scroll to zoom{onBarClick ? ' • Click bars for details' : ''}
           </div>
         </div>
       )}

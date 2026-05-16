@@ -21,7 +21,11 @@ CREATE TABLE IF NOT EXISTS benchmark_runs (
     tags JSONB,
     is_baseline BOOLEAN DEFAULT FALSE,
     baseline_name VARCHAR(255),
-    metadata JSONB
+    metadata JSONB,
+    full_results JSONB,
+    -- client_versions captures web3_clientVersion per client at run startup,
+    -- so a regression can be attributed to a specific build.
+    client_versions JSONB
 );`
 
 const GrafanaMetricsTable = `

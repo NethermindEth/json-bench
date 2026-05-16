@@ -38,6 +38,7 @@ func validateConfig(cfg *Config) error {
 	}
 
 	if cfg.CallsFile == "" {
+		totalWeight := 0
 		for _, call := range cfg.Calls {
 			if call.Name == "" {
 				return fmt.Errorf("call name is required")
@@ -48,6 +49,19 @@ func validateConfig(cfg *Config) error {
 					return fmt.Errorf("call must have a method and params defined if no file is provided")
 				}
 			}
+
+			totalWeight += call.Weight
+		}
+
+		// k6_generator uses totalWeight as the denominator for request
+		// distribution; if it's zero the generator emits an empty requests.csv
+		// and every k6 iteration throws "No more requests found" silently. The
+		// run then "succeeds" with zero HTTP requests. Fail loud here instead.
+		// Note: YAML is parsed non-strictly so a misspelled key like
+		// `frequency: "20/s"` is dropped without error — only `weight: N`
+		// (integer) is honored on a Call.
+		if totalWeight <= 0 {
+			return fmt.Errorf("sum of call weights must be > 0; every call has weight=0 (note: only `weight: N` integer is honored on a call — `frequency:` keys are silently ignored by the YAML parser)")
 		}
 	}
 

@@ -144,8 +144,7 @@ func (de *DataExporter) ExportClientComparisonCSV(result *types.BenchmarkResult,
 	// Write header
 	header := []string{
 		"Client", "Total Requests", "Total Errors", "Error Rate (%)",
-		"Avg Latency (ms)", "P95 Latency (ms)", "Performance Score",
-		"Active Connections", "Connection Reuse (%)", "DNS Resolution (ms)", "TLS Handshake (ms)",
+		"Avg Latency (ms)", "P95 Latency (ms)", "P99 Latency (ms)", "Performance Score",
 	}
 
 	if err := writer.Write(header); err != nil {
@@ -166,11 +165,8 @@ func (de *DataExporter) ExportClientComparisonCSV(result *types.BenchmarkResult,
 			fmt.Sprintf("%.2f", client.ErrorRate),
 			fmt.Sprintf("%.2f", client.Latency.Avg),
 			fmt.Sprintf("%.2f", client.Latency.P95),
+			fmt.Sprintf("%.2f", client.Latency.P99),
 			fmt.Sprintf("%.1f", score),
-			strconv.FormatInt(client.ConnectionMetrics.ActiveConnections, 10),
-			fmt.Sprintf("%.1f", client.ConnectionMetrics.ConnectionReuse),
-			fmt.Sprintf("%.2f", client.ConnectionMetrics.DNSResolutionTime),
-			fmt.Sprintf("%.2f", client.ConnectionMetrics.TLSHandshakeTime),
 		}
 
 		if err := writer.Write(row); err != nil {

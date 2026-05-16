@@ -87,14 +87,14 @@ export default function ConnectionStatus({ className = '' }: ConnectionStatusPro
         className={`h-2 w-2 rounded-full ${statusInfo.color} ${statusInfo.animate}`}
         aria-hidden="true"
       />
-      <span 
-        className="text-sm text-gray-500"
+      <span
+        className="text-sm text-gray-500 dark:text-slate-400"
         aria-label={`API connection status: ${statusInfo.text}`}
       >
         {statusInfo.text}
       </span>
       {statusInfo.details && (
-        <span className="text-xs text-gray-400 ml-1">
+        <span className="text-xs text-gray-400 ml-1 dark:text-slate-500">
           ({statusInfo.details})
         </span>
       )}

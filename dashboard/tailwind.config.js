@@ -4,6 +4,8 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  // class-based dark mode: ThemeProvider toggles `dark` on <html>
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

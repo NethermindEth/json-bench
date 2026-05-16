@@ -8,6 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createBenchmarkAPI, BenchmarkAPIError } from './client'
 import type { 
+  Baseline,
   HistoricRun, 
   BenchmarkResult, 
   TrendData, 
@@ -124,10 +125,10 @@ export function useClientTrends(client: string, days: number, enabled = true) {
 }
 
 /**
- * Hook to fetch baseline runs
+ * Hook to fetch baselines
  */
 export function useBaselines() {
-  return useQuery<HistoricRun[], BenchmarkAPIError>({
+  return useQuery<Baseline[], BenchmarkAPIError>({
     queryKey: queryKeys.baselines(),
     queryFn: () => api.listBaselines(),
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -175,6 +176,20 @@ export function useComparison(runId1: string, runId2: string, enabled = true) {
 }
 
 /**
+ * Hook to compare a run against a saved baseline. Disabled until both ids set
+ * so the dropdown can be empty without firing the request.
+ */
+export function useBaselineComparison(runId: string, baselineName: string, enabled = true) {
+  return useQuery({
+    queryKey: ['baseline-comparison', runId, baselineName],
+    queryFn: () => api.compareToBaseline(runId, baselineName),
+    enabled: enabled && !!runId && !!baselineName,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+/**
  * Mutation hook to set a baseline
  */
 export function useSetBaseline() {
@@ -199,7 +214,7 @@ export function useRemoveBaseline() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (runId: string) => api.removeBaseline(runId),
+    mutationFn: (baselineName: string) => api.removeBaseline(baselineName),
     onSuccess: () => {
       // Invalidate and refetch baselines
       queryClient.invalidateQueries({ queryKey: queryKeys.baselines() })
