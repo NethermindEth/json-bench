@@ -231,6 +231,26 @@ export default function TestDetail() {
             <StatCell label="Avg success" value={formatPercentage(summary.avgSuccess)} />
             <StatCell label="Latest" value={`${formatAge(summary.latest.timestamp)}`} icon={<ClockIcon className="h-3 w-3 text-gray-400 dark:text-slate-500" />} />
           </dl>
+          {/* When success_rate is low, latency rankings below are timing
+              FAILED/REVERTED requests, not successful ones. Surface this
+              loudly — silently ranking a 0%-success run is misleading. */}
+          {summary.avgSuccess < 95 && (
+            <div
+              className={`mt-2 rounded-md px-3 py-2 text-sm ${
+                summary.avgSuccess < 50
+                  ? 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-700/50 dark:text-red-200'
+                  : 'bg-yellow-50 border border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700/50 dark:text-yellow-200'
+              }`}
+              role="alert"
+            >
+              <strong>Low success rate ({formatPercentage(summary.avgSuccess)}).</strong>
+              {' '}
+              The latency numbers and rankings below include timing of
+              failed/reverted JSON-RPC calls. Inspect the per-method success
+              column in <em>Recent runs</em> below to see which calls are failing
+              before drawing conclusions from the leaderboard.
+            </div>
+          )}
         </div>
       </header>
 
@@ -334,7 +354,15 @@ export default function TestDetail() {
                     <td className="px-4 py-2 text-right font-mono text-sm text-gray-900 dark:text-slate-100">
                       {r.total_requests.toLocaleString()}
                     </td>
-                    <td className="px-4 py-2 text-right font-mono text-sm text-gray-900 dark:text-slate-100">
+                    <td
+                      className={`px-4 py-2 text-right font-mono text-sm ${
+                        r.success_rate < 50
+                          ? 'font-semibold text-red-600 dark:text-red-400'
+                          : r.success_rate < 95
+                            ? 'font-medium text-yellow-700 dark:text-yellow-400'
+                            : 'text-gray-900 dark:text-slate-100'
+                      }`}
+                    >
                       {formatPercentage(r.success_rate)}
                     </td>
                     <td className="px-4 py-2 text-right font-mono text-sm text-gray-900 dark:text-slate-100">
