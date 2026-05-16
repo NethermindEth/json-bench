@@ -545,10 +545,52 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	return &types.BaselineComparison{}, fmt.Errorf("not implemented")
 }
 
-// GetHistoricSummary retrieves a summary of historic data (placeholder implementation)
+// GetHistoricSummary retrieves a summary of historic data for a test, used by
+// the dashboard's /api/tests/{name}/summary endpoint. Aggregates runs from
+// the storage backend and picks the best/worst by p95 latency. Trends,
+// regressions, and improvements remain unset — those belong to higher-level
+// analyzers that consume this summary as input.
 func (h *HistoricStorage) GetHistoricSummary(ctx context.Context, filter types.RunFilter) (*types.HistoricSummary, error) {
-	// Placeholder implementation
-	return &types.HistoricSummary{}, fmt.Errorf("not implemented")
+	runs, err := h.db.ListRuns(filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs: %w", err)
+	}
+
+	summary := &types.HistoricSummary{
+		TestName:   filter.TestName,
+		TotalRuns:  len(runs),
+		RecentRuns: runs,
+	}
+
+	if len(runs) == 0 {
+		return summary, nil
+	}
+
+	// Single pass: oldest/newest timestamp + best/worst by p95.
+	oldest, newest := runs[0].Timestamp, runs[0].Timestamp
+	best, worst := runs[0], runs[0]
+	for _, r := range runs {
+		if r.Timestamp.Before(oldest) {
+			oldest = r.Timestamp
+		}
+		if r.Timestamp.After(newest) {
+			newest = r.Timestamp
+		}
+		// "Best" = lowest p95 latency (fastest); skip zero-success runs so
+		// a reverting test doesn't masquerade as the fastest.
+		if r.SuccessRate >= 50.0 && r.P95Latency > 0 && (r.P95Latency < best.P95Latency || best.P95Latency == 0) {
+			best = r
+		}
+		if r.P95Latency > worst.P95Latency {
+			worst = r
+		}
+	}
+	summary.FirstRun = oldest
+	summary.LastRun = newest
+	summary.BestRun = best
+	summary.WorstRun = worst
+
+	return summary, nil
 }
 
 func calculateP99Latency(result *types.BenchmarkResult) float64 {
