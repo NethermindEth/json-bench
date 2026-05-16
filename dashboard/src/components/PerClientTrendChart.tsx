@@ -45,6 +45,18 @@ export default function PerClientTrendChart({ series, metricLabel, unit = 'ms', 
   const chartRef = useRef<any>(null)
   const { isDark } = useTheme()
 
+  // Trend chart needs ≥2 data points per series to look like a trend. Compute
+  // the counts up-front (as hooks, before any conditional return) so we don't
+  // violate React's rules of hooks; the placeholder render uses these below.
+  const totalPoints = useMemo(
+    () => series.reduce((n, s) => n + s.points.length, 0),
+    [series],
+  )
+  const maxPerSeries = useMemo(
+    () => series.reduce((m, s) => Math.max(m, s.points.length), 0),
+    [series],
+  )
+
   const data = useMemo(() => ({
     datasets: series.map((s, i) => {
       const color = PALETTE[i % PALETTE.length]
@@ -119,8 +131,27 @@ export default function PerClientTrendChart({ series, metricLabel, unit = 'ms', 
     }
   }, [isDark, metricLabel, unit])
 
-  if (series.length === 0 || series.every(s => s.points.length === 0)) {
-    return <p className="text-sm text-gray-500 dark:text-slate-400">No per-client trend data available yet.</p>
+  if (totalPoints === 0) {
+    return (
+      <div
+        className="flex items-center justify-center text-sm text-gray-500 dark:text-slate-400"
+        style={{ height }}
+      >
+        No per-client trend data available yet.
+      </div>
+    )
+  }
+  if (maxPerSeries < 2) {
+    // Single data point looks like an empty chart on a line plot.
+    return (
+      <div
+        className="flex items-center justify-center px-6 text-center text-sm text-gray-500 dark:text-slate-400"
+        style={{ height }}
+      >
+        Only one run of this test yet — trend chart needs at least 2 runs to
+        plot a line. Run the test again to populate.
+      </div>
+    )
   }
 
   return (
