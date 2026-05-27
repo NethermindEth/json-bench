@@ -10,14 +10,12 @@ notifiers:
       url: "${WEBHOOK_CI_URL}"
       httpMethod: "POST"
       username: ""
-      password: ""
       title: "JSON-RPC Benchmark Alert"
       uploadImage: false
       autoResolve: true
       maxAlerts: 0
-    secureSettings:
-      password: ""
-      
+    secureSettings: {}
+
   - name: webhook-discord
     type: discord
     uid: webhook-discord
@@ -77,7 +75,6 @@ notifiers:
       url: "${GITHUB_WEBHOOK_URL}"
       httpMethod: "POST"
       username: ""
-      password: ""
       title: "JSON-RPC Benchmark Regression"
       uploadImage: false
       autoResolve: true

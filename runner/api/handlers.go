@@ -114,6 +114,16 @@ func (h *apiHandlers) HandleListRuns(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
+	for fieldName, value := range map[string]string{"test": testName, "branch": branch, "client": client} {
+		if value == "" {
+			continue
+		}
+		if err := ValidateID(fieldName, value); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
 	// Set defaults
 	limit := 50
 	offset := 0
@@ -259,12 +269,12 @@ func (h *apiHandlers) HandleGetRun(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	h.log.WithField("run_id", runID).Debug("Handling get run request")
-
-	if runID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("run_id", runID).Debug("Handling get run request")
 
 	run, err := h.storage.GetHistoricRun(ctx, runID)
 	if err != nil {
@@ -301,6 +311,11 @@ func (h *apiHandlers) HandleGetRun(w http.ResponseWriter, r *http.Request) {
 func (h *apiHandlers) HandleGetRunMethods(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
+
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	h.log.WithField("run_id", runID).Debug("Getting method metrics for run")
 
@@ -393,12 +408,12 @@ func (h *apiHandlers) HandleGetReport(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	h.log.WithField("run_id", runID).Debug("Handling get report request")
-
-	if runID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("run_id", runID).Debug("Handling get report request")
 
 	// Get the run
 	run, err := h.storage.GetHistoricRun(ctx, runID)
@@ -423,15 +438,16 @@ func (h *apiHandlers) HandleGetReport(w http.ResponseWriter, r *http.Request) {
 	// Generate comprehensive report
 	report := h.generateRunReport(run, &fullResult)
 
-	format := r.URL.Query().Get("format")
-	switch format {
-	case "html":
-		w.Header().Set("Content-Type", "text/html")
-		// In a full implementation, you would generate HTML here
-		fmt.Fprintf(w, "<h1>Report for Run %s</h1><pre>%+v</pre>", runID, report)
-	default:
-		h.writeJSONResponse(w, http.StatusOK, report)
-	}
+	// format := r.URL.Query().Get("format")
+	// switch format {
+	// case "html":
+	//     // TODO future use: render an escaped HTML report (use html/template,
+	//     // not raw fmt.Fprintf) so user-controlled values cannot break out of
+	//     // the document. Disabled to fix CodeQL go/reflected-xss; falls
+	//     // through to JSON for now.
+	// default:
+	h.writeJSONResponse(w, http.StatusOK, report)
+	// }
 }
 
 // HandleDeleteRun deletes a historic run
@@ -440,12 +456,12 @@ func (h *apiHandlers) HandleDeleteRun(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	h.log.WithField("run_id", runID).Info("Handling delete run request")
-
-	if runID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("run_id", runID).Info("Handling delete run request")
 
 	err := h.storage.DeleteHistoricRun(ctx, runID)
 	if err != nil {
@@ -472,15 +488,19 @@ func (h *apiHandlers) HandleCompareRuns(w http.ResponseWriter, r *http.Request) 
 	runID1 := vars["runId1"]
 	runID2 := vars["runId2"]
 
+	if err := ValidateID("runId1", runID1); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("runId2", runID2); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	h.log.WithFields(logrus.Fields{
 		"run_id_1": runID1,
 		"run_id_2": runID2,
 	}).Debug("Handling compare runs request")
-
-	if runID1 == "" || runID2 == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Both run IDs are required")
-		return
-	}
 
 	comparison, err := h.storage.CompareRuns(ctx, runID1, runID2)
 	if err != nil {
@@ -503,6 +523,13 @@ func (h *apiHandlers) HandleCompareRuns(w http.ResponseWriter, r *http.Request) 
 func (h *apiHandlers) HandleListBaselines(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	testName := r.URL.Query().Get("test")
+
+	if testName != "" {
+		if err := ValidateID("test", testName); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
 	h.log.WithField("test_name", testName).Debug("Handling list baselines request")
 
@@ -534,8 +561,12 @@ func (h *apiHandlers) HandleCreateBaseline(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if req.RunID == "" || req.Name == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID and name are required")
+	if err := ValidateID("run_id", req.RunID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("name", req.Name); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -555,12 +586,12 @@ func (h *apiHandlers) HandleGetBaseline(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	baselineName := vars["baselineName"]
 
-	h.log.WithField("baseline_name", baselineName).Debug("Handling get baseline request")
-
-	if baselineName == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Baseline name is required")
+	if err := ValidateID("baselineName", baselineName); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("baseline_name", baselineName).Debug("Handling get baseline request")
 
 	baseline, err := h.baselineManager.GetBaseline(ctx, baselineName)
 	if err != nil {
@@ -582,12 +613,12 @@ func (h *apiHandlers) HandleDeleteBaseline(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	baselineName := vars["baselineName"]
 
-	h.log.WithField("baseline_name", baselineName).Info("Handling delete baseline request")
-
-	if baselineName == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Baseline name is required")
+	if err := ValidateID("baselineName", baselineName); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("baseline_name", baselineName).Info("Handling delete baseline request")
 
 	err := h.baselineManager.DeleteBaseline(ctx, baselineName)
 	if err != nil {
@@ -613,12 +644,12 @@ func (h *apiHandlers) HandleSetBaseline(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	h.log.WithField("run_id", runID).Info("Handling set baseline request")
-
-	if runID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("run_id", runID).Info("Handling set baseline request")
 
 	var req SetBaselineRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -626,8 +657,8 @@ func (h *apiHandlers) HandleSetBaseline(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if req.Name == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Baseline name is required")
+	if err := ValidateID("name", req.Name); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -649,15 +680,21 @@ func (h *apiHandlers) HandleGetTrends(w http.ResponseWriter, r *http.Request) {
 	testName := r.URL.Query().Get("test")
 	daysStr := r.URL.Query().Get("days")
 
+	if err := ValidateID("test", testName); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if daysStr != "" {
+		if _, err := strconv.Atoi(daysStr); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, "invalid days: must be an integer")
+			return
+		}
+	}
+
 	h.log.WithFields(logrus.Fields{
 		"test_name": testName,
 		"days":      daysStr,
 	}).Debug("Handling get trends request")
-
-	if testName == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Test name is required")
-		return
-	}
 
 	days := 30 // Default
 	if daysStr != "" {
@@ -684,16 +721,26 @@ func (h *apiHandlers) HandleMethodTrends(w http.ResponseWriter, r *http.Request)
 	method := vars["method"]
 	daysStr := r.URL.Query().Get("days")
 
+	if err := ValidateID("testName", testName); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("method", method); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if daysStr != "" {
+		if _, err := strconv.Atoi(daysStr); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, "invalid days: must be an integer")
+			return
+		}
+	}
+
 	h.log.WithFields(logrus.Fields{
 		"test_name": testName,
 		"method":    method,
 		"days":      daysStr,
 	}).Debug("Handling method trends request")
-
-	if testName == "" || method == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Test name and method are required")
-		return
-	}
 
 	days := 30 // Default
 	if daysStr != "" {
@@ -720,16 +767,26 @@ func (h *apiHandlers) HandleClientTrends(w http.ResponseWriter, r *http.Request)
 	client := vars["client"]
 	daysStr := r.URL.Query().Get("days")
 
+	if err := ValidateID("testName", testName); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("client", client); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if daysStr != "" {
+		if _, err := strconv.Atoi(daysStr); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, "invalid days: must be an integer")
+			return
+		}
+	}
+
 	h.log.WithFields(logrus.Fields{
 		"test_name": testName,
 		"client":    client,
 		"days":      daysStr,
 	}).Debug("Handling client trends request")
-
-	if testName == "" || client == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Test name and client are required")
-		return
-	}
 
 	days := 30 // Default
 	if daysStr != "" {
@@ -756,12 +813,17 @@ func (h *apiHandlers) HandleGetRegressions(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	h.log.WithField("run_id", runID).Debug("Handling get regressions request")
-
-	if runID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	severityFilter := r.URL.Query().Get("severity")
+	if err := ValidateSeverity(severityFilter); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	h.log.WithField("run_id", runID).Debug("Handling get regressions request")
 
 	regressions, err := h.regressionDetector.GetRegressions(ctx, runID)
 	if err != nil {
@@ -770,8 +832,6 @@ func (h *apiHandlers) HandleGetRegressions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Filter by severity if requested
-	severityFilter := r.URL.Query().Get("severity")
 	if severityFilter != "" {
 		var filtered []*types.Regression
 		for _, regression := range regressions {
@@ -797,17 +857,52 @@ func (h *apiHandlers) HandleDetectRegressions(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	h.log.WithField("run_id", runID).Info("Handling detect regressions request")
-
-	if runID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("run_id", runID).Info("Handling detect regressions request")
 
 	var req RegressionDetectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if err := ValidateComparisonMode(req.ComparisonMode); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.BaselineName != "" {
+		if err := ValidateID("baseline_name", req.BaselineName); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	for _, item := range req.IncludeClients {
+		if err := ValidateID("include_clients", item); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	for _, item := range req.ExcludeClients {
+		if err := ValidateID("exclude_clients", item); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	for _, item := range req.IncludeMethods {
+		if err := ValidateID("include_methods", item); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	for _, item := range req.ExcludeMethods {
+		if err := ValidateID("exclude_methods", item); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	// Set defaults
@@ -852,12 +947,12 @@ func (h *apiHandlers) HandleAcknowledgeRegression(w http.ResponseWriter, r *http
 	vars := mux.Vars(r)
 	regressionID := vars["regressionId"]
 
-	h.log.WithField("regression_id", regressionID).Info("Handling acknowledge regression request")
-
-	if regressionID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Regression ID is required")
+	if err := ValidateID("regressionId", regressionID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("regression_id", regressionID).Info("Handling acknowledge regression request")
 
 	var req AcknowledgeRegressionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -869,8 +964,11 @@ func (h *apiHandlers) HandleAcknowledgeRegression(w http.ResponseWriter, r *http
 		h.writeErrorResponse(w, http.StatusBadRequest, "Acknowledged by is required")
 		return
 	}
+	// AcknowledgedBy is a free-form name; scrub control characters before
+	// it propagates into downstream log fields.
+	acknowledgedBy := SanitizeLogValue(req.AcknowledgedBy)
 
-	err := h.regressionDetector.AcknowledgeRegression(ctx, regressionID, req.AcknowledgedBy)
+	err := h.regressionDetector.AcknowledgeRegression(ctx, regressionID, acknowledgedBy)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeErrorResponse(w, http.StatusNotFound, "Regression not found")
@@ -896,12 +994,12 @@ func (h *apiHandlers) HandleAnalyzeRun(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	h.log.WithField("run_id", runID).Debug("Handling analyze run request")
-
-	if runID == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.log.WithField("run_id", runID).Debug("Handling analyze run request")
 
 	analysis, err := h.regressionDetector.AnalyzeRun(ctx, runID)
 	if err != nil {
@@ -920,13 +1018,12 @@ func (h *apiHandlers) HandleGetMetricTrends(w http.ResponseWriter, r *http.Reque
 	testName := vars["testName"]
 	metric := vars["metric"]
 
-	h.log.WithFields(logrus.Fields{
-		"test_name": testName,
-		"metric":    metric,
-	}).Debug("Handling get metric trends request")
-
-	if testName == "" || metric == "" {
-		h.writeErrorResponse(w, http.StatusBadRequest, "Test name and metric are required")
+	if err := ValidateID("testName", testName); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("metric", metric); err != nil {
+		h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -934,6 +1031,18 @@ func (h *apiHandlers) HandleGetMetricTrends(w http.ResponseWriter, r *http.Reque
 	daysStr := r.URL.Query().Get("days")
 	client := r.URL.Query().Get("client")
 	windowSizeStr := r.URL.Query().Get("window_size")
+
+	if client != "" {
+		if err := ValidateID("client", client); err != nil {
+			h.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
+	h.log.WithFields(logrus.Fields{
+		"test_name": testName,
+		"metric":    metric,
+	}).Debug("Handling get metric trends request")
 
 	days := 30 // Default
 	if daysStr != "" {

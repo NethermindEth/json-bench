@@ -98,7 +98,7 @@ func (g *grafanaAPI) HandleGrafanaSearch(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	g.log.WithField("target", req.Target).Debug("Search target")
+	g.log.WithField("target", SanitizeLogValue(req.Target)).Debug("Search target")
 
 	// Get available metrics based on search target
 	metrics, err := g.getAvailableMetrics(ctx, req.Target)
@@ -124,22 +124,24 @@ func (g *grafanaAPI) HandleGrafanaQuery(w http.ResponseWriter, r *http.Request) 
 	}
 
 	g.log.WithFields(logrus.Fields{
-		"from":    req.Range.From,
-		"to":      req.Range.To,
+		"from":    SanitizeLogValue(req.Range.From),
+		"to":      SanitizeLogValue(req.Range.To),
 		"targets": len(req.Targets),
 	}).Debug("Query parameters")
 
-	// Parse time range
+	// Parse time range. parseGrafanaTime echoes the user-supplied value in its
+	// error message, so log a sanitized snapshot of the error rather than the
+	// raw error chain.
 	fromTime, err := g.parseGrafanaTime(req.Range.From)
 	if err != nil {
-		g.log.WithError(err).Error("Failed to parse from time")
+		g.log.WithField("error", SanitizeLogValue(err.Error())).Error("Failed to parse from time")
 		g.writeGrafanaErrorResponse(w, http.StatusBadRequest, "Invalid from time format")
 		return
 	}
 
 	toTime, err := g.parseGrafanaTime(req.Range.To)
 	if err != nil {
-		g.log.WithError(err).Error("Failed to parse to time")
+		g.log.WithField("error", SanitizeLogValue(err.Error())).Error("Failed to parse to time")
 		g.writeGrafanaErrorResponse(w, http.StatusBadRequest, "Invalid to time format")
 		return
 	}
@@ -152,12 +154,13 @@ func (g *grafanaAPI) HandleGrafanaQuery(w http.ResponseWriter, r *http.Request) 
 			continue
 		}
 
-		g.log.WithField("target", target.Target).Debug("Processing target")
+		safeTarget := SanitizeLogValue(target.Target)
+		g.log.WithField("target", safeTarget).Debug("Processing target")
 
 		// Parse target to extract metric information
 		metricInfo := g.parseMetricTarget(target.Target)
 		if metricInfo == nil {
-			g.log.WithField("target", target.Target).Warn("Failed to parse metric target")
+			g.log.WithField("target", safeTarget).Warn("Failed to parse metric target")
 			continue
 		}
 
@@ -166,7 +169,7 @@ func (g *grafanaAPI) HandleGrafanaQuery(w http.ResponseWriter, r *http.Request) 
 		case "table":
 			tableData, err := g.queryTableData(ctx, metricInfo, fromTime, toTime)
 			if err != nil {
-				g.log.WithError(err).WithField("target", target.Target).Error("Failed to query table data")
+				g.log.WithError(err).WithField("target", safeTarget).Error("Failed to query table data")
 				continue
 			}
 			response = append(response, tableData)
@@ -174,7 +177,7 @@ func (g *grafanaAPI) HandleGrafanaQuery(w http.ResponseWriter, r *http.Request) 
 		default: // time series
 			timeSeriesData, err := g.queryTimeSeriesData(ctx, metricInfo, fromTime, toTime)
 			if err != nil {
-				g.log.WithError(err).WithField("target", target.Target).Error("Failed to query time series data")
+				g.log.WithError(err).WithField("target", safeTarget).Error("Failed to query time series data")
 				continue
 			}
 			response = append(response, timeSeriesData)
@@ -196,17 +199,18 @@ func (g *grafanaAPI) HandleGrafanaAnnotations(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Parse time range
+	// Parse time range. See note above in HandleGrafanaQuery on why we sanitize
+	// the formatted error string instead of using WithError.
 	fromTime, err := g.parseGrafanaTime(req.Range.From)
 	if err != nil {
-		g.log.WithError(err).Error("Failed to parse from time")
+		g.log.WithField("error", SanitizeLogValue(err.Error())).Error("Failed to parse from time")
 		g.writeGrafanaErrorResponse(w, http.StatusBadRequest, "Invalid from time format")
 		return
 	}
 
 	toTime, err := g.parseGrafanaTime(req.Range.To)
 	if err != nil {
-		g.log.WithError(err).Error("Failed to parse to time")
+		g.log.WithField("error", SanitizeLogValue(err.Error())).Error("Failed to parse to time")
 		g.writeGrafanaErrorResponse(w, http.StatusBadRequest, "Invalid to time format")
 		return
 	}
