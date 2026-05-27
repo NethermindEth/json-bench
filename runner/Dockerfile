@@ -1,5 +1,5 @@
 # Multi-stage build for Go runner
-FROM golang:1.25.0-alpine AS builder
+FROM golang:1.25.10-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
