@@ -233,8 +233,8 @@ func (h *WSHub) RegisterClient(conn *websocket.Conn, clientID, remoteAddr, userA
 	case h.register <- client:
 		h.log.WithFields(logrus.Fields{
 			"client_id":   clientID,
-			"remote_addr": remoteAddr,
-			"user_agent":  userAgent,
+			"remote_addr": SanitizeLogValue(remoteAddr),
+			"user_agent":  SanitizeLogValue(userAgent),
 		}).Info("WebSocket client registered")
 	case <-h.ctx.Done():
 		h.log.Warn("Cannot register client, hub is shutting down")
@@ -635,7 +635,7 @@ func (c *WSClient) readPump() {
 			// Handle other message types as needed
 			c.Hub.log.WithFields(logrus.Fields{
 				"client_id":    c.ID,
-				"message_type": msg.Type,
+				"message_type": SanitizeLogValue(string(msg.Type)),
 			}).Debug("Received WebSocket message")
 		}
 	}
