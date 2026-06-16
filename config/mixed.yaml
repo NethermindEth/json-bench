@@ -51,5 +51,3 @@ calls:
   # - file: "./rpc-calls/custom-queries.json"
   #   file_type: "json"  # or "jsonl" for JSON Lines format
   #   weight: 20
-
-validate_responses: false

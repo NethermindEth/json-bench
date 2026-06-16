@@ -9,18 +9,17 @@ import (
 
 // Config represents the benchmark configuration
 type Config struct {
-	TestName          string                `yaml:"test_name"`
-	Description       string                `yaml:"description"`
-	ClientRefs        []string              `yaml:"clients"`
-	Duration          string                `yaml:"duration"`
-	RPS               int                   `yaml:"rps"`
-	Iterations        int                   `yaml:"iterations"`
-	VUs               int                   `yaml:"vus"`
-	Calls             []*Call               `yaml:"calls"`
-	CallsFile         string                `yaml:"calls_file"` // Optional: use file containing RPC calls instead of generating them
-	ValidateResponses bool                  `yaml:"validate_responses"`
-	ResolvedClients   []*types.ClientConfig `yaml:"-"`
-	Outputs           *Outputs              `yaml:"-"`
+	TestName        string                `yaml:"test_name"`
+	Description     string                `yaml:"description"`
+	ClientRefs      []string              `yaml:"clients"`
+	Duration        string                `yaml:"duration"`
+	RPS             int                   `yaml:"rps"`
+	Iterations      int                   `yaml:"iterations"`
+	VUs             int                   `yaml:"vus"`
+	Calls           []*Call               `yaml:"calls"`
+	CallsFile       string                `yaml:"calls_file"` // Optional: use file containing RPC calls instead of generating them
+	ResolvedClients []*types.ClientConfig `yaml:"-"`
+	Outputs         *Outputs              `yaml:"-"`
 }
 
 // validateConfig performs validation on the loaded configuration

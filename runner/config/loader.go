@@ -136,14 +136,13 @@ func (cl *ConfigLoader) LoadWithBackwardCompatibility(filename string) (*Config,
 func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 	// Define a structure that can hold both old and new style configurations
 	type oldStyleConfig struct {
-		TestName          string               `yaml:"test_name"`
-		Description       string               `yaml:"description"`
-		Clients           []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
-		Duration          string               `yaml:"duration"`
-		RPS               int                  `yaml:"rps"`
-		VUs               int                  `yaml:"vus"`
-		Calls             []*Call              `yaml:"calls"`
-		ValidateResponses bool                 `yaml:"validate_responses"`
+		TestName    string               `yaml:"test_name"`
+		Description string               `yaml:"description"`
+		Clients     []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
+		Duration    string               `yaml:"duration"`
+		RPS         int                  `yaml:"rps"`
+		VUs         int                  `yaml:"vus"`
+		Calls       []*Call              `yaml:"calls"`
 	}
 
 	var oldConfig oldStyleConfig
@@ -153,15 +152,14 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 
 	// Convert to new style config
 	newConfig := &Config{
-		TestName:          oldConfig.TestName,
-		Description:       oldConfig.Description,
-		Duration:          oldConfig.Duration,
-		RPS:               oldConfig.RPS,
-		VUs:               oldConfig.VUs,
-		Calls:             oldConfig.Calls,
-		ValidateResponses: oldConfig.ValidateResponses,
-		ClientRefs:        make([]string, 0, len(oldConfig.Clients)),
-		ResolvedClients:   make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
+		TestName:        oldConfig.TestName,
+		Description:     oldConfig.Description,
+		Duration:        oldConfig.Duration,
+		RPS:             oldConfig.RPS,
+		VUs:             oldConfig.VUs,
+		Calls:           oldConfig.Calls,
+		ClientRefs:      make([]string, 0, len(oldConfig.Clients)),
+		ResolvedClients: make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
 	}
 
 	// If we have a client registry, register the embedded clients

@@ -32,5 +32,3 @@ calls:
   - name: "token-queries"
     file: "./rpc-calls/token-queries.json"
     weight: 20
-
-validate_responses: true

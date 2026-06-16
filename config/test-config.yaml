@@ -2,7 +2,6 @@ test_name: "Test with Client References"
 description: "Testing separated client configuration"
 duration: "10s"
 rps: 100
-validate_responses: true
 
 clients: ["geth", "nethermind"]
 

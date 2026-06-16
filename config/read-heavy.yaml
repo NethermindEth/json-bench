@@ -26,4 +26,3 @@ calls:
       - "latest"
       - true
     frequency: 10%
-validate_responses: true

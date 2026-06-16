@@ -50,7 +50,6 @@ endpoints:
   - method: "eth_chainId"
     params: []
     frequency: "50%"
-validate_responses: true
 `
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		require.NoError(t, err)
@@ -112,7 +111,6 @@ endpoints:
   - method: "eth_blockNumber"
     params: []
     frequency: "100%"
-validate_responses: true
 `
 		tmpFile, err := os.CreateTemp("", "test-new-style-*.yaml")
 		require.NoError(t, err)
@@ -146,7 +144,6 @@ endpoints:
   - method: "eth_blockNumber"
     params: []
     frequency: "100%"
-validate_responses: true
 `
 		tmpFile, err := os.CreateTemp("", "test-old-style-*.yaml")
 		require.NoError(t, err)
@@ -210,7 +207,6 @@ calls:
   - name: "blockNumber"
     method: "eth_blockNumber"
     params: []
-validate_responses: true
 `
 		tmpFile, err := os.CreateTemp("", "test-env-config-*.yaml")
 		require.NoError(t, err)
@@ -242,7 +238,6 @@ calls:
   - name: "blockNumber"
     method: "eth_blockNumber"
     params: []
-validate_responses: true
 `
 		tmpFile, err := os.CreateTemp("", "test-env-default-*.yaml")
 		require.NoError(t, err)
@@ -271,7 +266,6 @@ calls:
   - name: "blockNumber"
     method: "eth_blockNumber"
     params: []
-validate_responses: true
 `
 		tmpFile, err := os.CreateTemp("", "test-env-required-*.yaml")
 		require.NoError(t, err)
@@ -300,7 +294,6 @@ calls:
   - name: "blockNumber"
     method: "eth_blockNumber"
     params: []
-validate_responses: true
 `
 		tmpFile, err := os.CreateTemp("", "test-env-backward-*.yaml")
 		require.NoError(t, err)
