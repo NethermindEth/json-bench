@@ -14,7 +14,7 @@ RUN go mod download
 COPY runner/ ./runner/
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner
 
 # Final stage - minimal runtime image with k6 (base is alpine)
 FROM grafana/k6:1.4.0

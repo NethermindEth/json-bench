@@ -31,7 +31,8 @@ json-bench/
 │   └── param_variations.yaml
 │
 ├── runner/                   # Go benchmark runner with historic tracking
-│   ├── main.go              # Main CLI application
+│   ├── main.go              # Thin entry point — delegates to cmd.Execute()
+│   ├── cmd/                 # Cobra subcommands (benchmark, api, historic)
 │   ├── api/                 # HTTP API server and WebSocket support
 │   ├── storage/             # PostgreSQL integration
 │   ├── analysis/            # Trend analysis and regression detection
@@ -96,12 +97,12 @@ json-bench/
 
     ```bash
     # Basic benchmark (no historic tracking)
-    go run ./runner/main.go -config ./config/mixed.yaml -clients ./config/clients.yaml
+    go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml
     # With historic tracking (requires PostgreSQL)
-    go run ./runner/main.go -config ./config/mixed.yaml -clients ./config/clients.yaml -historic -storage-config ./config/storage-example.yaml
+    go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml --historic --storage-config ./config/storage-example.yaml
 
     # View results
-    open results/report.html
+    open outputs/report.html
     ```
 
     **NOTE:** `storage-example.yaml` works out of the box with the docker containers deployed in the compose file.
@@ -116,22 +117,35 @@ json-bench/
 
 ## Usage
 
+The `runner` binary exposes its functionality through subcommands. Running
+`runner` with no subcommand prints usage and exits with status 2.
+
+```text
+runner benchmark   Run a benchmark (k6 → Prometheus → reports)
+runner api         Start the HTTP API server
+runner historic    Generate a historic-analysis report from PostgreSQL
+```
+
+Global flags accepted by every subcommand:
+
+- `--output` (default `outputs/`) — where artefacts are written.
+- `--log-level` — `debug`, `info`, `warn`, or `error`. Falls back to the
+  `LOG_LEVEL` environment variable, then `info`.
+
 ### Basic Benchmarking
 
 ```bash
 # Run a mixed workload benchmark
-go run ./runner/main.go -config ./config/mixed.yaml -clients ./config/clients.yaml
+go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml
 
 # Run a read-heavy benchmark
-go run ./runner/main.go -config ./config/read-heavy.yaml -clients ./config/clients.yaml
+go run ./runner benchmark --config ./config/read-heavy.yaml --clients ./config/clients.yaml
 
-# Run with custom parameters
-go run ./runner/main.go \
-  -config ./config/mixed.yaml \
-  -clients ./config/clients.yaml \
-  -output ./custom-results \
-  -concurrency 10 \
-  -timeout 60
+# Run with a custom output directory and a non-default Prometheus endpoint
+go run ./runner --output ./custom-results benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --prometheus-rw http://prometheus:9090/api/v1/write
 ```
 
 ### Historic Tracking & Analysis
@@ -139,19 +153,17 @@ go run ./runner/main.go \
 Enable historic tracking to store results in PostgreSQL and analyze trends over time:
 
 ```bash
-# Run with historic tracking enabled
-go run ./runner/main.go \
-  -config ./config/mixed.yaml \
-  -clients ./config/clients.yaml \
-  -historic \
-  -storage-config ./config/storage-example.yaml
+# Persist this benchmark run to PostgreSQL
+go run ./runner benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --historic \
+  --storage-config ./config/storage-example.yaml
 
-# Run in historic analysis mode (no new benchmark)
-go run ./runner/main.go \
-  -config ./config/mixed.yaml \
-  -clients ./config/clients.yaml \
-  -historic-mode \
-  -storage-config ./config/storage-example.yaml
+# Generate a historic-analysis report (no new benchmark)
+go run ./runner historic \
+  --config ./config/mixed.yaml \
+  --storage-config ./config/storage-example.yaml
 ```
 
 ### API Server for Real-time Access
@@ -160,12 +172,27 @@ Start the HTTP API server for real-time data access and WebSocket updates:
 
 ```bash
 # Start the API server with historic storage
-go run ./runner/main.go \
-  -api \
-  -storage-config ./config/storage-example.yaml
+go run ./runner api \
+  --storage-config ./config/storage-example.yaml \
+  --api-addr :8081
 
-# API will be available at http://localhost:8080
+# API will be available at http://localhost:8081
 ```
+
+### Migrating from the pre-refactor CLI
+
+The flag-modal entry point (`runner -api`, `runner -historic-mode`,
+single-dash long flags) has been replaced with explicit Cobra
+subcommands. The old invocations will fail at flag-parse time with a
+clear error. The mapping is:
+
+| Old | New |
+|---|---|
+| `runner -config ... -prometheus-rw ...` | `runner benchmark --config ... --prometheus-rw ...` |
+| `runner -api -storage-config ... -api-addr ...` | `runner api --storage-config ... --api-addr ...` |
+| `runner -historic-mode -storage-config ... -config ...` | `runner historic --storage-config ... --config ...` |
+| `runner -historic -storage-config ...` (with `-config ...`) | `runner benchmark --historic --storage-config ...` |
+| `-config`, `-clients`, `-output`, `-prometheus-rw`, ... (single dash) | `--config`, `--clients`, `--output`, `--prometheus-rw`, ... (double dash) |
 
 **Available API endpoints:**
 
@@ -246,7 +273,7 @@ Configure PostgreSQL storage for historic tracking. Choose the appropriate confi
 
 ```bash
 # Use storage-example.yaml for local PostgreSQL connection
-go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
+go run ./runner benchmark --config ./config/mixed.yaml --historic --storage-config ./config/storage-example.yaml
 ```
 
 **Docker Environment:**
@@ -254,7 +281,7 @@ go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./
 ```bash
 # Use storage-docker.yaml when running inside Docker containers
 # (This config uses 'postgres' hostname which only exists in Docker network)
-docker run ... -storage-config ./config/storage-docker.yaml
+docker run ... api --storage-config ./config/storage-docker.yaml
 ```
 
 **Configuration Examples:**
