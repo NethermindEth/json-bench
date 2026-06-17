@@ -28,7 +28,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVar(&outputDir, "output", "outputs", "Directory to store outputs")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "", "Log level: debug, info, warn, error (falls back to $LOG_LEVEL, then info)")
-	rootCmd.AddCommand(benchmarkCmd, apiCmd, historicCmd, compareCmd)
+	rootCmd.AddCommand(benchmarkCmd, apiCmd, historicCmd, compareCmd, compareOpenRPCCmd)
 }
 
 func Execute() int {

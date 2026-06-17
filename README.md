@@ -121,9 +121,11 @@ The `runner` binary exposes its functionality through subcommands. Running
 `runner` with no subcommand prints usage and exits with status 2.
 
 ```text
-runner benchmark   Run a benchmark (k6 → Prometheus → reports)
-runner api         Start the HTTP API server
-runner historic    Generate a historic-analysis report from PostgreSQL
+runner benchmark        Run a benchmark (k6 → Prometheus → reports)
+runner compare          One-shot cross-client JSON-RPC response comparison
+runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
+runner api              Start the HTTP API server
+runner historic         Generate a historic-analysis report from PostgreSQL
 ```
 
 Global flags accepted by every subcommand:
@@ -178,6 +180,61 @@ go run ./runner api \
 
 # API will be available at http://localhost:8081
 ```
+
+### One-shot Cross-Client Comparison
+
+`runner compare` runs a one-shot JSON-RPC response comparison across a
+set of clients defined in `clients.yaml`. It is flags-only — there is
+no YAML schema for compare — and is filesystem-only: results are not
+written to the historic-runs database.
+
+```bash
+go run ./runner compare \
+  --clients ./config/clients.yaml \
+  --client-refs geth,nethermind \
+  --methods eth_blockNumber,eth_chainId,eth_gasPrice \
+  --output ./comparison-results
+```
+
+Both artefacts are always produced:
+
+- `<output>/comparison-results.json`
+- `<output>/comparison-report.html`
+
+`compare` uses the comparator's default empty-params behaviour for each
+method. Methods that need parameter variations should use
+`compare-openrpc`.
+
+### OpenRPC-Driven Comparison
+
+`runner compare-openrpc` loads the method set from an OpenRPC
+specification and runs the same cross-client comparison as `compare`,
+optionally expanding individual methods into per-parameter variations
+defined in a YAML file. Like `compare`, it is filesystem-only and does
+not write to the historic-runs database.
+
+```bash
+go run ./runner compare-openrpc \
+  --spec ./openrpc.json \
+  --variations ./config/param_variations.yaml \
+  --clients ./config/clients.yaml \
+  --client-refs geth,nethermind \
+  --filter eth_blockNumber,eth_getBlockByNumber \
+  --output ./openrpc-results
+```
+
+Useful debug aids:
+
+- `--filter <m1,m2,...>` — restrict the comparison to a whitelist of
+  method names. Matches the base method name, so `--filter
+  eth_getBlockByNumber` keeps every `eth_getBlockByNumber_variantN`
+  generated from the variations file.
+- `--curl` — log a curl-equivalent command for every JSON-RPC request
+  the comparator makes, useful for reproducing a single call against a
+  client by hand.
+
+Both `comparison-results.json` and `comparison-report.html` are written
+to `--output`.
 
 ### Migrating from the pre-refactor CLI
 
