@@ -224,11 +224,11 @@ func (s *server) loggingMiddleware(next http.Handler) http.Handler {
 		duration := time.Since(start)
 		s.log.WithFields(logrus.Fields{
 			"method":      r.Method,
-			"path":        r.URL.Path,
+			"path":        SanitizeLogValue(r.URL.Path),
 			"status":      wrapper.statusCode,
 			"duration_ms": duration.Milliseconds(),
-			"user_agent":  r.UserAgent(),
-			"remote_addr": r.RemoteAddr,
+			"user_agent":  SanitizeLogValue(r.UserAgent()),
+			"remote_addr": SanitizeLogValue(r.RemoteAddr),
 		}).Info("HTTP request processed")
 	})
 }
@@ -268,6 +268,13 @@ func (s *server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	testName := r.URL.Query().Get("test")
 	limitStr := r.URL.Query().Get("limit")
 
+	if testName != "" {
+		if err := ValidateID("test", testName); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
 	limit := 50 // Default limit
 	if limitStr != "" {
 		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
@@ -302,8 +309,8 @@ func (s *server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	if runID == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -340,8 +347,20 @@ func (s *server) handleGetRunMethods(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
+	if err := ValidateID("runId", runID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// Check if client parameter is provided for filtering
 	clientFilter := r.URL.Query().Get("client")
+
+	if clientFilter != "" {
+		if err := ValidateID("client", clientFilter); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
 	var query string
 	var args []interface{}
@@ -499,8 +518,8 @@ func (s *server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	if runID == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -524,8 +543,12 @@ func (s *server) handleCompareRuns(w http.ResponseWriter, r *http.Request) {
 	runID1 := vars["runId"]
 	runID2 := vars["compareRunId"]
 
-	if runID1 == "" || runID2 == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Both run IDs are required")
+	if err := ValidateID("runId", runID1); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("compareRunId", runID2); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -576,8 +599,8 @@ func (s *server) handleGetTestSummary(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	testName := vars["testName"]
 
-	if testName == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Test name is required")
+	if err := ValidateID("testName", testName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -602,8 +625,8 @@ func (s *server) handleGetTestTrends(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	testName := vars["testName"]
 
-	if testName == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Test name is required")
+	if err := ValidateID("testName", testName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -633,6 +656,13 @@ func (s *server) handleListBaselines(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	testName := r.URL.Query().Get("test")
+
+	if testName != "" {
+		if err := ValidateID("test", testName); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
 	baselines, err := s.baselineManager.ListBaselines(ctx, testName)
 	if err != nil {
@@ -664,8 +694,12 @@ func (s *server) handleCreateBaseline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.RunID == "" || req.Name == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Run ID and name are required")
+	if err := ValidateID("run_id", req.RunID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("name", req.Name); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -685,8 +719,8 @@ func (s *server) handleGetBaseline(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	baselineName := vars["baselineName"]
 
-	if baselineName == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Baseline name is required")
+	if err := ValidateID("baselineName", baselineName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -710,8 +744,8 @@ func (s *server) handleDeleteBaseline(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	baselineName := vars["baselineName"]
 
-	if baselineName == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Baseline name is required")
+	if err := ValidateID("baselineName", baselineName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -739,8 +773,12 @@ func (s *server) handleCompareToBaseline(w http.ResponseWriter, r *http.Request)
 	baselineName := vars["baselineName"]
 	runID := vars["runId"]
 
-	if baselineName == "" || runID == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Baseline name and run ID are required")
+	if err := ValidateID("baselineName", baselineName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("runId", runID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -762,8 +800,8 @@ func (s *server) handleDetectRegressions(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	if runID == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -771,6 +809,17 @@ func (s *server) handleDetectRegressions(w http.ResponseWriter, r *http.Request)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if err := ValidateComparisonMode(req.ComparisonMode); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.BaselineName != "" {
+		if err := ValidateID("baseline_name", req.BaselineName); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	// Set defaults
@@ -810,8 +859,8 @@ func (s *server) handleGetRegressions(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	if runID == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -834,8 +883,8 @@ func (s *server) handleAcknowledgeRegression(w http.ResponseWriter, r *http.Requ
 	vars := mux.Vars(r)
 	regressionID := vars["regressionId"]
 
-	if regressionID == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Regression ID is required")
+	if err := ValidateID("regressionId", regressionID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -849,8 +898,11 @@ func (s *server) handleAcknowledgeRegression(w http.ResponseWriter, r *http.Requ
 		s.writeErrorResponse(w, http.StatusBadRequest, "Acknowledged by is required")
 		return
 	}
+	// AcknowledgedBy is a free-form name; scrub control characters before
+	// it propagates into downstream log fields.
+	acknowledgedBy := SanitizeLogValue(req.AcknowledgedBy)
 
-	err := s.regressionDetector.AcknowledgeRegression(ctx, regressionID, req.AcknowledgedBy)
+	err := s.regressionDetector.AcknowledgeRegression(ctx, regressionID, acknowledgedBy)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeErrorResponse(w, http.StatusNotFound, "Regression not found")
@@ -875,8 +927,8 @@ func (s *server) handleAnalyzeRun(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	runID := vars["runId"]
 
-	if runID == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+	if err := ValidateID("runId", runID); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -897,14 +949,25 @@ func (s *server) handleGetMetricTrends(w http.ResponseWriter, r *http.Request) {
 	testName := vars["testName"]
 	metric := vars["metric"]
 
-	if testName == "" || metric == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Test name and metric are required")
+	if err := ValidateID("testName", testName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("metric", metric); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// Parse query parameters
 	daysStr := r.URL.Query().Get("days")
 	client := r.URL.Query().Get("client")
+
+	if client != "" {
+		if err := ValidateID("client", client); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
 	days := 30 // Default to 30 days
 	if daysStr != "" {
@@ -941,8 +1004,12 @@ func (s *server) handleGetClientTrends(w http.ResponseWriter, r *http.Request) {
 	testName := vars["testName"]
 	client := vars["client"]
 
-	if testName == "" || client == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Test name and client are required")
+	if err := ValidateID("testName", testName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("client", client); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -972,8 +1039,12 @@ func (s *server) handleGetMethodTrends(w http.ResponseWriter, r *http.Request) {
 	testName := vars["testName"]
 	method := vars["method"]
 
-	if testName == "" || method == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Test name and method are required")
+	if err := ValidateID("testName", testName); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := ValidateID("method", method); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -1010,7 +1081,7 @@ func (s *server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Register client
 	s.wsClients[conn] = true
 
-	s.log.WithField("remote_addr", r.RemoteAddr).Info("WebSocket client connected")
+	s.log.WithField("remote_addr", SanitizeLogValue(r.RemoteAddr)).Info("WebSocket client connected")
 
 	// Send initial connection message
 	message := map[string]interface{}{
@@ -1050,7 +1121,7 @@ func (s *server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Unregister client
 	delete(s.wsClients, conn)
-	s.log.WithField("remote_addr", r.RemoteAddr).Info("WebSocket client disconnected")
+	s.log.WithField("remote_addr", SanitizeLogValue(r.RemoteAddr)).Info("WebSocket client disconnected")
 }
 
 // handleWebSocketHub manages WebSocket message broadcasting
