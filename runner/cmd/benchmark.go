@@ -127,7 +127,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		logger.WithError(err).Warn("Failed to unmarshal k6 summary")
 	}
 
-	clientsMetrics, err := metrics.CollectClientsMetrics(cfg, endTime, summaryPath)
+	clientsMetrics, err := metrics.CollectClientsMetrics(cfg, endTime, summaryPath, logger)
 	if err != nil {
 		logger.WithError(err).Warn("Failed to collect benchmark clients metrics")
 	}

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/types"
 
@@ -15,16 +17,14 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-func CollectClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string) (map[string]*types.ClientMetrics, error) {
-	// Gather results from prometheus
+func CollectClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
 	if cfg.Outputs.PrometheusRW != nil {
-		return collectPrometheusClientsMetrics(cfg, timestamp, summaryPath)
+		return collectPrometheusClientsMetrics(cfg, timestamp, summaryPath, logger)
 	}
-	// No valid outputs configured
 	return nil, fmt.Errorf("no outputs configured")
 }
 
-func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string) (map[string]*types.ClientMetrics, error) {
+func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
 	clientsMetrics := make(map[string]*types.ClientMetrics, len(cfg.Calls))
 
 	for _, client := range cfg.ResolvedClients {
@@ -32,10 +32,12 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			Name:              client.Name,
 			Methods:           make(map[string]types.MetricSummary, len(cfg.Calls)),
 			ConnectionMetrics: types.ConnectionMetrics{},
-			ErrorTypes:        make(map[string]int64),
-			StatusCodes:       make(map[int]int64),
-			TotalRequests:     0,
-			TotalErrors:       0,
+			// TODO(post-merge): populate from k6 Prometheus labels (error_code, status).
+			// Tracked separately; not in scope for the develop→main merge.
+			ErrorTypes:    make(map[string]int64),
+			StatusCodes:   make(map[int]int64),
+			TotalRequests: 0,
+			TotalErrors:   0,
 			Latency: types.MetricSummary{
 				Min: 9999999999,
 				Max: 0,
@@ -161,6 +163,8 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		// Update method metrics
 		client.Methods[string(metricMethod)] = method
 	}
+
+	applySummaryFallback(clientsMetrics, cfg, summaryPath, logger)
 
 	for _, client := range clientsMetrics {
 		// Recalculate totals based on method data to ensure accuracy
