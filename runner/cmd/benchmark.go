@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -22,7 +23,8 @@ import (
 var (
 	benchmarkConfigPath        string
 	benchmarkClientsPath       string
-	benchmarkPrometheusRW      string
+	benchmarkPrometheusURL     string
+	benchmarkPrometheusRWPath  string
 	benchmarkPrometheusRWUser  string
 	benchmarkPrometheusRWPass  string
 	benchmarkEnableHistoric    bool
@@ -39,9 +41,10 @@ var benchmarkCmd = &cobra.Command{
 func init() {
 	benchmarkCmd.Flags().StringVar(&benchmarkConfigPath, "config", "", "Path to YAML configuration file")
 	benchmarkCmd.Flags().StringVar(&benchmarkClientsPath, "clients", "", "Path to clients configuration file (optional)")
-	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRW, "prometheus-rw", "http://localhost:9090/api/v1/write", "Prometheus remote write endpoint for metrics")
-	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWUser, "prometheus-rw-user", "", "Prometheus remote write username (optional)")
-	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPass, "prometheus-rw-pass", "", "Prometheus remote write password (optional)")
+	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusURL, "prometheus", "http://localhost:9090", "Prometheus base URL (used directly for queries; remote-write path is appended)")
+	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPath, "prometheus-rw-path", "/api/v1/write", "Path appended to --prometheus to form the remote-write target")
+	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWUser, "prometheus-rw-user", "", "Prometheus basic-auth username (optional)")
+	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPass, "prometheus-rw-pass", "", "Prometheus basic-auth password (optional)")
 	benchmarkCmd.Flags().BoolVar(&benchmarkEnableHistoric, "historic", false, "Persist this run to historic storage")
 	benchmarkCmd.Flags().StringVar(&benchmarkStorageConfigPath, "storage-config", "", "Path to storage configuration file (required with --historic)")
 	benchmarkCmd.Flags().BoolVar(&benchmarkHTMLReport, "html-report", false, "Generate the HTML benchmark report in addition to JSON/CSV")
@@ -53,8 +56,8 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	if benchmarkConfigPath == "" {
 		return fmt.Errorf("--config is required")
 	}
-	if benchmarkPrometheusRW == "" {
-		return fmt.Errorf("--prometheus-rw is required")
+	if benchmarkPrometheusURL == "" {
+		return fmt.Errorf("--prometheus is required")
 	}
 	if benchmarkEnableHistoric && benchmarkStorageConfigPath == "" {
 		return fmt.Errorf("--storage-config is required when --historic is set")
@@ -70,9 +73,15 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	queryURL := strings.TrimRight(benchmarkPrometheusURL, "/")
+	rwPath := benchmarkPrometheusRWPath
+	if !strings.HasPrefix(rwPath, "/") {
+		rwPath = "/" + rwPath
+	}
 	cfg.Outputs = &config.Outputs{
 		PrometheusRW: &config.PrometheusRW{
-			Endpoint: benchmarkPrometheusRW,
+			Endpoint: queryURL + rwPath,
+			QueryURL: queryURL,
 			BasicAuth: config.BasicAuth{
 				Username: benchmarkPrometheusRWUser,
 				Password: benchmarkPrometheusRWPass,

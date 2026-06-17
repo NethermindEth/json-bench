@@ -45,8 +45,15 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		}
 	}
 
-	// Parse prometheus endpoint
-	prometheusURL, err := url.Parse(cfg.Outputs.PrometheusRW.Endpoint)
+	// Parse prometheus endpoint. The query API lives at the base URL; the
+	// remote-write target on cfg.Outputs.PrometheusRW.Endpoint already has
+	// the write path appended and would 404 when the Prometheus client
+	// composes <base>/api/v1/query on top of it.
+	queryAddr := cfg.Outputs.PrometheusRW.QueryURL
+	if queryAddr == "" {
+		queryAddr = cfg.Outputs.PrometheusRW.Endpoint
+	}
+	prometheusURL, err := url.Parse(queryAddr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid prometheus endpoint: %w", err)
 	}

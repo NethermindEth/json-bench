@@ -146,7 +146,14 @@ go run ./runner benchmark --config ./config/read-heavy.yaml --clients ./config/c
 go run ./runner --output ./custom-results benchmark \
   --config ./config/mixed.yaml \
   --clients ./config/clients.yaml \
-  --prometheus-rw http://prometheus:9090/api/v1/write
+  --prometheus http://prometheus:9090
+
+# Override the remote-write path (defaults to /api/v1/write)
+go run ./runner benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --prometheus http://prometheus:9090 \
+  --prometheus-rw-path /custom/remote-write/path
 
 # Generate an HTML report alongside the JSON and CSV exports (off by default)
 go run ./runner benchmark \
@@ -254,11 +261,12 @@ clear error. The mapping is:
 
 | Old | New |
 |---|---|
-| `runner -config ... -prometheus-rw ...` | `runner benchmark --config ... --prometheus-rw ...` |
+| `runner -config ... -prometheus-rw ...` | `runner benchmark --config ... --prometheus ...` |
 | `runner -api -storage-config ... -api-addr ...` | `runner api --storage-config ... --api-addr ...` |
 | `runner -historic-mode -storage-config ... -config ...` | `runner historic --storage-config ... --config ...` |
 | `runner -historic -storage-config ...` (with `-config ...`) | `runner benchmark --historic --storage-config ...` |
-| `-config`, `-clients`, `-output`, `-prometheus-rw`, ... (single dash) | `--config`, `--clients`, `--output`, `--prometheus-rw`, ... (double dash) |
+| `-config`, `-clients`, `-output`, `-prometheus-rw`, ... (single dash) | `--config`, `--clients`, `--output`, `--prometheus`, ... (double dash) |
+| `--prometheus-rw http://host:9090/api/v1/write` (full URL) | `--prometheus http://host:9090` (base only). Override the appended path with `--prometheus-rw-path /api/v1/write` if your deployment is non-standard. |
 
 Additional behaviour changes worth noting:
 

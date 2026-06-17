@@ -15,6 +15,7 @@ import (
 
 var (
 	historicConfigPath        string
+	historicClientsPath       string
 	historicStorageConfigPath string
 )
 
@@ -26,6 +27,7 @@ var historicCmd = &cobra.Command{
 
 func init() {
 	historicCmd.Flags().StringVar(&historicConfigPath, "config", "", "Path to YAML configuration file")
+	historicCmd.Flags().StringVar(&historicClientsPath, "clients", "", "Path to clients configuration file (optional)")
 	historicCmd.Flags().StringVar(&historicStorageConfigPath, "storage-config", "", "Path to storage configuration file")
 	_ = historicCmd.MarkFlagRequired("storage-config")
 }
@@ -37,11 +39,11 @@ func runHistoric(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--config is required")
 	}
 
-	registry, err := loadClientRegistry("")
+	registry, err := loadClientRegistry(historicClientsPath)
 	if err != nil {
 		return err
 	}
-	cfg, err := loadBenchmarkConfig(historicConfigPath, "", registry)
+	cfg, err := loadBenchmarkConfig(historicConfigPath, historicClientsPath, registry)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
@@ -68,6 +70,11 @@ func generateHistoricReport(testName string, historic *storage.HistoricStorage, 
 		return fmt.Errorf("failed to get historic summary: %w", err)
 	}
 	logger.WithFields(logrus.Fields{"total_runs": summary.TotalRuns}).Info("Historic summary retrieved")
+
+	if summary.TotalRuns == 0 {
+		logger.WithField("test_name", testName).Info("No historic runs match the given test_name; nothing to report")
+		return nil
+	}
 
 	trendData, err := historic.GetHistoricTrends(ctx, types.TrendFilter{Since: time.Now().AddDate(0, 0, -30)})
 	if err != nil {

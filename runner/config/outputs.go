@@ -7,8 +7,11 @@ type BasicAuth struct {
 }
 
 // PrometheusRW represents the remote write endpoint of a prometheus server
+// together with the base URL used to issue read queries against the same
+// instance after a benchmark run.
 type PrometheusRW struct {
 	Endpoint  string    `yaml:"endpoint"`
+	QueryURL  string    `yaml:"query_url"`
 	BasicAuth BasicAuth `yaml:"basic_auth"`
 }
 

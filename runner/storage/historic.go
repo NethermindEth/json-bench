@@ -498,11 +498,14 @@ func (h *HistoricStorage) ListHistoricRuns(ctx context.Context, filter types.Run
 	return h.db.ListRuns(filter)
 }
 
-// GetHistoricTrends retrieves historic trend data (placeholder implementation)
+// GetHistoricTrends retrieves historic trend data.
+//
+// Aggregated trend computation is tracked as a post-merge follow-up
+// (see POST_MERGE_FOLLOWUPS.md). Until then we return an empty slice
+// rather than an error so callers degrade to "no trend data" instead
+// of failing the request.
 func (h *HistoricStorage) GetHistoricTrends(ctx context.Context, filter types.TrendFilter) ([]*types.TrendData, error) {
-	// Placeholder implementation - in a full implementation this would
-	// query aggregated trend data from the database
-	return []*types.TrendData{}, fmt.Errorf("not implemented")
+	return []*types.TrendData{}, nil
 }
 
 // DeleteHistoricRun deletes a historic run (placeholder implementation)
@@ -517,10 +520,53 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	return &types.BaselineComparison{}, fmt.Errorf("not implemented")
 }
 
-// GetHistoricSummary retrieves a summary of historic data (placeholder implementation)
+// GetHistoricSummary aggregates a per-test historic snapshot:
+// TotalRuns, FirstRun / LastRun timestamps, BestRun and WorstRun by
+// avg_latency (lowest / highest), and a slice of the most recent runs.
+// Trends, Regressions and Improvements are left empty here; those are
+// produced by dedicated analysers.
 func (h *HistoricStorage) GetHistoricSummary(ctx context.Context, filter types.RunFilter) (*types.HistoricSummary, error) {
-	// Placeholder implementation
-	return &types.HistoricSummary{}, fmt.Errorf("not implemented")
+	allFilter := filter
+	allFilter.Limit = 0
+	allFilter.Offset = 0
+	runs, err := h.db.ListRuns(allFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runs for summary: %w", err)
+	}
+
+	summary := &types.HistoricSummary{
+		TestName:  filter.TestName,
+		TotalRuns: len(runs),
+	}
+	if len(runs) == 0 {
+		return summary, nil
+	}
+
+	// ListRuns orders by timestamp DESC, so runs[0] is newest, runs[len-1] is oldest.
+	summary.LastRun = runs[0].Timestamp
+	summary.FirstRun = runs[len(runs)-1].Timestamp
+
+	best := runs[0]
+	worst := runs[0]
+	for _, r := range runs[1:] {
+		if r.AvgLatency < best.AvgLatency {
+			best = r
+		}
+		if r.AvgLatency > worst.AvgLatency {
+			worst = r
+		}
+	}
+	summary.BestRun = best
+	summary.WorstRun = worst
+
+	const recentRunsCap = 10
+	if len(runs) > recentRunsCap {
+		summary.RecentRuns = runs[:recentRunsCap]
+	} else {
+		summary.RecentRuns = runs
+	}
+
+	return summary, nil
 }
 
 func calculateP99Latency(result *types.BenchmarkResult) float64 {
