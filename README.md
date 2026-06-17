@@ -31,8 +31,9 @@ json-bench/
 │   └── param_variations.yaml
 │
 ├── runner/                   # Go benchmark runner with historic tracking
-│   ├── main.go              # Thin entry point — delegates to cmd.Execute()
-│   ├── cmd/                 # Cobra subcommands (benchmark, api, historic)
+│   ├── main.go              # Thin entry point - delegates to cmd.Execute()
+│   ├── cmd/                 # Cobra subcommands (benchmark, api, historic,
+│   │                        #                    compare, compare-openrpc)
 │   ├── api/                 # HTTP API server and WebSocket support
 │   ├── storage/             # PostgreSQL integration
 │   ├── analysis/            # Trend analysis and regression detection
@@ -49,9 +50,7 @@ json-bench/
 │   ├── grafana-provisioning/
 │   └── dashboards/         # Pre-built Grafana dashboards
 │
-└── cmd/                     # Additional tools
-    ├── compare/            # Response comparison utilities
-    └── compare-openrpc/    # OpenRPC-based comparison tools
+└── cmd/                     # Legacy debug helpers (not built by default)
 ```
 
 ## Getting Started
@@ -121,7 +120,7 @@ The `runner` binary exposes its functionality through subcommands. Running
 `runner` with no subcommand prints usage and exits with status 2.
 
 ```text
-runner benchmark        Run a benchmark (k6 → Prometheus → reports)
+runner benchmark        Run a benchmark (k6 -> Prometheus -> reports)
 runner compare          One-shot cross-client JSON-RPC response comparison
 runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
 runner api              Start the HTTP API server
@@ -130,8 +129,8 @@ runner historic         Generate a historic-analysis report from PostgreSQL
 
 Global flags accepted by every subcommand:
 
-- `--output` (default `outputs/`) — where artefacts are written.
-- `--log-level` — `debug`, `info`, `warn`, or `error`. Falls back to the
+- `--output` (default `outputs/`) - where artefacts are written.
+- `--log-level` - `debug`, `info`, `warn`, or `error`. Falls back to the
   `LOG_LEVEL` environment variable, then `info`.
 
 ### Basic Benchmarking
@@ -148,7 +147,17 @@ go run ./runner --output ./custom-results benchmark \
   --config ./config/mixed.yaml \
   --clients ./config/clients.yaml \
   --prometheus-rw http://prometheus:9090/api/v1/write
+
+# Generate an HTML report alongside the JSON and CSV exports (off by default)
+go run ./runner benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --html-report
 ```
+
+`benchmark` always writes `outputs/results.json` and `outputs/results.csv`.
+The HTML report at `outputs/report.html` is opt-in via `--html-report`.
+`compare` and `compare-openrpc` always produce their HTML report.
 
 ### Historic Tracking & Analysis
 
@@ -184,9 +193,9 @@ go run ./runner api \
 ### One-shot Cross-Client Comparison
 
 `runner compare` runs a one-shot JSON-RPC response comparison across a
-set of clients defined in `clients.yaml`. It is flags-only — there is
-no YAML schema for compare — and is filesystem-only: results are not
-written to the historic-runs database.
+set of clients defined in `clients.yaml`. It is flags-only (no YAML
+schema for compare) and filesystem-only: results are not written to the
+historic-runs database.
 
 ```bash
 go run ./runner compare \
@@ -225,11 +234,11 @@ go run ./runner compare-openrpc \
 
 Useful debug aids:
 
-- `--filter <m1,m2,...>` — restrict the comparison to a whitelist of
+- `--filter <m1,m2,...>` - restrict the comparison to a whitelist of
   method names. Matches the base method name, so `--filter
   eth_getBlockByNumber` keeps every `eth_getBlockByNumber_variantN`
   generated from the variations file.
-- `--curl` — log a curl-equivalent command for every JSON-RPC request
+- `--curl` - log a curl-equivalent command for every JSON-RPC request
   the comparator makes, useful for reproducing a single call against a
   client by hand.
 
@@ -250,6 +259,20 @@ clear error. The mapping is:
 | `runner -historic-mode -storage-config ... -config ...` | `runner historic --storage-config ... --config ...` |
 | `runner -historic -storage-config ...` (with `-config ...`) | `runner benchmark --historic --storage-config ...` |
 | `-config`, `-clients`, `-output`, `-prometheus-rw`, ... (single dash) | `--config`, `--clients`, `--output`, `--prometheus-rw`, ... (double dash) |
+
+Additional behaviour changes worth noting:
+
+- The benchmark `report.html` is opt-in via `--html-report`. JSON and CSV
+  exports remain on by default.
+- The legacy `endpoints + frequency` YAML schema is no longer accepted.
+  Configs using it must be migrated by hand to the `calls:` schema (see
+  `config/mixed.yaml` for the canonical shape). No migrator is provided.
+- The `jsonrpc-benchmark.json` Grafana dashboard has been removed. Its
+  Prometheus queries (`method_calls_*`, `rpc_errors_*`, `rpc_calls_*`)
+  reference custom counters from the pre-refactor k6 template that are
+  no longer emitted. The other three dashboards
+  (`k6-dashboard.json`, `jsonrpc-benchmark-enhanced.json`,
+  `baseline-comparison.json`) remain in place.
 
 **Available API endpoints:**
 

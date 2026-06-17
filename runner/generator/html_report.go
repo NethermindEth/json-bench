@@ -6,7 +6,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/jsonrpc-bench/runner/comparator"
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -316,7 +315,6 @@ type HTMLReportData struct {
 	MethodLatency   map[string]map[string]float64
 	MethodRate      map[string]map[string]float64
 	MethodErrorRate map[string]map[string]float64
-	ResponseDiffs   []types.ResponseDiff
 	ChartData       map[string][]float64
 	ChartColors     []string
 	ChartBorders    []string
@@ -324,20 +322,6 @@ type HTMLReportData struct {
 
 // GenerateHTMLReport generates an HTML report from the benchmark results
 func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outputPath string) error {
-	// Extract response diffs from the result
-	var responseDiffs []types.ResponseDiff
-
-	// If we have comparison results in the benchmark result, convert them to ResponseDiffs
-	if result.ResponseDiff != nil {
-		// First try to get pre-converted diffs
-		if diffs, ok := result.ResponseDiff["diffs"].([]types.ResponseDiff); ok {
-			responseDiffs = diffs
-		} else if compResults, ok := result.ResponseDiff["results"].([]comparator.ComparisonResult); ok {
-			// Convert comparison results to response diffs
-			responseDiffs = ConvertComparisonResults(compResults)
-		}
-	}
-
 	// Prepare chart colors for each client
 	// Colors for: geth, nethermind, besu, erigon, reth, nimbusel, and extras
 	chartColors := []string{
@@ -467,7 +451,6 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 		MethodLatency:   methodLatency,
 		MethodRate:      methodRate,
 		MethodErrorRate: methodErrorRate,
-		ResponseDiffs:   responseDiffs, // Use extracted response diffs
 		ChartData:       chartData,
 		ChartColors:     chartColors,
 		ChartBorders:    chartBorders,

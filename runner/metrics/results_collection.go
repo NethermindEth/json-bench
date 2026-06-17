@@ -33,7 +33,7 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			Methods:           make(map[string]types.MetricSummary, len(cfg.Calls)),
 			ConnectionMetrics: types.ConnectionMetrics{},
 			// TODO(post-merge): populate from k6 Prometheus labels (error_code, status).
-			// Tracked separately; not in scope for the develop→main merge.
+			// Tracked separately; not in scope for the develop->main merge.
 			ErrorTypes:    make(map[string]int64),
 			StatusCodes:   make(map[int]int64),
 			TotalRequests: 0,

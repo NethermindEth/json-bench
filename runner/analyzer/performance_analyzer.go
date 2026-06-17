@@ -284,25 +284,25 @@ func (pa *PerformanceAnalyzer) generateRecommendations(result *types.BenchmarkRe
 		// High error rate recommendations
 		if client.ErrorRate > 10 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("🚨 %s: Critical error rate (%.1f%%). Check server health, connection limits, and timeout settings.",
+				fmt.Sprintf("[CRITICAL] %s: Critical error rate (%.1f%%). Check server health, connection limits, and timeout settings.",
 					name, client.ErrorRate))
 		} else if client.ErrorRate > 5 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("⚠️  %s: Elevated error rate (%.1f%%). Consider increasing timeouts or connection pool size.",
+				fmt.Sprintf("[WARN] %s: Elevated error rate (%.1f%%). Consider increasing timeouts or connection pool size.",
 					name, client.ErrorRate))
 		}
 
 		// High latency recommendations
 		if client.Latency.P95 > 1000 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("🐌 %s: High P95 latency (%.0fms). Investigate slow queries, database locks, or resource constraints.",
+				fmt.Sprintf("[LATENCY] %s: High P95 latency (%.0fms). Investigate slow queries, database locks, or resource constraints.",
 					name, client.Latency.P95))
 		}
 
 		// Connection efficiency
 		if client.ConnectionMetrics.ConnectionReuse < 50 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("🔄 %s: Low connection reuse (%.1f%%). Enable connection pooling or keep-alive to improve performance.",
+				fmt.Sprintf("[CONN] %s: Low connection reuse (%.1f%%). Enable connection pooling or keep-alive to improve performance.",
 					name, client.ConnectionMetrics.ConnectionReuse))
 		}
 
@@ -315,14 +315,14 @@ func (pa *PerformanceAnalyzer) generateRecommendations(result *types.BenchmarkRe
 		}
 		if len(highVarMethods) > 0 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("📊 %s: High latency variability in methods: %v. This indicates inconsistent performance.",
+				fmt.Sprintf("[VARIABILITY] %s: High latency variability in methods: %v. This indicates inconsistent performance.",
 					name, highVarMethods))
 		}
 
 		// DNS/TLS overhead
 		if client.ConnectionMetrics.DNSResolutionTime > 100 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("🌐 %s: Slow DNS resolution (%.0fms). Consider using DNS caching or direct IP connections.",
+				fmt.Sprintf("[DNS] %s: Slow DNS resolution (%.0fms). Consider using DNS caching or direct IP connections.",
 					name, client.ConnectionMetrics.DNSResolutionTime))
 		}
 	}
@@ -330,15 +330,15 @@ func (pa *PerformanceAnalyzer) generateRecommendations(result *types.BenchmarkRe
 	// System-level recommendations
 	if result.Environment.CPUCores < 4 {
 		recommendations = append(recommendations,
-			"💻 System: Limited CPU cores detected. Consider running benchmarks on a more powerful machine for accurate results.")
+			"[SYSTEM] Limited CPU cores detected. Consider running benchmarks on a more powerful machine for accurate results.")
 	}
 
 	// General best practices
 	if len(recommendations) == 0 {
 		recommendations = append(recommendations,
-			"✅ All clients performing well within acceptable parameters.",
-			"💡 Consider increasing load to find performance limits.",
-			"📈 Monitor performance over time to detect regressions.")
+			"[OK] All clients performing well within acceptable parameters.",
+			"[TIP] Consider increasing load to find performance limits.",
+			"[TIP] Monitor performance over time to detect regressions.")
 	}
 
 	return recommendations
@@ -354,7 +354,7 @@ func (pa *PerformanceAnalyzer) DetectRegression(current, baseline *types.Benchma
 			latencyIncrease := ((currentClient.Latency.P95 - baselineClient.Latency.P95) / baselineClient.Latency.P95) * 100
 			if latencyIncrease > 10 {
 				regressions = append(regressions,
-					fmt.Sprintf("⚠️  %s: P95 latency increased by %.1f%% (%.1fms → %.1fms)",
+					fmt.Sprintf("[REGRESSION] %s: P95 latency increased by %.1f%% (%.1fms -> %.1fms)",
 						name, latencyIncrease, baselineClient.Latency.P95, currentClient.Latency.P95))
 			}
 
@@ -362,7 +362,7 @@ func (pa *PerformanceAnalyzer) DetectRegression(current, baseline *types.Benchma
 			errorIncrease := currentClient.ErrorRate - baselineClient.ErrorRate
 			if errorIncrease > 1 {
 				regressions = append(regressions,
-					fmt.Sprintf("🚨 %s: Error rate increased by %.1f%% (%.1f%% → %.1f%%)",
+					fmt.Sprintf("[REGRESSION] %s: Error rate increased by %.1f%% (%.1f%% -> %.1f%%)",
 						name, errorIncrease, baselineClient.ErrorRate, currentClient.ErrorRate))
 			}
 
@@ -372,7 +372,7 @@ func (pa *PerformanceAnalyzer) DetectRegression(current, baseline *types.Benchma
 					throughputDecrease := ((baselineMetrics.Throughput - currentMetrics.Throughput) / baselineMetrics.Throughput) * 100
 					if throughputDecrease > 15 {
 						regressions = append(regressions,
-							fmt.Sprintf("📉 %s/%s: Throughput decreased by %.1f%%",
+							fmt.Sprintf("[REGRESSION] %s/%s: Throughput decreased by %.1f%%",
 								name, method, throughputDecrease))
 					}
 				}

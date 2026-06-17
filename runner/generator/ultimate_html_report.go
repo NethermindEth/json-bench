@@ -375,21 +375,21 @@ const UltimateHTMLReportTemplate = `
         <!-- Key Metrics Dashboard (smaller) -->
         <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
             <div class="metric-card">
-                <div class="metric-icon">📊</div>
+                <div class="metric-icon">REQ</div>
                 <div class="metric-value">{{.TotalRequests}}</div>
                 <div class="metric-label">Total Requests</div>
                 <div class="metric-trend">{{.ActualRPS}} req/s</div>
             </div>
             
             <div class="metric-card">
-                <div class="metric-icon">✅</div>
+                <div class="metric-icon">OK</div>
                 <div class="metric-value">{{printf "%.2f" .OverallSuccessRate}}%</div>
                 <div class="metric-label">Success Rate</div>
                 <div class="metric-trend">{{.TotalSuccess}} successful</div>
             </div>
             
             <div class="metric-card">
-                <div class="metric-icon">⚡</div>
+                <div class="metric-icon">P95</div>
                 <div class="metric-value">{{printf "%.1f" .OverallP95}}ms</div>
                 <div class="metric-label">P95 Latency</div>
                 <div class="metric-trend">95th percentile</div>
@@ -398,7 +398,7 @@ const UltimateHTMLReportTemplate = `
         
         <!-- Detailed Results Tabs -->
         <div class="table-section">
-            <h2 class="chart-title">📋 Detailed Results</h2>
+            <h2 class="chart-title">Detailed Results</h2>
             <div class="tabs">
                 {{range $index, $client := .ClientMetrics}}
                 <button class="tab {{if eq $index 0}}active{{end}}" onclick="showTab('{{$client.Name}}', this)">
@@ -489,7 +489,7 @@ const UltimateHTMLReportTemplate = `
         
         <!-- Environment Information -->
         <div class="chart-section">
-            <h2 class="chart-title">🖥️ Test Environment</h2>
+            <h2 class="chart-title">Test Environment</h2>
             <div class="environment-info">
                 <div class="env-item">
                     <span class="env-label">Operating System</span>
@@ -521,13 +521,13 @@ const UltimateHTMLReportTemplate = `
         <!-- Performance Comparison -->
         {{if .Comparison}}
         <div class="chart-section">
-            <h2 class="chart-title">🏁 Performance Comparison</h2>
+            <h2 class="chart-title">Performance Comparison</h2>
             <div class="comparison-grid">
                 {{range $client, $score := .PerformanceScore}}
                 <div class="comparison-card">
                     <h3>{{$client}}</h3>
                     {{if eq $client $.Comparison.Winner}}
-                    <span class="winner-badge">🥇 Winner</span>
+                    <span class="winner-badge">Winner</span>
                     {{end}}
                     <div style="margin-top: 10px;">
                         <strong>Performance Score:</strong> {{printf "%.1f" $score}}/100
@@ -546,7 +546,7 @@ const UltimateHTMLReportTemplate = `
         <!-- Recommendations -->
         {{if .Recommendations}}
         <div class="chart-section">
-            <h2 class="chart-title">💡 Performance Recommendations</h2>
+            <h2 class="chart-title">Performance Recommendations</h2>
             <ul style="padding-left: 20px;">
                 {{range .Recommendations}}
                 <li style="margin-bottom: 10px;">{{.}}</li>

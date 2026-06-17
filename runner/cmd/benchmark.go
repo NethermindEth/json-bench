@@ -27,11 +27,12 @@ var (
 	benchmarkPrometheusRWPass  string
 	benchmarkEnableHistoric    bool
 	benchmarkStorageConfigPath string
+	benchmarkHTMLReport        bool
 )
 
 var benchmarkCmd = &cobra.Command{
 	Use:   "benchmark",
-	Short: "Run a benchmark (k6 → Prometheus → reports)",
+	Short: "Run a benchmark (k6 -> Prometheus -> reports)",
 	RunE:  runBenchmark,
 }
 
@@ -43,6 +44,7 @@ func init() {
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPass, "prometheus-rw-pass", "", "Prometheus remote write password (optional)")
 	benchmarkCmd.Flags().BoolVar(&benchmarkEnableHistoric, "historic", false, "Persist this run to historic storage")
 	benchmarkCmd.Flags().StringVar(&benchmarkStorageConfigPath, "storage-config", "", "Path to storage configuration file (required with --historic)")
+	benchmarkCmd.Flags().BoolVar(&benchmarkHTMLReport, "html-report", false, "Generate the HTML benchmark report in addition to JSON/CSV")
 }
 
 func runBenchmark(cmd *cobra.Command, args []string) error {
@@ -165,17 +167,19 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	reportPath := filepath.Join(outputDir, "report.html")
-	if err := generator.GenerateUltimateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
-		logger.Warnf("Ultimate report generation failed, falling back to enhanced report: %v", err)
-		if err := generator.GenerateEnhancedHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
-			logger.Warnf("Enhanced report generation failed, falling back to basic report: %v", err)
-			if err := generator.GenerateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
-				return fmt.Errorf("failed to generate HTML report: %w", err)
+	if benchmarkHTMLReport {
+		reportPath := filepath.Join(outputDir, "report.html")
+		if err := generator.GenerateUltimateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
+			logger.Warnf("Ultimate report generation failed, falling back to enhanced report: %v", err)
+			if err := generator.GenerateEnhancedHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
+				logger.Warnf("Enhanced report generation failed, falling back to basic report: %v", err)
+				if err := generator.GenerateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
+					return fmt.Errorf("failed to generate HTML report: %w", err)
+				}
 			}
 		}
+		logger.Infof("Generated HTML report at: %s", reportPath)
 	}
-	logger.Infof("Generated HTML report at: %s", reportPath)
 
 	dataExporter := exporter.NewDataExporter(outputDir)
 	if err := dataExporter.ExportAll(benchmarkResults); err != nil {
