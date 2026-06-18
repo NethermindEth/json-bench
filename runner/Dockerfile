@@ -22,8 +22,10 @@ FROM grafana/k6:1.4.0
 # Use root user for dependencies installation
 USER root
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata curl postgresql-client
+# Refresh base image packages so the pinned grafana/k6:1.4.0 picks up
+# patched libcrypto3/libssl3 from Alpine 3.22's update channel.
+RUN apk --no-cache upgrade && \
+    apk --no-cache add ca-certificates tzdata curl postgresql-client
 
 WORKDIR /app
 
