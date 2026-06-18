@@ -12,6 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/jsonrpc-bench/runner/internal/sanitize"
 	"github.com/jsonrpc-bench/runner/storage"
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -186,8 +187,8 @@ func (bm *baselineManager) Stop() error {
 // SetBaseline creates or updates a performance baseline
 func (bm *baselineManager) SetBaseline(ctx context.Context, runID, name, description string) (*Baseline, error) {
 	bm.log.WithFields(logrus.Fields{
-		"run_id": runID,
-		"name":   name,
+		"run_id": sanitize.LogValue(runID),
+		"name":   sanitize.LogValue(name),
 	}).Info("Setting baseline")
 
 	// Get the historic run to use as baseline
@@ -222,9 +223,9 @@ func (bm *baselineManager) SetBaseline(ctx context.Context, runID, name, descrip
 	}
 
 	bm.log.WithFields(logrus.Fields{
-		"baseline_id": baseline.ID,
-		"name":        name,
-		"test_name":   run.TestName,
+		"baseline_id": sanitize.LogValue(baseline.ID),
+		"name":        sanitize.LogValue(name),
+		"test_name":   sanitize.LogValue(run.TestName),
 	}).Info("Baseline set successfully")
 
 	return baseline, nil
@@ -327,7 +328,7 @@ func (bm *baselineManager) ListBaselines(ctx context.Context, testName string) (
 
 // DeleteBaseline soft deletes a baseline by marking it as inactive
 func (bm *baselineManager) DeleteBaseline(ctx context.Context, name string) error {
-	bm.log.WithField("name", name).Info("Deleting baseline")
+	bm.log.WithField("name", sanitize.LogValue(name)).Info("Deleting baseline")
 
 	query := `UPDATE baselines SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE name = $1`
 	result, err := bm.db.ExecContext(ctx, query, name)
@@ -344,15 +345,15 @@ func (bm *baselineManager) DeleteBaseline(ctx context.Context, name string) erro
 		return fmt.Errorf("baseline not found: %s", name)
 	}
 
-	bm.log.WithField("name", name).Info("Baseline deleted successfully")
+	bm.log.WithField("name", sanitize.LogValue(name)).Info("Baseline deleted successfully")
 	return nil
 }
 
 // CompareToBaseline compares a run against a specific baseline
 func (bm *baselineManager) CompareToBaseline(ctx context.Context, runID, baselineName string) (*BaselineComparison, error) {
 	bm.log.WithFields(logrus.Fields{
-		"run_id":        runID,
-		"baseline_name": baselineName,
+		"run_id":        sanitize.LogValue(runID),
+		"baseline_name": sanitize.LogValue(baselineName),
 	}).Info("Comparing run to baseline")
 
 	// Get the run and baseline
@@ -379,8 +380,8 @@ func (bm *baselineManager) CompareToBaseline(ctx context.Context, runID, baselin
 	}
 
 	bm.log.WithFields(logrus.Fields{
-		"run_id":        runID,
-		"baseline_name": baselineName,
+		"run_id":        sanitize.LogValue(runID),
+		"baseline_name": sanitize.LogValue(baselineName),
 		"status":        comparison.Status,
 		"risk_level":    comparison.RiskLevel,
 	}).Info("Comparison completed")
@@ -431,8 +432,8 @@ func (bm *baselineManager) CompareToAllBaselines(ctx context.Context, runID stri
 // DetectRegressions detects performance regressions compared to a baseline
 func (bm *baselineManager) DetectRegressions(ctx context.Context, runID, baselineName string, thresholds RegressionThresholds) ([]*types.Regression, error) {
 	bm.log.WithFields(logrus.Fields{
-		"run_id":        runID,
-		"baseline_name": baselineName,
+		"run_id":        sanitize.LogValue(runID),
+		"baseline_name": sanitize.LogValue(baselineName),
 	}).Info("Detecting regressions")
 
 	// Get comparison first
@@ -458,8 +459,8 @@ func (bm *baselineManager) DetectRegressions(ctx context.Context, runID, baselin
 	})
 
 	bm.log.WithFields(logrus.Fields{
-		"run_id":            runID,
-		"baseline_name":     baselineName,
+		"run_id":            sanitize.LogValue(runID),
+		"baseline_name":     sanitize.LogValue(baselineName),
 		"regressions_found": len(regressions),
 	}).Info("Regression detection completed")
 

@@ -498,26 +498,350 @@ func (h *HistoricStorage) ListHistoricRuns(ctx context.Context, filter types.Run
 	return h.db.ListRuns(filter)
 }
 
-// GetHistoricTrends retrieves historic trend data.
+// GetHistoricTrends returns one TrendData per top-level run metric
+// (avg_latency, p95_latency, success_rate, total_requests) over the
+// runs matching filter.TestName / GitBranch / Since / Until.
 //
-// Aggregated trend computation is tracked as a post-merge follow-up
-// (see POST_MERGE_FOLLOWUPS.md). Until then we return an empty slice
-// rather than an error so callers degrade to "no trend data" instead
-// of failing the request.
+// Each TrendData carries the raw per-run samples in chronological
+// order; the caller (analysis package, dashboard, etc.) is responsible
+// for any further smoothing. PercentChange is computed first-to-last
+// and Direction is derived from a 1% threshold so flat series read as
+// "stable" rather than spuriously labeled improving/degrading.
 func (h *HistoricStorage) GetHistoricTrends(ctx context.Context, filter types.TrendFilter) ([]*types.TrendData, error) {
-	return []*types.TrendData{}, nil
+	query := `SELECT id, timestamp, git_commit, total_requests, success_rate, avg_latency, p95_latency
+		FROM benchmark_runs WHERE 1=1`
+	args := []interface{}{}
+	idx := 1
+	if filter.TestName != "" {
+		query += fmt.Sprintf(" AND test_name = $%d", idx)
+		args = append(args, filter.TestName)
+		idx++
+	}
+	if filter.GitBranch != "" {
+		query += fmt.Sprintf(" AND git_branch = $%d", idx)
+		args = append(args, filter.GitBranch)
+		idx++
+	}
+	if !filter.Since.IsZero() {
+		query += fmt.Sprintf(" AND timestamp >= $%d", idx)
+		args = append(args, filter.Since)
+		idx++
+	}
+	if !filter.Until.IsZero() {
+		query += fmt.Sprintf(" AND timestamp <= $%d", idx)
+		args = append(args, filter.Until)
+		idx++
+	}
+	query += " ORDER BY timestamp ASC"
+
+	rows, err := h.db.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query benchmark_runs: %w", err)
+	}
+	defer rows.Close()
+
+	type sample struct {
+		ts            time.Time
+		runID         string
+		gitCommit     string
+		totalRequests float64
+		successRate   float64
+		avgLatency    float64
+		p95Latency    float64
+	}
+	var samples []sample
+	for rows.Next() {
+		var s sample
+		var totalRequests int64
+		if err := rows.Scan(&s.runID, &s.ts, &s.gitCommit, &totalRequests, &s.successRate, &s.avgLatency, &s.p95Latency); err != nil {
+			return nil, fmt.Errorf("scan trend row: %w", err)
+		}
+		s.totalRequests = float64(totalRequests)
+		samples = append(samples, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate trend rows: %w", err)
+	}
+
+	if len(samples) == 0 {
+		return []*types.TrendData{}, nil
+	}
+
+	metrics := []struct {
+		name   string
+		select_ func(sample) float64
+	}{
+		{"avg_latency", func(s sample) float64 { return s.avgLatency }},
+		{"p95_latency", func(s sample) float64 { return s.p95Latency }},
+		{"success_rate", func(s sample) float64 { return s.successRate }},
+		{"total_requests", func(s sample) float64 { return s.totalRequests }},
+	}
+
+	period := filter.Interval
+	if period == "" {
+		period = "raw"
+	}
+
+	result := make([]*types.TrendData, 0, len(metrics))
+	for _, m := range metrics {
+		points := make([]types.TrendPoint, 0, len(samples))
+		for _, s := range samples {
+			points = append(points, types.TrendPoint{
+				Timestamp: s.ts,
+				Value:     m.select_(s),
+				RunID:     s.runID,
+				GitCommit: s.gitCommit,
+			})
+		}
+		first, last := points[0].Value, points[len(points)-1].Value
+		var pctChange float64
+		if first != 0 {
+			pctChange = (last - first) / first * 100
+		}
+		direction := "stable"
+		if pctChange > 1 {
+			direction = trendDirectionFor(m.name, true)
+		} else if pctChange < -1 {
+			direction = trendDirectionFor(m.name, false)
+		}
+		result = append(result, &types.TrendData{
+			Period:        period,
+			TrendPoints:   points,
+			Direction:     direction,
+			PercentChange: pctChange,
+		})
+	}
+	return result, nil
 }
 
-// DeleteHistoricRun deletes a historic run (placeholder implementation)
+// trendDirectionFor maps an absolute change direction onto the
+// improving/degrading semantics the dashboard wants. Latency going up
+// is bad; success rate going up is good. metricUp == true means the
+// last sample is larger than the first.
+func trendDirectionFor(metric string, metricUp bool) string {
+	higherIsBetter := metric == "success_rate" || metric == "total_requests"
+	if metricUp == higherIsBetter {
+		return "improving"
+	}
+	return "degrading"
+}
+
+// DeleteHistoricRun removes a run row and best-effort cleans up its
+// per-run files under basePath. The caller (HandleDeleteRun) maps a
+// "run not found" error to HTTP 404; everything else is a 500.
 func (h *HistoricStorage) DeleteHistoricRun(ctx context.Context, runID string) error {
-	// Placeholder implementation
-	return fmt.Errorf("not implemented")
+	tx, err := h.db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Drop dependent rows first so the FK-less per-metric table doesn't
+	// orphan samples whose run has gone away.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM benchmark_metrics WHERE run_id = $1`, runID); err != nil {
+		return fmt.Errorf("delete benchmark_metrics: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, `DELETE FROM benchmark_runs WHERE id = $1`, runID)
+	if err != nil {
+		return fmt.Errorf("delete benchmark_runs: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("run not found: %s", runID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	if h.basePath != "" {
+		runDir := filepath.Join(h.basePath, runID)
+		if err := os.RemoveAll(runDir); err != nil && !os.IsNotExist(err) {
+			h.log.WithError(err).WithField("run_dir", runDir).Warn("Failed to remove run directory")
+		}
+	}
+	return nil
 }
 
-// CompareRuns compares two historic runs (placeholder implementation)
+// CompareRuns produces a BaselineComparison-shaped diff between two
+// runs: runID1 is treated as the baseline (older / reference) and
+// runID2 as the current run under analysis. Per-client/per-method
+// average-latency, p95, and success-rate deltas drive the regression /
+// improvement lists. The CurrentRun slot is filled from the parsed
+// `full_results` blob so the React dashboard sees the same shape it
+// gets from a fresh in-memory comparison.
 func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string) (*types.BaselineComparison, error) {
-	// Placeholder implementation
-	return &types.BaselineComparison{}, fmt.Errorf("not implemented")
+	baselineRun, err := h.db.GetRun(runID1)
+	if err != nil {
+		return nil, fmt.Errorf("get baseline run %s: %w", runID1, err)
+	}
+	currentRun, err := h.db.GetRun(runID2)
+	if err != nil {
+		return nil, fmt.Errorf("get current run %s: %w", runID2, err)
+	}
+
+	current := &types.BenchmarkResult{}
+	if len(currentRun.FullResults) > 0 {
+		if err := json.Unmarshal(currentRun.FullResults, current); err != nil {
+			h.log.WithError(err).WithField("run_id", runID2).Warn("Failed to parse full_results; comparison will use top-level metrics only")
+			current = nil
+		}
+	}
+
+	baseline := &types.BenchmarkResult{}
+	if len(baselineRun.FullResults) > 0 {
+		if err := json.Unmarshal(baselineRun.FullResults, baseline); err != nil {
+			h.log.WithError(err).WithField("run_id", runID1).Warn("Failed to parse baseline full_results; comparison will use top-level metrics only")
+			baseline = nil
+		}
+	}
+
+	comparison := &types.BaselineComparison{
+		BaselineRun: baselineRun,
+		CurrentRun:  current,
+	}
+
+	if baseline == nil || current == nil {
+		// Fall back to the top-level aggregate diff so the API still has
+		// something meaningful to return when full_results is missing.
+		comparison.Summary = summarizeAggregateDiff(baselineRun, currentRun)
+		return comparison, nil
+	}
+
+	regressions, improvements := diffClientMetrics(baseline.ClientMetrics, current.ClientMetrics, runID2, runID1)
+	comparison.Regressions = regressions
+	comparison.Improvements = improvements
+	comparison.Summary = fmt.Sprintf("Compared %s -> %s: %d regression(s), %d improvement(s)",
+		runID1, runID2, len(regressions), len(improvements))
+	return comparison, nil
+}
+
+// summarizeAggregateDiff is the fallback summary used when one or both
+// FullResults blobs are missing or malformed.
+func summarizeAggregateDiff(base, curr *types.HistoricRun) string {
+	avgDelta := pctDelta(base.AvgLatency, curr.AvgLatency)
+	p95Delta := pctDelta(base.P95Latency, curr.P95Latency)
+	succDelta := curr.SuccessRate - base.SuccessRate
+	return fmt.Sprintf("avg_latency %+.2f%%, p95_latency %+.2f%%, success_rate %+.2f pp",
+		avgDelta, p95Delta, succDelta)
+}
+
+func pctDelta(base, curr float64) float64 {
+	if base == 0 {
+		return 0
+	}
+	return (curr - base) / base * 100
+}
+
+// diffClientMetrics walks the per-client/per-method MetricSummary maps
+// and emits a Regression for any (client, method, metric) tuple where
+// the current value is materially worse than the baseline. The 5%
+// threshold matches the analysis package's RegressionThresholds.LatencyThreshold
+// default and the 1pp threshold for success rate matches the API
+// contract.
+func diffClientMetrics(base, curr map[string]*types.ClientMetrics, runID, baselineRunID string) ([]types.Regression, []types.Improvement) {
+	var regressions []types.Regression
+	var improvements []types.Improvement
+	now := time.Now()
+
+	for clientName, currClient := range curr {
+		baseClient, ok := base[clientName]
+		if !ok {
+			continue
+		}
+		for methodName, currMethod := range currClient.Methods {
+			baseMethod, ok := baseClient.Methods[methodName]
+			if !ok {
+				continue
+			}
+
+			for _, m := range []struct {
+				name        string
+				base, curr  float64
+				higherWorse bool
+				threshold   float64
+			}{
+				{"avg_latency", baseMethod.Avg, currMethod.Avg, true, 5},
+				{"p95_latency", baseMethod.P95, currMethod.P95, true, 5},
+				{"success_rate", baseMethod.SuccessRate, currMethod.SuccessRate, false, 1},
+			} {
+				delta := m.curr - m.base
+				pct := pctDelta(m.base, m.curr)
+				worse := (m.higherWorse && pct > m.threshold) || (!m.higherWorse && delta < -m.threshold)
+				better := (m.higherWorse && pct < -m.threshold) || (!m.higherWorse && delta > m.threshold)
+
+				if worse {
+					regressions = append(regressions, types.Regression{
+						ID:             fmt.Sprintf("%s-%s-%s-%s", runID, clientName, methodName, m.name),
+						RunID:          runID,
+						BaselineRunID:  baselineRunID,
+						Client:         clientName,
+						Method:         methodName,
+						Metric:         m.name,
+						BaselineValue:  m.base,
+						CurrentValue:   m.curr,
+						AbsoluteChange: delta,
+						PercentChange:  pct,
+						Severity:       severityFor(pct, m.higherWorse),
+						IsSignificant:  true,
+						DetectedAt:     now,
+					})
+				} else if better {
+					improvements = append(improvements, types.Improvement{
+						ID:             fmt.Sprintf("%s-%s-%s-%s", runID, clientName, methodName, m.name),
+						RunID:          runID,
+						BaselineRunID:  baselineRunID,
+						Client:         clientName,
+						Method:         methodName,
+						Metric:         m.name,
+						BaselineValue:  m.base,
+						CurrentValue:   m.curr,
+						AbsoluteChange: delta,
+						PercentChange:  pct,
+						Significance:   significanceFor(pct, m.higherWorse),
+						DetectedAt:     now,
+					})
+				}
+			}
+		}
+	}
+	return regressions, improvements
+}
+
+func severityFor(pct float64, higherIsWorse bool) string {
+	mag := pct
+	if !higherIsWorse {
+		mag = -pct
+	}
+	switch {
+	case mag > 25:
+		return "critical"
+	case mag > 15:
+		return "high"
+	case mag > 5:
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func significanceFor(pct float64, higherIsWorse bool) string {
+	mag := pct
+	if higherIsWorse {
+		mag = -pct
+	}
+	switch {
+	case mag > 20:
+		return "significant"
+	case mag > 10:
+		return "major"
+	default:
+		return "minor"
+	}
 }
 
 // GetHistoricSummary aggregates a per-test historic snapshot:

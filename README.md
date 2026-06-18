@@ -353,6 +353,26 @@ For advanced time-series analysis and alerting, you can use Grafana:
 
 5. **Set up alerting** for performance regressions and system issues
 
+#### Scraping node-side metrics
+
+This tool only ships k6 client-side metrics (`k6_http_req_*`) to Prometheus.
+It does **not** scrape the Geth/Nethermind/etc. clients under test — bring
+your own observability for server-side metrics. To add them, point your own
+Prometheus at the node's metrics endpoint (each EL client publishes one):
+
+```yaml
+# prometheus.yml — example for a local Geth instance
+scrape_configs:
+  - job_name: 'geth'
+    metrics_path: /debug/metrics/prometheus
+    static_configs:
+      - targets: ['localhost:6060']
+```
+
+If you compose your own Prometheus alongside this stack, add the scrape
+job to that config; the bundled `metrics/prometheus.yml` only handles k6's
+remote-write target.
+
 ### Storage Configuration
 
 Configure PostgreSQL storage for historic tracking. Choose the appropriate configuration file based on your setup:

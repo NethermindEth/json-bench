@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/jsonrpc-bench/runner/internal/sanitize"
 	"github.com/jsonrpc-bench/runner/storage"
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -351,8 +352,8 @@ func (rd *regressionDetector) GetThresholds() map[string]RegressionThreshold {
 // DetectRegressions performs comprehensive regression detection on a run
 func (rd *regressionDetector) DetectRegressions(ctx context.Context, runID string, options DetectionOptions) (*RegressionReport, error) {
 	rd.log.WithFields(logrus.Fields{
-		"run_id":          runID,
-		"comparison_mode": options.ComparisonMode,
+		"run_id":          sanitize.LogValue(runID),
+		"comparison_mode": sanitize.LogValue(options.ComparisonMode),
 	}).Info("Detecting regressions")
 
 	// Get the run
@@ -453,7 +454,7 @@ func (rd *regressionDetector) DetectRegressions(ctx context.Context, runID strin
 	}
 
 	rd.log.WithFields(logrus.Fields{
-		"run_id":            runID,
+		"run_id":            sanitize.LogValue(runID),
 		"regressions_found": len(regressions),
 		"improvements":      len(improvements),
 		"overall_health":    report.Summary.OverallHealthScore,
@@ -465,7 +466,7 @@ func (rd *regressionDetector) DetectRegressions(ctx context.Context, runID strin
 
 // AnalyzeRun performs comprehensive analysis of a single run
 func (rd *regressionDetector) AnalyzeRun(ctx context.Context, runID string) (*RunAnalysis, error) {
-	rd.log.WithField("run_id", runID).Info("Analyzing run")
+	rd.log.WithField("run_id", sanitize.LogValue(runID)).Info("Analyzing run")
 
 	// Get the run
 	run, err := rd.storage.GetHistoricRun(ctx, runID)
@@ -512,7 +513,7 @@ func (rd *regressionDetector) AnalyzeRun(ctx context.Context, runID string) (*Ru
 	analysis.ComparisonHistory = rd.getComparisonHistory(ctx, runID, 5)
 
 	rd.log.WithFields(logrus.Fields{
-		"run_id":        runID,
+		"run_id":        sanitize.LogValue(runID),
 		"health_score":  analysis.OverallHealthScore,
 		"perf_score":    analysis.PerformanceScore,
 		"anomalies":     len(analysis.Anomalies),
@@ -559,7 +560,7 @@ func (rd *regressionDetector) ClassifyRegression(regression *types.Regression) s
 // CompareToSequential compares against previous sequential runs
 func (rd *regressionDetector) CompareToSequential(ctx context.Context, runID string, lookback int) ([]*types.Regression, error) {
 	rd.log.WithFields(logrus.Fields{
-		"run_id":   runID,
+		"run_id":   sanitize.LogValue(runID),
 		"lookback": lookback,
 	}).Info("Comparing to sequential runs")
 
@@ -611,8 +612,8 @@ func (rd *regressionDetector) CompareToSequential(ctx context.Context, runID str
 // CompareToBaseline compares against a specific baseline
 func (rd *regressionDetector) CompareToBaseline(ctx context.Context, runID, baselineName string) ([]*types.Regression, error) {
 	rd.log.WithFields(logrus.Fields{
-		"run_id":        runID,
-		"baseline_name": baselineName,
+		"run_id":        sanitize.LogValue(runID),
+		"baseline_name": sanitize.LogValue(baselineName),
 	}).Info("Comparing to baseline")
 
 	// Use baseline manager to detect regressions
@@ -631,7 +632,7 @@ func (rd *regressionDetector) CompareToBaseline(ctx context.Context, runID, base
 // CompareToRollingAverage compares against rolling average of previous runs
 func (rd *regressionDetector) CompareToRollingAverage(ctx context.Context, runID string, windowSize int) ([]*types.Regression, error) {
 	rd.log.WithFields(logrus.Fields{
-		"run_id":      runID,
+		"run_id":      sanitize.LogValue(runID),
 		"window_size": windowSize,
 	}).Info("Comparing to rolling average")
 
@@ -768,8 +769,8 @@ func (rd *regressionDetector) GetRegressions(ctx context.Context, runID string) 
 // AcknowledgeRegression marks a regression as acknowledged
 func (rd *regressionDetector) AcknowledgeRegression(ctx context.Context, regressionID, acknowledgedBy string) error {
 	rd.log.WithFields(logrus.Fields{
-		"regression_id":   regressionID,
-		"acknowledged_by": acknowledgedBy,
+		"regression_id":   sanitize.LogValue(regressionID),
+		"acknowledged_by": sanitize.LogValue(acknowledgedBy),
 	}).Info("Acknowledging regression")
 
 	query := `

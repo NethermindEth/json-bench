@@ -124,6 +124,7 @@ type RunFilter struct {
 
 // TrendFilter represents filtering criteria for trend analysis
 type TrendFilter struct {
+	TestName  string    `json:"test_name,omitempty"`
 	Client    string    `json:"client,omitempty"`
 	Method    string    `json:"method,omitempty"`
 	GitBranch string    `json:"git_branch,omitempty"`

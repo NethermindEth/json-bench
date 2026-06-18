@@ -43,13 +43,14 @@ clients:
   - erigon
 duration: "30s"
 rps: 100
-endpoints:
-  - method: "eth_blockNumber"
+vus: 1
+calls:
+  - name: "blockNumber"
+    method: "eth_blockNumber"
     params: []
-    frequency: "50%"
-  - method: "eth_chainId"
+  - name: "chainId"
+    method: "eth_chainId"
     params: []
-    frequency: "50%"
 `
 		tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
 		require.NoError(t, err)
@@ -107,10 +108,11 @@ clients:
   - erigon
 duration: "30s"
 rps: 100
-endpoints:
-  - method: "eth_blockNumber"
+vus: 1
+calls:
+  - name: "blockNumber"
+    method: "eth_blockNumber"
     params: []
-    frequency: "100%"
 `
 		tmpFile, err := os.CreateTemp("", "test-new-style-*.yaml")
 		require.NoError(t, err)
@@ -134,16 +136,17 @@ endpoints:
 test_name: "old-style-test"
 description: "Old style configuration"
 clients:
-  - name: "local-geth"
+  - name: "local_geth"
     url: "http://localhost:9545"
-  - name: "local-erigon"
+  - name: "local_erigon"
     url: "http://localhost:9546"
 duration: "30s"
 rps: 100
-endpoints:
-  - method: "eth_blockNumber"
+vus: 1
+calls:
+  - name: "blockNumber"
+    method: "eth_blockNumber"
     params: []
-    frequency: "100%"
 `
 		tmpFile, err := os.CreateTemp("", "test-old-style-*.yaml")
 		require.NoError(t, err)
@@ -157,9 +160,9 @@ endpoints:
 		require.NoError(t, err)
 
 		assert.Equal(t, "old-style-test", config.TestName)
-		assert.Equal(t, []string{"local-geth", "local-erigon"}, config.ClientRefs)
+		assert.Equal(t, []string{"local_geth", "local_erigon"}, config.ClientRefs)
 		assert.Len(t, config.ResolvedClients, 2)
-		assert.Equal(t, "local-geth", config.ResolvedClients[0].Name)
+		assert.Equal(t, "local_geth", config.ResolvedClients[0].Name)
 		assert.Equal(t, "http://localhost:9545", config.ResolvedClients[0].URL)
 	})
 }

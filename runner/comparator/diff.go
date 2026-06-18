@@ -201,7 +201,7 @@ func compareObjects(path string, obj1, obj2 map[string]interface{}) ([]DiffEntry
 
 	// Compare each key
 	for _, key := range keys {
-		keyPath := path
+		var keyPath string
 		if path != "" {
 			keyPath = path + "." + key
 		} else {

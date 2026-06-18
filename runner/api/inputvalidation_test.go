@@ -79,37 +79,3 @@ func TestValidateSeverity(t *testing.T) {
 	}
 }
 
-func TestSanitizeLogValue(t *testing.T) {
-	t.Run("strips CR LF NUL TAB", func(t *testing.T) {
-		got := SanitizeLogValue("hello\r\nworld\x00x\ty")
-		want := "helloworldxy"
-		if got != want {
-			t.Errorf("SanitizeLogValue = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("truncates long input", func(t *testing.T) {
-		input := strings.Repeat("a", maxLogValueLen+50)
-		got := SanitizeLogValue(input)
-		if len(got) != maxLogValueLen+3 { // truncated body + "..."
-			t.Errorf("unexpected length: %d", len(got))
-		}
-		if !strings.HasSuffix(got, "...") {
-			t.Errorf("expected truncation suffix, got %q", got[len(got)-5:])
-		}
-	})
-
-	t.Run("trims surrounding whitespace", func(t *testing.T) {
-		got := SanitizeLogValue("  padded  ")
-		if got != "padded" {
-			t.Errorf("SanitizeLogValue = %q, want %q", got, "padded")
-		}
-	})
-
-	t.Run("passes safe input through", func(t *testing.T) {
-		got := SanitizeLogValue("legit-id_v2.0")
-		if got != "legit-id_v2.0" {
-			t.Errorf("SanitizeLogValue = %q, want passthrough", got)
-		}
-	})
-}

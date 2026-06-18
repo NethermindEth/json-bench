@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,12 +33,10 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			Name:              client.Name,
 			Methods:           make(map[string]types.MetricSummary, len(cfg.Calls)),
 			ConnectionMetrics: types.ConnectionMetrics{},
-			// TODO(post-merge): populate from k6 Prometheus labels (error_code, status).
-			// Tracked separately; not in scope for the develop->main merge.
-			ErrorTypes:    make(map[string]int64),
-			StatusCodes:   make(map[int]int64),
-			TotalRequests: 0,
-			TotalErrors:   0,
+			ErrorTypes:        make(map[string]int64),
+			StatusCodes:       make(map[int]int64),
+			TotalRequests:     0,
+			TotalErrors:       0,
 			Latency: types.MetricSummary{
 				Min: 9999999999,
 				Max: 0,
@@ -155,16 +154,22 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 				client.ConnectionMetrics.TCPHandshakeTime += milliseconds
 			}
 		} else if strings.EqualFold(string(metricName), "k6_http_reqs_total") { // Parse total requests metrics per tags
-			_, isError := sample.Metric["error_code"]
+			errorCode, isError := sample.Metric["error_code"]
 			method.Count += int64(metricValue)
 			if isError {
 				method.ErrorCount += int64(metricValue)
-				// Update rates with latest available values
 				method.ErrorRate = (float64(method.ErrorCount) / float64(method.Count)) * 100
+				if code := strings.TrimSpace(string(errorCode)); code != "" {
+					client.ErrorTypes[code] += int64(metricValue)
+				}
 			} else {
 				method.SuccessCount += int64(metricValue)
-				// Update rates with latest available values
 				method.SuccessRate = (float64(method.SuccessCount) / float64(method.Count)) * 100
+			}
+			if statusLabel, ok := sample.Metric["status"]; ok {
+				if code, err := strconv.Atoi(string(statusLabel)); err == nil {
+					client.StatusCodes[code] += int64(metricValue)
+				}
 			}
 		}
 		// Update method metrics

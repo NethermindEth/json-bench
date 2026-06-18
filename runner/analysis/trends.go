@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/jsonrpc-bench/runner/internal/sanitize"
 	"github.com/jsonrpc-bench/runner/storage"
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -368,7 +369,7 @@ func (ta *trendAnalyzer) Stop() error {
 // CalculateTrends performs comprehensive trend analysis for a test
 func (ta *trendAnalyzer) CalculateTrends(ctx context.Context, testName string, days int) (*TrendAnalysisResult, error) {
 	ta.log.WithFields(logrus.Fields{
-		"test_name": testName,
+		"test_name": sanitize.LogValue(testName),
 		"days":      days,
 	}).Info("Calculating comprehensive trends")
 
@@ -431,7 +432,7 @@ func (ta *trendAnalyzer) CalculateTrends(ctx context.Context, testName string, d
 	}
 
 	ta.log.WithFields(logrus.Fields{
-		"test_name": testName,
+		"test_name": sanitize.LogValue(testName),
 		"metrics":   len(trends),
 		"insights":  len(insights),
 	}).Info("Trend analysis completed")
@@ -442,8 +443,8 @@ func (ta *trendAnalyzer) CalculateTrends(ctx context.Context, testName string, d
 // GetMethodTrends analyzes trends for a specific method
 func (ta *trendAnalyzer) GetMethodTrends(ctx context.Context, testName, method string, days int) (*MethodTrendAnalysis, error) {
 	ta.log.WithFields(logrus.Fields{
-		"test_name": testName,
-		"method":    method,
+		"test_name": sanitize.LogValue(testName),
+		"method":    sanitize.LogValue(method),
 		"days":      days,
 	}).Info("Analyzing method trends")
 
@@ -460,9 +461,9 @@ func (ta *trendAnalyzer) GetMethodTrends(ctx context.Context, testName, method s
 	for _, metric := range metrics {
 		trendData, err := ta.analyzeMethodTrendForMetric(ctx, methodData, metric, method)
 		if err != nil {
-			ta.log.WithError(err).WithFields(logrus.Fields{
-				"method": method,
-				"metric": metric,
+			ta.log.WithError(sanitize.LogError(err)).WithFields(logrus.Fields{
+				"method": sanitize.LogValue(method),
+				"metric": sanitize.LogValue(metric),
 			}).Warn("Failed to analyze method trend")
 			continue
 		}
@@ -491,15 +492,15 @@ func (ta *trendAnalyzer) GetMethodTrends(ctx context.Context, testName, method s
 		Ranking:    ranking,
 	}
 
-	ta.log.WithField("method", method).Info("Method trend analysis completed")
+	ta.log.WithField("method", sanitize.LogValue(method)).Info("Method trend analysis completed")
 	return result, nil
 }
 
 // GetClientTrends analyzes trends for a specific client
 func (ta *trendAnalyzer) GetClientTrends(ctx context.Context, testName, client string, days int) (*ClientTrendAnalysis, error) {
 	ta.log.WithFields(logrus.Fields{
-		"test_name": testName,
-		"client":    client,
+		"test_name": sanitize.LogValue(testName),
+		"client":    sanitize.LogValue(client),
 		"days":      days,
 	}).Info("Analyzing client trends")
 
@@ -516,9 +517,9 @@ func (ta *trendAnalyzer) GetClientTrends(ctx context.Context, testName, client s
 	for _, metric := range metrics {
 		trendData, err := ta.analyzeClientTrendForMetric(ctx, clientData, metric, client)
 		if err != nil {
-			ta.log.WithError(err).WithFields(logrus.Fields{
-				"client": client,
-				"metric": metric,
+			ta.log.WithError(sanitize.LogError(err)).WithFields(logrus.Fields{
+				"client": sanitize.LogValue(client),
+				"metric": sanitize.LogValue(metric),
 			}).Warn("Failed to analyze client trend")
 			continue
 		}
@@ -547,15 +548,15 @@ func (ta *trendAnalyzer) GetClientTrends(ctx context.Context, testName, client s
 		Ranking:    ranking,
 	}
 
-	ta.log.WithField("client", client).Info("Client trend analysis completed")
+	ta.log.WithField("client", sanitize.LogValue(client)).Info("Client trend analysis completed")
 	return result, nil
 }
 
 // CalculateMovingAverage calculates moving averages for a metric
 func (ta *trendAnalyzer) CalculateMovingAverage(ctx context.Context, testName, metric string, windowSize, days int) (*MovingAverageResult, error) {
 	ta.log.WithFields(logrus.Fields{
-		"test_name":   testName,
-		"metric":      metric,
+		"test_name":   sanitize.LogValue(testName),
+		"metric":      sanitize.LogValue(metric),
 		"window_size": windowSize,
 		"days":        days,
 	}).Info("Calculating moving average")
@@ -621,8 +622,8 @@ func (ta *trendAnalyzer) CalculateMovingAverage(ctx context.Context, testName, m
 	}
 
 	ta.log.WithFields(logrus.Fields{
-		"test_name":     testName,
-		"metric":        metric,
+		"test_name":     sanitize.LogValue(testName),
+		"metric":        sanitize.LogValue(metric),
 		"points":        len(points),
 		"smoothness":    smoothness,
 		"trend_clarity": trendClarity,
@@ -693,8 +694,8 @@ func (ta *trendAnalyzer) DetectTrendDirection(ctx context.Context, testName, met
 // ForecastTrend generates forecasts for a metric
 func (ta *trendAnalyzer) ForecastTrend(ctx context.Context, testName, metric string, days, forecastDays int) (*TrendForecast, error) {
 	ta.log.WithFields(logrus.Fields{
-		"test_name":     testName,
-		"metric":        metric,
+		"test_name":     sanitize.LogValue(testName),
+		"metric":        sanitize.LogValue(metric),
 		"days":          days,
 		"forecast_days": forecastDays,
 	}).Info("Generating trend forecast")
@@ -762,8 +763,8 @@ func (ta *trendAnalyzer) ForecastTrend(ctx context.Context, testName, metric str
 	}
 
 	ta.log.WithFields(logrus.Fields{
-		"test_name":   testName,
-		"metric":      metric,
+		"test_name":   sanitize.LogValue(testName),
+		"metric":      sanitize.LogValue(metric),
 		"predictions": len(predictions),
 		"accuracy":    result.Accuracy,
 	}).Info("Trend forecast completed")

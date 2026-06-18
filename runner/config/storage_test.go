@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -755,22 +756,22 @@ func (suite *StorageConfigTestSuite) TestConcurrentConfigOperations() {
 	// Create multiple config files
 	configs := make([]string, 5)
 	for i := 0; i < 5; i++ {
-		configFile := filepath.Join(suite.tempDir, "concurrent_config_"+string(rune(i+'0'))+".yaml")
-		configContent := `
-historic_path: "` + filepath.Join(suite.tempDir, "concurrent_historic_"+string(rune(i+'0'))) + `"
-retention_days: ` + string(rune(30+i)) + `
+		configFile := filepath.Join(suite.tempDir, fmt.Sprintf("concurrent_config_%d.yaml", i))
+		configContent := fmt.Sprintf(`
+historic_path: "%s"
+retention_days: %d
 enable_historic: true
 
 postgresql:
   host: "localhost"
   port: 5432
-  database: "concurrent_db_` + string(rune(i+'0')) + `"
-  user: "user_` + string(rune(i+'0')) + `"
-  max_open_conns: ` + string(rune(10+i)) + `
-  max_idle_conns: ` + string(rune(5+i)) + `
-  metrics_table: "metrics_` + string(rune(i+'0')) + `"
-  runs_table: "runs_` + string(rune(i+'0')) + `"
-`
+  database: "concurrent_db_%d"
+  user: "user_%d"
+  max_open_conns: %d
+  max_idle_conns: %d
+  metrics_table: "metrics_%d"
+  runs_table: "runs_%d"
+`, filepath.Join(suite.tempDir, fmt.Sprintf("concurrent_historic_%d", i)), 30+i, i, i, 10+i, 5+i, i, i)
 
 		err := os.WriteFile(configFile, []byte(configContent), 0644)
 		require.NoError(t, err)

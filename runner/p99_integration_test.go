@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -37,7 +38,7 @@ func TestP99DataFlow(t *testing.T) {
 	defer db.Close()
 
 	// Ensure benchmark_metrics table exists
-	err := storage.RunMigrations(db)
+	err := storage.RunMigrations(db, logrus.New())
 	require.NoError(t, err, "Failed to run migrations")
 
 	// Create test handler function that uses the database

@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/jsonrpc-bench/runner/analysis"
+	"github.com/jsonrpc-bench/runner/internal/sanitize"
 	"github.com/jsonrpc-bench/runner/storage"
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -223,12 +224,12 @@ func (s *server) loggingMiddleware(next http.Handler) http.Handler {
 
 		duration := time.Since(start)
 		s.log.WithFields(logrus.Fields{
-			"method":      r.Method,
-			"path":        SanitizeLogValue(r.URL.Path),
+			"method":      sanitize.LogValue(r.Method),
+			"path":        sanitize.LogValue(r.URL.Path),
 			"status":      wrapper.statusCode,
 			"duration_ms": duration.Milliseconds(),
-			"user_agent":  SanitizeLogValue(r.UserAgent()),
-			"remote_addr": SanitizeLogValue(r.RemoteAddr),
+			"user_agent":  sanitize.LogValue(r.UserAgent()),
+			"remote_addr": sanitize.LogValue(r.RemoteAddr),
 		}).Info("HTTP request processed")
 	})
 }
@@ -319,7 +320,7 @@ func (s *server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeErrorResponse(w, http.StatusNotFound, "Run not found")
 		} else {
-			s.log.WithError(err).Error("Failed to get historic run")
+			s.log.WithError(sanitize.LogError(err)).Error("Failed to get historic run")
 			s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve run")
 		}
 		return
@@ -336,7 +337,7 @@ func (s *server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		s.log.WithError(err).Warn("Failed to get client metrics from database")
 	} else if len(clientMetrics) > 0 {
 		response["client_metrics"] = clientMetrics
-		s.log.WithField("run_id", runID).WithField("client_count", len(clientMetrics)).Debug("Added client metrics to response")
+		s.log.WithField("run_id", sanitize.LogValue(runID)).WithField("client_count", len(clientMetrics)).Debug("Added client metrics to response")
 	}
 
 	s.writeJSONResponse(w, http.StatusOK, response)
@@ -705,7 +706,7 @@ func (s *server) handleCreateBaseline(w http.ResponseWriter, r *http.Request) {
 
 	baseline, err := s.baselineManager.SetBaseline(ctx, req.RunID, req.Name, req.Description)
 	if err != nil {
-		s.log.WithError(err).Error("Failed to create baseline")
+		s.log.WithError(sanitize.LogError(err)).Error("Failed to create baseline")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to create baseline")
 		return
 	}
@@ -729,7 +730,7 @@ func (s *server) handleGetBaseline(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeErrorResponse(w, http.StatusNotFound, "Baseline not found")
 		} else {
-			s.log.WithError(err).Error("Failed to get baseline")
+			s.log.WithError(sanitize.LogError(err)).Error("Failed to get baseline")
 			s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve baseline")
 		}
 		return
@@ -754,7 +755,7 @@ func (s *server) handleDeleteBaseline(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeErrorResponse(w, http.StatusNotFound, "Baseline not found")
 		} else {
-			s.log.WithError(err).Error("Failed to delete baseline")
+			s.log.WithError(sanitize.LogError(err)).Error("Failed to delete baseline")
 			s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to delete baseline")
 		}
 		return
@@ -784,7 +785,7 @@ func (s *server) handleCompareToBaseline(w http.ResponseWriter, r *http.Request)
 
 	comparison, err := s.baselineManager.CompareToBaseline(ctx, runID, baselineName)
 	if err != nil {
-		s.log.WithError(err).Error("Failed to compare to baseline")
+		s.log.WithError(sanitize.LogError(err)).Error("Failed to compare to baseline")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to compare to baseline")
 		return
 	}
@@ -845,7 +846,7 @@ func (s *server) handleDetectRegressions(w http.ResponseWriter, r *http.Request)
 
 	report, err := s.regressionDetector.DetectRegressions(ctx, runID, options)
 	if err != nil {
-		s.log.WithError(err).Error("Failed to detect regressions")
+		s.log.WithError(sanitize.LogError(err)).Error("Failed to detect regressions")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to detect regressions")
 		return
 	}
@@ -900,14 +901,14 @@ func (s *server) handleAcknowledgeRegression(w http.ResponseWriter, r *http.Requ
 	}
 	// AcknowledgedBy is a free-form name; scrub control characters before
 	// it propagates into downstream log fields.
-	acknowledgedBy := SanitizeLogValue(req.AcknowledgedBy)
+	acknowledgedBy := sanitize.LogValue(req.AcknowledgedBy)
 
 	err := s.regressionDetector.AcknowledgeRegression(ctx, regressionID, acknowledgedBy)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeErrorResponse(w, http.StatusNotFound, "Regression not found")
 		} else {
-			s.log.WithError(err).Error("Failed to acknowledge regression")
+			s.log.WithError(sanitize.LogError(err)).Error("Failed to acknowledge regression")
 			s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to acknowledge regression")
 		}
 		return
@@ -934,7 +935,7 @@ func (s *server) handleAnalyzeRun(w http.ResponseWriter, r *http.Request) {
 
 	analysis, err := s.regressionDetector.AnalyzeRun(ctx, runID)
 	if err != nil {
-		s.log.WithError(err).Error("Failed to analyze run")
+		s.log.WithError(sanitize.LogError(err)).Error("Failed to analyze run")
 		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to analyze run")
 		return
 	}
@@ -983,8 +984,10 @@ func (s *server) handleGetMetricTrends(w http.ResponseWriter, r *http.Request) {
 	// Create trend filter
 	since := time.Now().AddDate(0, 0, -days)
 	filter := types.TrendFilter{
-		Client: client,
-		Since:  since,
+		TestName: testName,
+		Client:   client,
+		Method:   metric,
+		Since:    since,
 	}
 
 	trend, err := s.storage.GetHistoricTrends(ctx, filter)
@@ -1081,7 +1084,7 @@ func (s *server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Register client
 	s.wsClients[conn] = true
 
-	s.log.WithField("remote_addr", SanitizeLogValue(r.RemoteAddr)).Info("WebSocket client connected")
+	s.log.WithField("remote_addr", sanitize.LogValue(r.RemoteAddr)).Info("WebSocket client connected")
 
 	// Send initial connection message
 	message := map[string]interface{}{
@@ -1121,7 +1124,7 @@ func (s *server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Unregister client
 	delete(s.wsClients, conn)
-	s.log.WithField("remote_addr", SanitizeLogValue(r.RemoteAddr)).Info("WebSocket client disconnected")
+	s.log.WithField("remote_addr", sanitize.LogValue(r.RemoteAddr)).Info("WebSocket client disconnected")
 }
 
 // handleWebSocketHub manages WebSocket message broadcasting
