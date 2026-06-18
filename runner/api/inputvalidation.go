@@ -3,14 +3,10 @@ package api
 import (
 	"fmt"
 	"regexp"
-	"strings"
 )
 
-const maxLogValueLen = 512
-
 var (
-	idRegex       = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
-	ctrlCharRegex = regexp.MustCompile(`[\x00-\x1f\x7f]`)
+	idRegex = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 
 	validComparisonModes = map[string]struct{}{
 		"sequential":      {},
@@ -62,14 +58,3 @@ func ValidateSeverity(s string) error {
 	return nil
 }
 
-// SanitizeLogValue scrubs ASCII control characters (CR, LF, NUL, etc.) and
-// truncates to maxLogValueLen. Use it for fields that legitimately accept
-// free-form user input but still get logged (request paths, user agents,
-// Grafana query targets, acknowledger names, etc.).
-func SanitizeLogValue(s string) string {
-	s = ctrlCharRegex.ReplaceAllString(s, "")
-	if len(s) > maxLogValueLen {
-		s = s[:maxLogValueLen] + "..."
-	}
-	return strings.TrimSpace(s)
-}

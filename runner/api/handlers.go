@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/jsonrpc-bench/runner/analysis"
+	"github.com/jsonrpc-bench/runner/internal/sanitize"
 	"github.com/jsonrpc-bench/runner/storage"
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -274,7 +275,7 @@ func (h *apiHandlers) HandleGetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.WithField("run_id", runID).Debug("Handling get run request")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Debug("Handling get run request")
 
 	if runID == "" {
 		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
@@ -286,7 +287,7 @@ func (h *apiHandlers) HandleGetRun(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeErrorResponse(w, http.StatusNotFound, "Run not found")
 		} else {
-			h.log.WithError(err).Error("Failed to get historic run")
+			h.log.WithError(sanitize.LogError(err)).Error("Failed to get historic run")
 			h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve run")
 		}
 		return
@@ -322,7 +323,7 @@ func (h *apiHandlers) HandleGetRunMethods(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	h.log.WithField("run_id", runID).Debug("Getting method metrics for run")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Debug("Getting method metrics for run")
 
 	// Query method metrics directly from database
 	// Note: Using MAX aggregation to handle cases where there might be multiple metric entries
@@ -395,7 +396,7 @@ func (h *apiHandlers) HandleGetRunMethods(w http.ResponseWriter, r *http.Request
 
 	// Debug logging for total methods found
 	h.log.WithFields(logrus.Fields{
-		"run_id":       runID,
+		"run_id":       sanitize.LogValue(runID),
 		"method_count": methodCount,
 	}).Debug("Completed processing method metrics")
 
@@ -418,7 +419,7 @@ func (h *apiHandlers) HandleGetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.WithField("run_id", runID).Debug("Handling get report request")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Debug("Handling get report request")
 
 	// Get the run
 	run, err := h.storage.GetHistoricRun(ctx, runID)
@@ -426,7 +427,7 @@ func (h *apiHandlers) HandleGetReport(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeErrorResponse(w, http.StatusNotFound, "Run not found")
 		} else {
-			h.log.WithError(err).Error("Failed to get historic run")
+			h.log.WithError(sanitize.LogError(err)).Error("Failed to get historic run")
 			h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve run")
 		}
 		return
@@ -466,7 +467,7 @@ func (h *apiHandlers) HandleDeleteRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.WithField("run_id", runID).Info("Handling delete run request")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Info("Handling delete run request")
 
 	err := h.storage.DeleteHistoricRun(ctx, runID)
 	if err != nil {
@@ -503,8 +504,8 @@ func (h *apiHandlers) HandleCompareRuns(w http.ResponseWriter, r *http.Request) 
 	}
 
 	h.log.WithFields(logrus.Fields{
-		"run_id_1": runID1,
-		"run_id_2": runID2,
+		"run_id_1": sanitize.LogValue(runID1),
+		"run_id_2": sanitize.LogValue(runID2),
 	}).Debug("Handling compare runs request")
 
 	comparison, err := h.storage.CompareRuns(ctx, runID1, runID2)
@@ -536,7 +537,7 @@ func (h *apiHandlers) HandleListBaselines(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	h.log.WithField("test_name", testName).Debug("Handling list baselines request")
+	h.log.WithField("test_name", sanitize.LogValue(testName)).Debug("Handling list baselines request")
 
 	baselines, err := h.baselineManager.ListBaselines(ctx, testName)
 	if err != nil {
@@ -577,7 +578,7 @@ func (h *apiHandlers) HandleCreateBaseline(w http.ResponseWriter, r *http.Reques
 
 	baseline, err := h.baselineManager.SetBaseline(ctx, req.RunID, req.Name, req.Description)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to create baseline")
+		h.log.WithError(sanitize.LogError(err)).Error("Failed to create baseline")
 		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to create baseline")
 		return
 	}
@@ -596,14 +597,14 @@ func (h *apiHandlers) HandleGetBaseline(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.log.WithField("baseline_name", baselineName).Debug("Handling get baseline request")
+	h.log.WithField("baseline_name", sanitize.LogValue(baselineName)).Debug("Handling get baseline request")
 
 	baseline, err := h.baselineManager.GetBaseline(ctx, baselineName)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeErrorResponse(w, http.StatusNotFound, "Baseline not found")
 		} else {
-			h.log.WithError(err).Error("Failed to get baseline")
+			h.log.WithError(sanitize.LogError(err)).Error("Failed to get baseline")
 			h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to retrieve baseline")
 		}
 		return
@@ -623,14 +624,14 @@ func (h *apiHandlers) HandleDeleteBaseline(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.log.WithField("baseline_name", baselineName).Info("Handling delete baseline request")
+	h.log.WithField("baseline_name", sanitize.LogValue(baselineName)).Info("Handling delete baseline request")
 
 	err := h.baselineManager.DeleteBaseline(ctx, baselineName)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeErrorResponse(w, http.StatusNotFound, "Baseline not found")
 		} else {
-			h.log.WithError(err).Error("Failed to delete baseline")
+			h.log.WithError(sanitize.LogError(err)).Error("Failed to delete baseline")
 			h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to delete baseline")
 		}
 		return
@@ -654,7 +655,7 @@ func (h *apiHandlers) HandleSetBaseline(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.log.WithField("run_id", runID).Info("Handling set baseline request")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Info("Handling set baseline request")
 
 	var req SetBaselineRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -669,7 +670,7 @@ func (h *apiHandlers) HandleSetBaseline(w http.ResponseWriter, r *http.Request) 
 
 	baseline, err := h.baselineManager.SetBaseline(ctx, runID, req.Name, req.Description)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to set baseline")
+		h.log.WithError(sanitize.LogError(err)).Error("Failed to set baseline")
 		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to set baseline")
 		return
 	}
@@ -697,8 +698,8 @@ func (h *apiHandlers) HandleGetTrends(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.log.WithFields(logrus.Fields{
-		"test_name": testName,
-		"days":      SanitizeLogValue(daysStr),
+		"test_name": sanitize.LogValue(testName),
+		"days":      sanitize.LogValue(daysStr),
 	}).Debug("Handling get trends request")
 
 	days := 30 // Default
@@ -742,9 +743,9 @@ func (h *apiHandlers) HandleMethodTrends(w http.ResponseWriter, r *http.Request)
 	}
 
 	h.log.WithFields(logrus.Fields{
-		"test_name": testName,
-		"method":    method,
-		"days":      SanitizeLogValue(daysStr),
+		"test_name": sanitize.LogValue(testName),
+		"method":    sanitize.LogValue(method),
+		"days":      sanitize.LogValue(daysStr),
 	}).Debug("Handling method trends request")
 
 	days := 30 // Default
@@ -788,9 +789,9 @@ func (h *apiHandlers) HandleClientTrends(w http.ResponseWriter, r *http.Request)
 	}
 
 	h.log.WithFields(logrus.Fields{
-		"test_name": testName,
-		"client":    client,
-		"days":      SanitizeLogValue(daysStr),
+		"test_name": sanitize.LogValue(testName),
+		"client":    sanitize.LogValue(client),
+		"days":      sanitize.LogValue(daysStr),
 	}).Debug("Handling client trends request")
 
 	days := 30 // Default
@@ -828,7 +829,7 @@ func (h *apiHandlers) HandleGetRegressions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.log.WithField("run_id", runID).Debug("Handling get regressions request")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Debug("Handling get regressions request")
 
 	regressions, err := h.regressionDetector.GetRegressions(ctx, runID)
 	if err != nil {
@@ -867,7 +868,7 @@ func (h *apiHandlers) HandleDetectRegressions(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	h.log.WithField("run_id", runID).Info("Handling detect regressions request")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Info("Handling detect regressions request")
 
 	var req RegressionDetectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -938,7 +939,7 @@ func (h *apiHandlers) HandleDetectRegressions(w http.ResponseWriter, r *http.Req
 
 	report, err := h.regressionDetector.DetectRegressions(ctx, runID, options)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to detect regressions")
+		h.log.WithError(sanitize.LogError(err)).Error("Failed to detect regressions")
 		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to detect regressions")
 		return
 	}
@@ -957,7 +958,7 @@ func (h *apiHandlers) HandleAcknowledgeRegression(w http.ResponseWriter, r *http
 		return
 	}
 
-	h.log.WithField("regression_id", regressionID).Info("Handling acknowledge regression request")
+	h.log.WithField("regression_id", sanitize.LogValue(regressionID)).Info("Handling acknowledge regression request")
 
 	var req AcknowledgeRegressionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -971,14 +972,14 @@ func (h *apiHandlers) HandleAcknowledgeRegression(w http.ResponseWriter, r *http
 	}
 	// AcknowledgedBy is a free-form name; scrub control characters before
 	// it propagates into downstream log fields.
-	acknowledgedBy := SanitizeLogValue(req.AcknowledgedBy)
+	acknowledgedBy := sanitize.LogValue(req.AcknowledgedBy)
 
 	err := h.regressionDetector.AcknowledgeRegression(ctx, regressionID, acknowledgedBy)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeErrorResponse(w, http.StatusNotFound, "Regression not found")
 		} else {
-			h.log.WithError(err).Error("Failed to acknowledge regression")
+			h.log.WithError(sanitize.LogError(err)).Error("Failed to acknowledge regression")
 			h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to acknowledge regression")
 		}
 		return
@@ -1004,11 +1005,11 @@ func (h *apiHandlers) HandleAnalyzeRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.WithField("run_id", runID).Debug("Handling analyze run request")
+	h.log.WithField("run_id", sanitize.LogValue(runID)).Debug("Handling analyze run request")
 
 	analysis, err := h.regressionDetector.AnalyzeRun(ctx, runID)
 	if err != nil {
-		h.log.WithError(err).Error("Failed to analyze run")
+		h.log.WithError(sanitize.LogError(err)).Error("Failed to analyze run")
 		h.writeErrorResponse(w, http.StatusInternalServerError, "Failed to analyze run")
 		return
 	}
@@ -1045,8 +1046,8 @@ func (h *apiHandlers) HandleGetMetricTrends(w http.ResponseWriter, r *http.Reque
 	}
 
 	h.log.WithFields(logrus.Fields{
-		"test_name": testName,
-		"metric":    metric,
+		"test_name": sanitize.LogValue(testName),
+		"metric":    sanitize.LogValue(metric),
 	}).Debug("Handling get metric trends request")
 
 	days := 30 // Default
@@ -1063,8 +1064,10 @@ func (h *apiHandlers) HandleGetMetricTrends(w http.ResponseWriter, r *http.Reque
 	// Create trend filter
 	since := time.Now().AddDate(0, 0, -days)
 	filter := types.TrendFilter{
-		Client: client,
-		Since:  since,
+		TestName: testName,
+		Client:   client,
+		Method:   metric,
+		Since:    since,
 	}
 
 	// Get basic trend

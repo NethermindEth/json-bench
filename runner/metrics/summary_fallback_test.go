@@ -97,10 +97,11 @@ func TestApplySummaryFallback_FillsMissingPair(t *testing.T) {
 
 	dir := t.TempDir()
 	path := writeSummary(t, dir, map[string]k6MetricValue{
-		"client_geth_method_calls_eth_blockNumber":   {Count: 250},
-		"client_geth_method_latency_eth_blockNumber": {Avg: 12.5, Min: 1, Max: 100, Med: 8, P90: 25, P95: 35, P99: 80},
-		"client_geth_method_errors_eth_blockNumber":  {Count: 5},
-		"client_geth_method_success_eth_blockNumber": {Count: 245},
+		"http_req_duration{req_name:eth_blockNumber,scenario:geth}": {
+			Avg: 12.5, Min: 1, Max: 100, Med: 8, P90: 25, P95: 35, P99: 80,
+		},
+		"http_reqs{req_name:eth_blockNumber,scenario:geth}":       {Count: 250},
+		"http_req_failed{req_name:eth_blockNumber,scenario:geth}": {Rate: 0.02},
 	})
 
 	logger, buf := makeLogger()

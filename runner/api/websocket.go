@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 
+	"github.com/jsonrpc-bench/runner/internal/sanitize"
 	"github.com/jsonrpc-bench/runner/types"
 )
 
@@ -232,9 +233,9 @@ func (h *WSHub) RegisterClient(conn *websocket.Conn, clientID, remoteAddr, userA
 	select {
 	case h.register <- client:
 		h.log.WithFields(logrus.Fields{
-			"client_id":   clientID,
-			"remote_addr": SanitizeLogValue(remoteAddr),
-			"user_agent":  SanitizeLogValue(userAgent),
+			"client_id":   sanitize.LogValue(clientID),
+			"remote_addr": sanitize.LogValue(remoteAddr),
+			"user_agent":  sanitize.LogValue(userAgent),
 		}).Info("WebSocket client registered")
 	case <-h.ctx.Done():
 		h.log.Warn("Cannot register client, hub is shutting down")
@@ -634,8 +635,8 @@ func (c *WSClient) readPump() {
 		default:
 			// Handle other message types as needed
 			c.Hub.log.WithFields(logrus.Fields{
-				"client_id":    c.ID,
-				"message_type": SanitizeLogValue(string(msg.Type)),
+				"client_id":    sanitize.LogValue(c.ID),
+				"message_type": sanitize.LogValue(string(msg.Type)),
 			}).Debug("Received WebSocket message")
 		}
 	}
@@ -704,7 +705,7 @@ func (h *WSHub) HandleWebSocketConnection(upgrader *websocket.Upgrader) func(w h
 
 		h.log.WithFields(logrus.Fields{
 			"client_id":   clientID,
-			"remote_addr": SanitizeLogValue(remoteAddr),
+			"remote_addr": sanitize.LogValue(remoteAddr),
 		}).Info("WebSocket connection established")
 	}
 }

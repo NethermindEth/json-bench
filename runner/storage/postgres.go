@@ -190,7 +190,6 @@ func (d *Database) ListRuns(filter types.RunFilter) ([]*types.HistoricRun, error
 	if !filter.Since.IsZero() {
 		query += fmt.Sprintf(" AND timestamp >= $%d", argCount)
 		args = append(args, filter.Since)
-		argCount++
 	}
 
 	query += " ORDER BY timestamp DESC"
@@ -295,7 +294,6 @@ func (d *Database) QueryMetrics(query types.MetricQuery) ([]types.TimeSeriesMetr
 	if !query.Since.IsZero() {
 		sqlQuery += fmt.Sprintf(" AND time >= $%d", argCount)
 		args = append(args, query.Since)
-		argCount++
 	}
 
 	sqlQuery += " ORDER BY time DESC"

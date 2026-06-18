@@ -4,9 +4,17 @@ extensions:
       extensible: neutralModel
     data:
       - [
-          "github.com/jsonrpc-bench/runner/api",
+          "github.com/jsonrpc-bench/runner/internal/sanitize",
           "",
-          "SanitizeLogValue",
+          "LogValue",
+          "",
+          "summary",
+          "manual",
+        ]
+      - [
+          "github.com/jsonrpc-bench/runner/internal/sanitize",
+          "",
+          "LogError",
           "",
           "summary",
           "manual",

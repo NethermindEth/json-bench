@@ -83,8 +83,6 @@ type ClientMetrics struct {
 	ConnectionMetrics ConnectionMetrics            `json:"connection_metrics"`
 	TimeSeries        map[string][]TimeSeriesPoint `json:"time_series"`
 	SystemMetrics     []SystemMetrics              `json:"system_metrics"`
-	// TODO(post-merge): populate from k6 Prometheus labels (error_code, status).
-	// Tracked separately; not in scope for the develop->main merge.
 	ErrorTypes  map[string]int64 `json:"error_types"`
 	StatusCodes map[int]int64    `json:"status_codes"`
 }
