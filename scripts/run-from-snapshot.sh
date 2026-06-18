@@ -1,4 +1,13 @@
 #!/bin/bash
+set -eo pipefail
+
+# This script relies on Linux overlayfs (`sudo mount -t overlay`); it does not
+# run on macOS or any kernel without overlay support. Fail loudly rather than
+# silently falling back to a different code path.
+if [[ "$(uname -s)" != "Linux" ]]; then
+    echo "Error: $(basename "$0") requires Linux (overlayfs); detected $(uname -s)" >&2
+    exit 1
+fi
 
 # Default configuration
 DATADIR="json-bench-data"
@@ -50,32 +59,49 @@ usage() {
 # Function to download and extract snapshot
 download_snapshot() {
     echo "Downloading snapshot from: $SNAPSHOT_URL"
-    
+
+    # Defend against shell-metacharacter injection in -u/--snapshot-url.
+    # The URL is passed through `docker run -e SNAPSHOT_URL=... sh -c '...wget "$SNAPSHOT_URL"...'`
+    # below, so a value like `http://x'; rm -rf / #` would only matter if we
+    # interpolated it directly. We still validate up front to keep error
+    # output predictable.
+    case "$SNAPSHOT_URL" in
+        http://*|https://*) ;;
+        *)
+            echo "Error: --snapshot-url must be an http(s):// URL"
+            exit 1
+            ;;
+    esac
+
     # Check if snapshot directory already exists
     if [[ -d "$SNAPSHOT_PATH" ]]; then
         echo "Error: Snapshot directory '$SNAPSHOT_PATH' already exists"
         echo "Please remove the existing directory, choose a different path or remove the --snapshot-url flag"
         exit 1
     fi
-    
+
     # Create snapshot directory
     mkdir -p "$SNAPSHOT_PATH"
-    
+
     # Check if Docker is available
     if ! command -v docker &> /dev/null; then
         echo "Error: Docker is required but not installed"
         exit 1
     fi
-    
+
     echo "Using Docker for download and extraction..."
-    # Use Docker approach similar to ethPandaOps quickstart
-    docker run --rm -it \
+    # Pass the URL via the container environment instead of splicing it into
+    # the `sh -c '...'` string. The inner shell expands $SNAPSHOT_URL safely
+    # because it's quoted ("$SNAPSHOT_URL") inside the script and is no longer
+    # part of the outer shell's argv.
+    docker run --rm -i \
+        -e SNAPSHOT_URL="$SNAPSHOT_URL" \
         -v "$(pwd)/$SNAPSHOT_PATH:/data" \
         --entrypoint "/bin/sh" \
         alpine -c \
         'apk add --no-cache wget curl tar zstd && \
         echo "Downloading snapshot..." && \
-        wget --tries=0 --retry-connrefused -O - "'"$SNAPSHOT_URL"'" | \
+        wget --tries=0 --retry-connrefused -O - "$SNAPSHOT_URL" | \
         tar -I zstd -xvf - -C /data'
     
     if [[ $? -ne 0 ]]; then
@@ -330,11 +356,14 @@ run_docker_command() {
         exit 1
     fi
     
-    # Execute Docker command
+    # Execute Docker command. FINAL_ARGS is intentionally unquoted so each
+    # space-separated flag becomes a distinct argv entry to the client; if
+    # callers need a single arg containing spaces they should pass it through
+    # the client's own config file rather than -a.
     docker run --rm -it \
         -v "$MERGED_DIR:/execution-data" \
-        -p $RPC_PORT:$RPC_PORT \
-        ${FINAL_IMAGE} \
+        -p "$RPC_PORT:$RPC_PORT" \
+        "$FINAL_IMAGE" \
         ${FINAL_ARGS}
 }
 

@@ -281,8 +281,6 @@ func (h *apiHandlers) HandleGetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.WithField("run_id", runID).Debug("Handling get run request")
-
 	run, err := h.storage.GetHistoricRun(ctx, runID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -700,7 +698,7 @@ func (h *apiHandlers) HandleGetTrends(w http.ResponseWriter, r *http.Request) {
 
 	h.log.WithFields(logrus.Fields{
 		"test_name": testName,
-		"days":      daysStr,
+		"days":      SanitizeLogValue(daysStr),
 	}).Debug("Handling get trends request")
 
 	days := 30 // Default
@@ -746,7 +744,7 @@ func (h *apiHandlers) HandleMethodTrends(w http.ResponseWriter, r *http.Request)
 	h.log.WithFields(logrus.Fields{
 		"test_name": testName,
 		"method":    method,
-		"days":      daysStr,
+		"days":      SanitizeLogValue(daysStr),
 	}).Debug("Handling method trends request")
 
 	days := 30 // Default
@@ -792,7 +790,7 @@ func (h *apiHandlers) HandleClientTrends(w http.ResponseWriter, r *http.Request)
 	h.log.WithFields(logrus.Fields{
 		"test_name": testName,
 		"client":    client,
-		"days":      daysStr,
+		"days":      SanitizeLogValue(daysStr),
 	}).Debug("Handling client trends request")
 
 	days := 30 // Default

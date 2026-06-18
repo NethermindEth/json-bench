@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
+
+	"github.com/jsonrpc-bench/runner/config"
 )
 
 // OpenRPCSpec represents the structure of an OpenRPC specification
@@ -129,15 +133,15 @@ func LoadMethodsFromOpenRPC(specPath string, variationsPath string) (*Comparison
 
 func loadOpenRPCSpec(specPath string) (*OpenRPCSpec, error) {
 	var data []byte
-	var err error
 
-	// Check if specPath is a URL or a file path
-	if isURL(specPath) {
-		// Download from URL
+	if u, ok := parseRemoteURL(specPath); ok {
+		if err := validateRemoteSpecURL(u); err != nil {
+			return nil, err
+		}
 		client := http.Client{
 			Timeout: 30 * time.Second,
 		}
-		resp, err := client.Get(specPath)
+		resp, err := client.Get(u.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to download OpenRPC spec: %w", err)
 		}
@@ -152,8 +156,11 @@ func loadOpenRPCSpec(specPath string) (*OpenRPCSpec, error) {
 			return nil, fmt.Errorf("failed to read OpenRPC spec: %w", err)
 		}
 	} else {
-		// Read from file
-		data, err = os.ReadFile(specPath)
+		safePath, err := config.SafeReadPath(specPath)
+		if err != nil {
+			return nil, err
+		}
+		data, err = os.ReadFile(safePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read OpenRPC spec file: %w", err)
 		}
@@ -168,7 +175,44 @@ func loadOpenRPCSpec(specPath string) (*OpenRPCSpec, error) {
 	return &spec, nil
 }
 
-// isURL checks if a string is a URL
-func isURL(s string) bool {
-	return len(s) >= 7 && (s[:7] == "http://" || s[:8] == "https://")
+// parseRemoteURL returns the parsed URL and true when specPath looks like an
+// http(s) URL. Anything else (file:// schemes, gopher://, bare strings) is
+// treated as a local file path so the file-read branch can apply its own
+// path-traversal guard via config.SafeReadPath.
+func parseRemoteURL(specPath string) (*url.URL, bool) {
+	u, err := url.Parse(specPath)
+	if err != nil || u.Scheme == "" {
+		return nil, false
+	}
+	switch u.Scheme {
+	case "http", "https":
+		return u, true
+	}
+	return nil, false
+}
+
+// validateRemoteSpecURL rejects URLs whose host is empty, localhost, or a
+// literal IP in a private/loopback/link-local range. This blocks the most
+// common SSRF vectors (cloud metadata endpoints, intranet services) without
+// requiring a DNS lookup on every legitimate URL. Set the env var
+// JSON_BENCH_ALLOW_PRIVATE_SPEC_URL=1 to bypass for trusted local testing.
+func validateRemoteSpecURL(u *url.URL) error {
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("OpenRPC spec URL has no host: %s", u)
+	}
+	if os.Getenv("JSON_BENCH_ALLOW_PRIVATE_SPEC_URL") == "1" {
+		return nil
+	}
+	if host == "localhost" {
+		return fmt.Errorf("OpenRPC spec URL host %q is blocked; set JSON_BENCH_ALLOW_PRIVATE_SPEC_URL=1 to override", host)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return fmt.Errorf("OpenRPC spec URL host %q is in a blocked range; set JSON_BENCH_ALLOW_PRIVATE_SPEC_URL=1 to override", host)
+	}
+	return nil
 }

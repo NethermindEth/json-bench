@@ -55,5 +55,8 @@
     "typescript": "^5.2.2",
     "vite": "^7.0.4",
     "vitest": "^4.1.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }

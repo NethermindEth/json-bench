@@ -1,0 +1,13 @@
+extensions:
+  - addsTo:
+      pack: codeql/go-all
+      extensible: neutralModel
+    data:
+      - [
+          "github.com/jsonrpc-bench/runner/api",
+          "",
+          "SanitizeLogValue",
+          "",
+          "summary",
+          "manual",
+        ]

@@ -10,24 +10,28 @@ import (
 
 // LoadCallsFromFile loads RPC calls from a file
 func LoadCallsFromFile(filePath string, fileType string) ([]RPCCall, error) {
+	safePath, err := SafeReadPath(filePath)
+	if err != nil {
+		return nil, err
+	}
+
 	if fileType == "" {
-		// Auto-detect file type based on extension
-		ext := filepath.Ext(filePath)
+		ext := filepath.Ext(safePath)
 		switch ext {
 		case ".json":
 			fileType = "json"
 		case ".jsonl":
 			fileType = "jsonl"
 		default:
-			return nil, fmt.Errorf("unable to determine file type for %s", filePath)
+			return nil, fmt.Errorf("unable to determine file type for %s", safePath)
 		}
 	}
 
 	switch fileType {
 	case "json":
-		return loadCallsFromJSON(filePath)
+		return loadCallsFromJSON(safePath)
 	case "jsonl":
-		return loadCallsFromJSONL(filePath)
+		return loadCallsFromJSONL(safePath)
 	default:
 		return nil, fmt.Errorf("unsupported file type: %s", fileType)
 	}
