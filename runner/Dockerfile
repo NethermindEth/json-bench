@@ -1,5 +1,5 @@
 # Multi-stage build for Go runner
-FROM golang:1.25.4-alpine AS builder
+FROM golang:1.25.11-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -17,7 +17,7 @@ COPY runner/ ./runner/
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner
 
 # Final stage - minimal runtime image with k6 (base is alpine)
-FROM grafana/k6:1.4.0
+FROM grafana/k6:1.8.0
 
 # Use root user for dependencies installation
 USER root
