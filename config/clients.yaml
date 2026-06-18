@@ -5,79 +5,89 @@
 clients:
   # Geth (Go-Ethereum)
   - name: "geth"
+    type: "geth"
     url: "http://localhost:8545"
     timeout: "30s"
     max_retries: 3
     headers:
       X-Client-Type: "geth"
-  
+
   # Nethermind
   - name: "nethermind"
+    type: "nethermind"
     url: "http://localhost:8546"
     timeout: "30s"
     max_retries: 3
     headers:
       X-Client-Type: "nethermind"
-  
+
   # Reth
   - name: "reth"
+    type: "reth"
     url: "http://localhost:8547"
     timeout: "30s"
     max_retries: 3
     headers:
       X-Client-Type: "reth"
-  
+
   # Erigon (formerly Turbo-Geth)
   - name: "erigon"
+    type: "erigon"
     url: "http://localhost:8548"
     timeout: "30s"
     max_retries: 3
     headers:
       X-Client-Type: "erigon"
-  
+
   # Besu
   - name: "besu"
+    type: "besu"
     url: "http://localhost:8549"
     timeout: "30s"
     max_retries: 3
     headers:
       X-Client-Type: "besu"
-  
+
   # Alternative port configurations (for multi-client setups)
   - name: "geth_40003"
+    type: "geth"
     url: "http://localhost:40003"
     timeout: "30s"
     max_retries: 3
-  
+
   - name: "nethermind_40010"
+    type: "nethermind"
     url: "http://localhost:40010"
     timeout: "30s"
     max_retries: 3
-  
+
   - name: "reth_40017"
+    type: "reth"
     url: "http://localhost:40017"
     timeout: "30s"
     max_retries: 3
-  
+
   - name: "erigon_40024"
+    type: "erigon"
     url: "http://localhost:40024"
     timeout: "30s"
     max_retries: 3
-  
+
   - name: "besu_40031"
+    type: "besu"
     url: "http://localhost:40031"
     timeout: "30s"
     max_retries: 3
-
 # Example configurations for different environments
 # Uncomment and modify as needed:
 
 # # Local development clients
 # - name: "geth_dev"
+#   type: "geth"
 #   url: "http://localhost:8545"
 #   timeout: "30s"
 #   max_retries: 3
-#   
+#
 # - name: "anvil"
 #   url: "http://localhost:8545"
 #   timeout: "30s"
@@ -85,20 +95,23 @@ clients:
 
 # # Testnet configurations
 # - name: "geth_sepolia"
+#   type: "geth"
 #   url: "https://sepolia.infura.io/v3/YOUR_API_KEY"
 #   timeout: "60s"
 #   max_retries: 3
 #   auth:
 #     type: "bearer"
 #     token: "${INFURA_API_TOKEN}"
-#   
+#
 # - name: "nethermind_goerli"
+#   type: "nethermind"
 #   url: "https://goerli.nethermind.io"
 #   timeout: "60s"
 #   max_retries: 3
 
 # # Production configurations
 # - name: "geth_mainnet"
+#   type: "geth"
 #   url: "https://mainnet.infura.io/v3/YOUR_API_KEY"
 #   timeout: "60s"
 #   max_retries: 5
@@ -108,8 +121,9 @@ clients:
 #   rate_limit:
 #     requests_per_second: 100
 #     burst: 10
-#   
+#
 # - name: "alchemy_mainnet"
+#   type: "alchemy"
 #   url: "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY"
 #   timeout: "60s"
 #   max_retries: 5

@@ -23,7 +23,7 @@ contactPoints:
             {{ end }}
         secureSettings:
           authorization_header: "Bearer ${CI_WEBHOOK_TOKEN}"
-          
+
   - orgId: 1
     name: slack-alerts
     receivers:
@@ -44,7 +44,7 @@ contactPoints:
             {{ if .GeneratorURL }}*Dashboard:* {{ .GeneratorURL }}{{ end }}
             {{ end }}
           iconEmoji: ":warning:"
-          
+
   - orgId: 1
     name: discord-alerts
     receivers:
@@ -63,15 +63,14 @@ contactPoints:
             Status: {{ .Status }}
             {{ if .GeneratorURL }}Dashboard: {{ .GeneratorURL }}{{ end }}
             {{ end }}
-          
+
   - orgId: 1
     name: email-alerts
     receivers:
       - uid: email-receiver
         type: email
         settings:
-          addresses:
-            - "${ALERT_EMAIL_ADDRESSES}"
+          addresses: "${ALERT_EMAIL_ADDRESSES}"
           subject: "JSON-RPC Benchmark Alert - {{ .Status }}"
           message: |
             {{ range .Alerts }}
@@ -83,7 +82,7 @@ contactPoints:
             Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
             {{ if .GeneratorURL }}Dashboard: {{ .GeneratorURL }}{{ end }}
             {{ end }}
-            
+
   - orgId: 1
     name: github-issues
     receivers:
@@ -97,16 +96,16 @@ contactPoints:
           message: |
             {{ range .Alerts }}
             ## Performance Regression Alert
-            
+
             **Summary:** {{ .Annotations.summary }}
             **Description:** {{ .Annotations.description }}
             **Severity:** {{ .Labels.severity }}
             **Component:** {{ .Labels.component }}
             **Status:** {{ .Status }}
             **Time:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
-            
+
             {{ if .GeneratorURL }}**Dashboard:** {{ .GeneratorURL }}{{ end }}
-            
+
             ### Labels
             {{ range .Labels.SortedPairs }}
             - **{{ .Name }}:** {{ .Value }}

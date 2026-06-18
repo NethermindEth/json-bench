@@ -5,16 +5,19 @@ This directory contains the complete Grafana integration for the JSON-RPC benchm
 ## Components
 
 ### Data Sources
+
 - **PostgreSQL**: Direct database access for detailed queries and table views
 - **JSON-RPC Bench API**: SimpleJSON datasource pointing to the custom Grafana API endpoints
 - **Prometheus**: For real-time metrics collection (optional)
 
 ### Dashboards
+
 1. **jsonrpc-benchmark-enhanced.json**: Main performance monitoring dashboard
 2. **baseline-comparison.json**: Baseline comparison and regression analysis
 3. **jsonrpc-benchmark.json**: Legacy Prometheus-based dashboard
 
 ### Alerting
+
 - **alerts.yml**: Alert rules for regression detection, error rate spikes, and system monitoring
 - **contact-points.yml**: Modern Grafana alerting contact points (webhooks, email, Slack, Discord)
 - **notification-policies.yml**: Alert routing and escalation policies
@@ -23,12 +26,14 @@ This directory contains the complete Grafana integration for the JSON-RPC benchm
 ## Quick Start
 
 ### 1. Set up environment variables
+
 ```bash
-cp grafana.env.example grafana.env
-# Edit grafana.env with your specific configuration
+cp grafana.env.example .env
+# Edit .env with your specific configuration
 ```
 
 ### 2. Deploy with Docker Compose
+
 ```bash
 # Start the complete stack
 docker-compose -f docker-compose.grafana.yml up -d
@@ -39,11 +44,13 @@ docker-compose -f docker-compose.grafana.yml up -d grafana
 ```
 
 ### 3. Access Grafana
-- URL: http://localhost:3000
+
+- URL: <http://localhost:3000>
 - Username: admin
 - Password: admin (or your configured password)
 
 ### 4. Import Dashboards
+
 Dashboards are automatically provisioned from the `dashboards/` directory.
 
 ## Configuration
@@ -51,6 +58,7 @@ Dashboards are automatically provisioned from the `dashboards/` directory.
 ### Environment Variables
 
 #### Required Variables
+
 ```bash
 # Database
 POSTGRES_DB=jsonrpc_bench
@@ -63,6 +71,7 @@ GF_SECURITY_ADMIN_PASSWORD=your-secure-password
 ```
 
 #### Optional Notification Variables
+
 ```bash
 # Slack Integration
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your-webhook-url
@@ -89,6 +98,7 @@ GITHUB_TOKEN=your-github-token
 ### Data Source Configuration
 
 #### PostgreSQL
+
 ```yaml
 datasources:
   - name: PostgreSQL
@@ -102,6 +112,7 @@ datasources:
 ```
 
 #### JSON-RPC Bench API
+
 ```yaml
 datasources:
   - name: JSON-RPC Bench API
@@ -113,6 +124,7 @@ datasources:
 ## Dashboards
 
 ### Main Dashboard (jsonrpc-benchmark-enhanced.json)
+
 - **Overall Latency Metrics**: Average, P95, P99 latency trends
 - **Client Comparison**: Performance metrics by client (Geth, Nethermind, Besu, Erigon)
 - **Error Rate Monitoring**: Error rate trends and alerts
@@ -121,6 +133,7 @@ datasources:
 - **Regression Detection**: Automated detection of performance regressions
 
 ### Baseline Comparison Dashboard
+
 - **Performance vs Baseline**: Compare current performance against established baselines
 - **Deviation Analysis**: Percentage deviation from baseline metrics
 - **Historical Trends**: Long-term performance trend analysis
@@ -131,28 +144,32 @@ datasources:
 ### Alert Rules
 
 #### High Latency Regression
+
 - **Condition**: Average latency increased by >50% compared to previous 10 minutes
 - **Duration**: 2 minutes
 - **Severity**: Major
 
 #### High Error Rate
+
 - **Condition**: Error rate >5% for 5 minutes
 - **Duration**: 1 minute  
 - **Severity**: Critical
 
 #### Throughput Drop
+
 - **Condition**: Throughput dropped by >30% compared to previous 25 minutes
 - **Duration**: 3 minutes
 - **Severity**: Major
 
 #### No Benchmark Data
+
 - **Condition**: No data received for 15 minutes
 - **Duration**: 5 minutes
 - **Severity**: Major
 
 ### Notification Routing
 
-1. **Critical Alerts**: 
+1. **Critical Alerts**:
    - Immediate CI/CD webhook
    - Slack notification
    - Email to team
@@ -170,6 +187,7 @@ datasources:
 ## API Integration
 
 ### Grafana API Endpoints
+
 The system provides SimpleJSON datasource compatible endpoints:
 
 - `GET /api/grafana/` - Test connection
@@ -179,6 +197,7 @@ The system provides SimpleJSON datasource compatible endpoints:
 - `GET /api/grafana/metrics` - Metrics metadata
 
 ### Supported Metrics
+
 - `{test_name}.{client}.avg_latency`
 - `{test_name}.{client}.p95_latency`
 - `{test_name}.{client}.p99_latency`
@@ -186,6 +205,7 @@ The system provides SimpleJSON datasource compatible endpoints:
 - `{test_name}.{client}.throughput`
 
 ### Aggregation Functions
+
 - `rate({metric})` - Rate of change
 - `delta({metric})` - Difference from previous value
 - `count({metric})` - Count of data points
@@ -193,6 +213,7 @@ The system provides SimpleJSON datasource compatible endpoints:
 ## Database Schema
 
 ### Tables
+
 - **historic_runs**: Benchmark execution results
 - **baselines**: Performance baselines for comparison
 - **regressions**: Detected performance regressions
@@ -200,6 +221,7 @@ The system provides SimpleJSON datasource compatible endpoints:
 - **test_configurations**: Test configuration metadata
 
 ### Key Indexes
+
 - Composite indexes on (test_name, timestamp)
 - GIN indexes on JSONB columns for performance
 - Individual indexes on frequently queried columns
@@ -207,17 +229,20 @@ The system provides SimpleJSON datasource compatible endpoints:
 ## Maintenance
 
 ### Database Cleanup
+
 ```sql
 -- Clean up old data (keeps baselines)
 SELECT cleanup_old_data(90); -- Keep 90 days of data
 ```
 
 ### Backup Recommendations
+
 - Regular PostgreSQL backups of the `jsonrpc_bench` database
 - Grafana dashboard backups (JSON exports)
 - Configuration backups (provisioning files)
 
 ### Monitoring Health
+
 - Grafana health endpoint: `http://localhost:3000/api/health`
 - PostgreSQL connection monitoring
 - Alert delivery verification
@@ -227,26 +252,31 @@ SELECT cleanup_old_data(90); -- Keep 90 days of data
 ### Common Issues
 
 #### Data Source Connection Failed
+
 1. Verify PostgreSQL is running and accessible
 2. Check database credentials in environment variables
 3. Ensure network connectivity between containers
 
 #### No Data in Dashboards
+
 1. Verify the runner service is populating data
 2. Check SimpleJSON datasource configuration
 3. Validate API endpoints are responding
 
 #### Alerts Not Firing
+
 1. Check alert rule conditions and thresholds
 2. Verify notification channel configuration
 3. Review Grafana alerting logs
 
 #### Performance Issues
+
 1. Review database query performance
 2. Check resource allocation for containers
 3. Optimize dashboard refresh intervals
 
 ### Logs
+
 - Grafana logs: `docker logs jsonrpc-bench-grafana`
 - PostgreSQL logs: `docker logs jsonrpc-bench-postgres`
 - Runner API logs: `docker logs jsonrpc-bench-runner`
@@ -263,17 +293,20 @@ SELECT cleanup_old_data(90); -- Keep 90 days of data
 ## Development
 
 ### Adding New Metrics
+
 1. Extend the Grafana API in `runner/api/grafana_api.go`
 2. Update dashboard queries to include new metrics
 3. Add appropriate alert rules if needed
 
 ### Custom Dashboard Development
+
 1. Create dashboards in Grafana UI
 2. Export as JSON
 3. Place in `dashboards/` directory for provisioning
 4. Update variable queries as needed
 
 ### Testing Alerts
+
 ```bash
 # Trigger test alerts
 curl -X POST http://localhost:8080/api/test/alert \
@@ -284,6 +317,7 @@ curl -X POST http://localhost:8080/api/test/alert \
 ## Production Deployment
 
 ### Prerequisites
+
 - Docker and Docker Compose
 - Persistent volume storage
 - Reverse proxy (nginx/traefik) for HTTPS
@@ -291,6 +325,7 @@ curl -X POST http://localhost:8080/api/test/alert \
 - SMTP server for email notifications
 
 ### Environment Specific Configuration
+
 - Update all webhook URLs for production systems
 - Configure proper email settings
 - Set appropriate data retention policies
@@ -299,6 +334,7 @@ curl -X POST http://localhost:8080/api/test/alert \
 - Set up monitoring for the monitoring system
 
 ### Scaling Considerations
+
 - PostgreSQL read replicas for query performance
 - Grafana clustering for high availability
 - Load balancing for API endpoints

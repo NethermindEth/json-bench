@@ -79,7 +79,7 @@ func main() {
 				}
 			}
 		} else {
-			fmt.Println("⚠️  ClientMetrics NOT found in saved full_results!")
+			fmt.Println("[WARN] ClientMetrics NOT found in saved full_results!")
 		}
 	}
 }

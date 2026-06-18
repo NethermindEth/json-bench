@@ -20,21 +20,20 @@ This project runs predefined RPC tests derived from the official Ethereum Execut
 
 ## Project Structure
 
-```
+```dir-tree
 json-bench/
 │
-├── clients/                  # Docker Compose setups for each client
-│   ├── geth/
-│   └── nethermind/
-│
-├── config/                   # YAML test configurations
-│   ├── mixed.yaml           # Mixed workload benchmark
+├── config/                  # YAML test configurations
+│   ├── clients.yaml         # RPC clients configurations
+|   ├── mixed.yaml           # Mixed workload benchmark
 │   ├── read-heavy.yaml      # Read-heavy workload benchmark
 │   ├── storage-example.yaml # Historic storage configuration
 │   └── param_variations.yaml
 │
 ├── runner/                   # Go benchmark runner with historic tracking
-│   ├── main.go              # Main CLI application
+│   ├── main.go              # Thin entry point - delegates to cmd.Execute()
+│   ├── cmd/                 # Cobra subcommands (benchmark, api, historic,
+│   │                        #                    compare, compare-openrpc)
 │   ├── api/                 # HTTP API server and WebSocket support
 │   ├── storage/             # PostgreSQL integration
 │   ├── analysis/            # Trend analysis and regression detection
@@ -47,14 +46,11 @@ json-bench/
 │   │   └── api/            # API client for backend integration
 │   └── dist/               # Built dashboard files
 │
-├── metrics/                 # Prometheus + Grafana configuration
+├── metrics/                 # Postgres + Prometheus + Grafana configuration
 │   ├── grafana-provisioning/
-│   ├── dashboards/         # Pre-built Grafana dashboards
-│   └── docker-compose.grafana.yml
+│   └── dashboards/         # Pre-built Grafana dashboards
 │
-└── cmd/                     # Additional tools
-    ├── compare/            # Response comparison utilities
-    └── compare-openrpc/    # OpenRPC-based comparison tools
+└── cmd/                     # Legacy debug helpers (not built by default)
 ```
 
 ## Getting Started
@@ -64,84 +60,128 @@ json-bench/
 - **Docker and Docker Compose** (for client nodes and infrastructure)
 - **Go 1.20+** (for the benchmark runner)
 - **Node.js 18+** (for the React dashboard)
-- **k6** (for load testing - install from https://k6.io/)
+- **k6** (for load testing - install from <https://k6.io/>)
 - **PostgreSQL** (for historic tracking - included in Docker Compose)
 
 ### Quick Start
 
 1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd json-bench
-   ```
 
-2. **Start the infrastructure (PostgreSQL and Prometheus):**
-   ```bash
-   # Start PostgreSQL and Prometheus for data storage
-   docker-compose -f metrics/docker-compose.grafana.yml up postgres prometheus -d
-   ```
+    ```bash
+    git clone <repository-url>
+    cd json-bench
+    ```
+
+2. **Start the infrastructure (PostgreSQL, Prometheus and Grafana):**
+
+    ```bash
+    # Start Grafana, PostgreSQL and Prometheus
+    docker compose up -d grafana postgres prometheus
+
+    # You can also start the runner API and the dashboard
+    docker compose up -d runner dashboard
+
+    # Or just start everything
+    docker compose up -d
+    ```
 
 3. **Set up your client nodes:**
-   ```bash
-   # Start Ethereum client containers
-   docker-compose up -d geth nethermind
-   
-   # Or configure your own endpoints in the config files
-   ```
+
+    ```bash
+    # Configure your own endpoints in the config files
+    nano config/clients.yaml
+    ```
 
 4. **Run a benchmark:**
-   ```bash
-   # Basic benchmark (no historic tracking)
-   go run ./runner/main.go -config ./config/mixed.yaml
-   
-   # With historic tracking (requires PostgreSQL)
-   go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
-   
-   # View results
-   open results/report.html
-   ```
+
+    ```bash
+    # Basic benchmark (no historic tracking)
+    go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml
+    # With historic tracking (requires PostgreSQL)
+    go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml --historic --storage-config ./config/storage-example.yaml
+
+    # View results
+    open outputs/report.html
+    ```
+
+    **NOTE:** `storage-example.yaml` works out of the box with the docker containers deployed in the compose file.
 
 5. **Access the services:**
+
    - **PostgreSQL**: localhost:5432 (postgres/postgres)
-   - **Prometheus**: http://localhost:9090
-   - **API Server**: http://localhost:8080 (when running with `-api` flag)
-   - **Grafana**: Manual setup required (see Grafana Integration section)
+   - **Prometheus**: <http://localhost:9090>
+   - **Grafana**: <http://localhost:3000> (admin/admin)
+   - **RunnerAPI**: <http://localhost:8082> (if started)
+   - **Dashboard**: <http://localhost:8080> (if started)
 
 ## Usage
+
+The `runner` binary exposes its functionality through subcommands. Running
+`runner` with no subcommand prints usage and exits with status 2.
+
+```text
+runner benchmark        Run a benchmark (k6 -> Prometheus -> reports)
+runner compare          One-shot cross-client JSON-RPC response comparison
+runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
+runner api              Start the HTTP API server
+runner historic         Generate a historic-analysis report from PostgreSQL
+```
+
+Global flags accepted by every subcommand:
+
+- `--output` (default `outputs/`) - where artefacts are written.
+- `--log-level` - `debug`, `info`, `warn`, or `error`. Falls back to the
+  `LOG_LEVEL` environment variable, then `info`.
 
 ### Basic Benchmarking
 
 ```bash
 # Run a mixed workload benchmark
-go run ./runner/main.go -config ./config/mixed.yaml
+go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml
 
 # Run a read-heavy benchmark
-go run ./runner/main.go -config ./config/read-heavy.yaml
+go run ./runner benchmark --config ./config/read-heavy.yaml --clients ./config/clients.yaml
 
-# Run with custom parameters
-go run ./runner/main.go \
-  -config ./config/mixed.yaml \
-  -output ./custom-results \
-  -concurrency 10 \
-  -timeout 60
+# Run with a custom output directory and a non-default Prometheus endpoint
+go run ./runner --output ./custom-results benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --prometheus http://prometheus:9090
+
+# Override the remote-write path (defaults to /api/v1/write)
+go run ./runner benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --prometheus http://prometheus:9090 \
+  --prometheus-rw-path /custom/remote-write/path
+
+# Generate an HTML report alongside the JSON and CSV exports (off by default)
+go run ./runner benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --html-report
 ```
+
+`benchmark` always writes `outputs/results.json` and `outputs/results.csv`.
+The HTML report at `outputs/report.html` is opt-in via `--html-report`.
+`compare` and `compare-openrpc` always produce their HTML report.
 
 ### Historic Tracking & Analysis
 
 Enable historic tracking to store results in PostgreSQL and analyze trends over time:
 
 ```bash
-# Run with historic tracking enabled
-go run ./runner/main.go \
-  -config ./config/mixed.yaml \
-  -historic \
-  -storage-config ./config/storage-example.yaml
+# Persist this benchmark run to PostgreSQL
+go run ./runner benchmark \
+  --config ./config/mixed.yaml \
+  --clients ./config/clients.yaml \
+  --historic \
+  --storage-config ./config/storage-example.yaml
 
-# Run in historic analysis mode (no new benchmark)
-go run ./runner/main.go \
-  -config ./config/mixed.yaml \
-  -historic-mode \
-  -storage-config ./config/storage-example.yaml
+# Generate a historic-analysis report (no new benchmark)
+go run ./runner historic \
+  --config ./config/mixed.yaml \
+  --storage-config ./config/storage-example.yaml
 ```
 
 ### API Server for Real-time Access
@@ -150,14 +190,100 @@ Start the HTTP API server for real-time data access and WebSocket updates:
 
 ```bash
 # Start the API server with historic storage
-go run ./runner/main.go \
-  -api \
-  -storage-config ./config/storage-example.yaml
+go run ./runner api \
+  --storage-config ./config/storage-example.yaml \
+  --api-addr :8081
 
-# API will be available at http://localhost:8080
+# API will be available at http://localhost:8081
 ```
 
+### One-shot Cross-Client Comparison
+
+`runner compare` runs a one-shot JSON-RPC response comparison across a
+set of clients defined in `clients.yaml`. It is flags-only (no YAML
+schema for compare) and filesystem-only: results are not written to the
+historic-runs database.
+
+```bash
+go run ./runner compare \
+  --clients ./config/clients.yaml \
+  --client-refs geth,nethermind \
+  --methods eth_blockNumber,eth_chainId,eth_gasPrice \
+  --output ./comparison-results
+```
+
+Both artefacts are always produced:
+
+- `<output>/comparison-results.json`
+- `<output>/comparison-report.html`
+
+`compare` uses the comparator's default empty-params behaviour for each
+method. Methods that need parameter variations should use
+`compare-openrpc`.
+
+### OpenRPC-Driven Comparison
+
+`runner compare-openrpc` loads the method set from an OpenRPC
+specification and runs the same cross-client comparison as `compare`,
+optionally expanding individual methods into per-parameter variations
+defined in a YAML file. Like `compare`, it is filesystem-only and does
+not write to the historic-runs database.
+
+```bash
+go run ./runner compare-openrpc \
+  --spec ./openrpc.json \
+  --variations ./config/param_variations.yaml \
+  --clients ./config/clients.yaml \
+  --client-refs geth,nethermind \
+  --filter eth_blockNumber,eth_getBlockByNumber \
+  --output ./openrpc-results
+```
+
+Useful debug aids:
+
+- `--filter <m1,m2,...>` - restrict the comparison to a whitelist of
+  method names. Matches the base method name, so `--filter
+  eth_getBlockByNumber` keeps every `eth_getBlockByNumber_variantN`
+  generated from the variations file.
+- `--curl` - log a curl-equivalent command for every JSON-RPC request
+  the comparator makes, useful for reproducing a single call against a
+  client by hand.
+
+Both `comparison-results.json` and `comparison-report.html` are written
+to `--output`.
+
+### Migrating from the pre-refactor CLI
+
+The flag-modal entry point (`runner -api`, `runner -historic-mode`,
+single-dash long flags) has been replaced with explicit Cobra
+subcommands. The old invocations will fail at flag-parse time with a
+clear error. The mapping is:
+
+| Old | New |
+|---|---|
+| `runner -config ... -prometheus-rw ...` | `runner benchmark --config ... --prometheus ...` |
+| `runner -api -storage-config ... -api-addr ...` | `runner api --storage-config ... --api-addr ...` |
+| `runner -historic-mode -storage-config ... -config ...` | `runner historic --storage-config ... --config ...` |
+| `runner -historic -storage-config ...` (with `-config ...`) | `runner benchmark --historic --storage-config ...` |
+| `-config`, `-clients`, `-output`, `-prometheus-rw`, ... (single dash) | `--config`, `--clients`, `--output`, `--prometheus`, ... (double dash) |
+| `--prometheus-rw http://host:9090/api/v1/write` (full URL) | `--prometheus http://host:9090` (base only). Override the appended path with `--prometheus-rw-path /api/v1/write` if your deployment is non-standard. |
+
+Additional behaviour changes worth noting:
+
+- The benchmark `report.html` is opt-in via `--html-report`. JSON and CSV
+  exports remain on by default.
+- The legacy `endpoints + frequency` YAML schema is no longer accepted.
+  Configs using it must be migrated by hand to the `calls:` schema (see
+  `config/mixed.yaml` for the canonical shape). No migrator is provided.
+- The `jsonrpc-benchmark.json` Grafana dashboard has been removed. Its
+  Prometheus queries (`method_calls_*`, `rpc_errors_*`, `rpc_calls_*`)
+  reference custom counters from the pre-refactor k6 template that are
+  no longer emitted. The other three dashboards
+  (`k6-dashboard.json`, `jsonrpc-benchmark-enhanced.json`,
+  `baseline-comparison.json`) remain in place.
+
 **Available API endpoints:**
+
 - `GET /api/runs` - List historic benchmark runs
 - `GET /api/runs/:id` - Get specific run details
 - `GET /api/trends` - Get performance trend data
@@ -185,6 +311,7 @@ npm run preview
 ```
 
 **Dashboard Features:**
+
 - **Dashboard Page**: Overview of recent runs and performance trends
 - **Run Details**: Detailed analysis of individual benchmark runs
 - **Comparison View**: Side-by-side comparison of multiple runs
@@ -194,82 +321,59 @@ npm run preview
 
 ### Grafana Integration
 
-For advanced time-series analysis and alerting, you can set up Grafana manually:
+For advanced time-series analysis and alerting, you can use Grafana:
 
-1. **Install Grafana locally or use Docker:**
+1. **Setup Grafana locally or use Docker:**
+
    ```bash
-   # Using Docker
-   docker run -d --name=grafana -p 3000:3000 grafana/grafana:latest
-   
-   # Or install locally from https://grafana.com/grafana/download
+   docker compose up -d grafana
    ```
 
-2. **Open Grafana**: http://localhost:3000 (admin/admin)
+2. **Open Grafana**: <http://localhost:3000> (admin/admin)
 
-3. **Configure data sources**:
-   - **Prometheus**: 
+3. **Provisioned data sources**:
+   - **Prometheus**:
      - URL: `http://localhost:9090` (or `http://prometheus:9090` if using Docker network)
      - Access: Server (default)
    - **PostgreSQL** (for historic data):
-     - Host: `localhost:5432` (or `postgres:5432` if using Docker network) 
+     - Host: `localhost:5432` (or `postgres:5432` if using Docker network)
      - Database: `jsonrpc_bench`
      - User: `postgres`
      - Password: `postgres`
      - SSL Mode: `disable`
 
-4. **Import dashboards** from `metrics/dashboards/` (if available)
+4. **Provisioned dashboards** from `metrics/dashboards/`
 
-5. **Create custom dashboards** for:
+   - K6 Performance
    - Client performance comparison
-   - Method-specific latency trends  
+   - Method-specific latency trends
    - Error rate monitoring
    - System resource usage
    - Historic trend analysis
 
-6. **Set up alerting** for performance regressions and system issues
-
-### JSON-RPC Response Comparison
-
-Compare JSON-RPC responses across different clients to identify inconsistencies:
-
-```bash
-# Compare using YAML configuration
-go run ./cmd/compare/main.go -config ./config/compare.yaml
-
-# Compare using OpenRPC specification
-go run ./cmd/compare-openrpc/main.go \
-  -spec https://raw.githubusercontent.com/ethereum/execution-apis/main/openrpc.json \
-  -clients "geth:http://localhost:8545,nethermind:http://localhost:8546"
-
-# Compare specific methods with parameter variations
-go run ./cmd/compare-openrpc/main.go \
-  -spec https://raw.githubusercontent.com/ethereum/execution-apis/main/openrpc.json \
-  -variations ./config/param_variations.yaml \
-  -clients "geth:http://localhost:8545,nethermind:http://localhost:8546" \
-  -filter "eth_call,eth_getBalance"
-
-# View comparison results
-open comparison-results/comparison-report.html
-```
+5. **Set up alerting** for performance regressions and system issues
 
 ### Storage Configuration
 
 Configure PostgreSQL storage for historic tracking. Choose the appropriate configuration file based on your setup:
 
 **Local Development (outside Docker):**
+
 ```bash
 # Use storage-example.yaml for local PostgreSQL connection
-go run ./runner/main.go -config ./config/mixed.yaml -historic -storage-config ./config/storage-example.yaml
+go run ./runner benchmark --config ./config/mixed.yaml --historic --storage-config ./config/storage-example.yaml
 ```
 
 **Docker Environment:**
+
 ```bash
 # Use storage-docker.yaml when running inside Docker containers
 # (This config uses 'postgres' hostname which only exists in Docker network)
-docker run ... -storage-config ./config/storage-docker.yaml
+docker run ... api --storage-config ./config/storage-docker.yaml
 ```
 
 **Configuration Examples:**
+
 ```yaml
 # config/storage-example.yaml (for local development)
 historic_path: "./historic"
@@ -336,15 +440,15 @@ clients:
   - name: "nethermind"
     url: "http://localhost:8546"
 
-load_test:
-  target_rps: 500
-  duration: "5m"
-  ramp_duration: "30s"
+rps: 500
+duration: "5m"
 
-endpoints:
-  - method: "eth_blockNumber"
+calls:
+  - name: "my_method_1"
+    method: "eth_blockNumber"
     weight: 20
-  - method: "eth_getBalance"
+  - name: "my_method_2"
+    method: "eth_getBalance"
     params: ["0x742d35Cc641C0532a7D4567bb19f68cE3FdD72cD", "latest"]
     weight: 40
 ```
@@ -370,12 +474,7 @@ Deploy the entire stack using Docker:
 
 ```bash
 # Full stack deployment
-docker-compose -f metrics/docker-compose.grafana.yml up -d
-
-# Build and deploy the dashboard
-cd dashboard
-docker build -t jsonrpc-bench-dashboard .
-docker run -p 3000:80 jsonrpc-bench-dashboard
+docker-compose up -d
 ```
 
 ## Environment Variables
@@ -383,16 +482,11 @@ docker run -p 3000:80 jsonrpc-bench-dashboard
 Configure the application using environment variables:
 
 ```bash
-# Database configuration
-export DATABASE_URL="postgres://user:password@localhost:5432/jsonrpc_bench"
+# Create a copy of the .env.example file
+cp .env.example .env
 
-# API configuration
-export API_PORT=8080
-export LOG_LEVEL=info
-
-# Dashboard configuration (in dashboard/.env)
-VITE_API_URL=http://localhost:8080
-VITE_WS_URL=ws://localhost:8080/api/ws
+# Edit environment configuration
+nano .env
 ```
 
 ## Monitoring and Alerting

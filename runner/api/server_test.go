@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jsonrpc-bench/runner/analysis"
-	"github.com/jsonrpc-bench/runner/storage"
 	"github.com/jsonrpc-bench/runner/types"
 )
 

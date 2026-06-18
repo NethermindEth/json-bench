@@ -1,0 +1,60 @@
+{
+  "options": {
+    "scenarios": {
+      "geth_40003": {
+        "executor": "constant-arrival-rate",
+        "rate": 10,
+        "timeUnit": "1s",
+        "duration": "10s",
+        "preAllocatedVUs": 10,
+        "maxVUs": 100,
+        "env": {
+          "RPC_CLIENT_ENDPOINT": "http://localhost:8545"
+        },
+        "tags": {
+          "client_type": "geth"
+        }
+      },
+      "nethermind_40010": {
+        "executor": "constant-arrival-rate",
+        "rate": 10,
+        "timeUnit": "1s",
+        "duration": "10s",
+        "preAllocatedVUs": 10,
+        "maxVUs": 100,
+        "env": {
+          "RPC_CLIENT_ENDPOINT": "http://localhost:8546"
+        },
+        "tags": {
+          "client_type": "nethermind"
+        }
+      }
+    },
+    "thresholds": {
+      "http_req_failed": [
+        "rate < 0.01"
+      ]
+    },
+    "systemTags": [
+      "scenario",
+      "status",
+      "url",
+      "group",
+      "check",
+      "error",
+      "error_code"
+    ],
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)",
+      "p(99)"
+    ],
+    "tags": {
+      "testid": "Test"
+    }
+  }
+}

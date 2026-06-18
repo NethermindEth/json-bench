@@ -2,7 +2,15 @@
 -- This script initializes the database with required tables and indexes
 
 -- Create Grafana database if it doesn't exist
-CREATE DATABASE IF NOT EXISTS grafana;
+CREATE EXTENSION IF NOT EXISTS dblink;
+
+DO $$
+BEGIN
+    PERFORM dblink_exec('', 'CREATE DATABASE grafana');
+EXCEPTION
+    WHEN duplicate_database THEN
+        RAISE NOTICE 'Database "grafana" already exists, skipping creation.';
+END $$;
 
 -- Create user for Grafana if it doesn't exist
 DO $$
@@ -13,8 +21,20 @@ BEGIN
 END
 $$;
 
--- Grant privileges to grafana user
-GRANT ALL PRIVILEGES ON DATABASE grafana TO grafana;
+-- Grant privileges to grafana user in the grafana database
+DO $$
+BEGIN
+    PERFORM dblink_exec('dbname=grafana', 'GRANT ALL PRIVILEGES ON SCHEMA public TO grafana');
+    PERFORM dblink_exec('dbname=grafana', 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO grafana');
+    PERFORM dblink_exec('dbname=grafana', 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO grafana');
+    PERFORM dblink_exec('dbname=grafana', 'GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO grafana');
+    PERFORM dblink_exec('dbname=grafana', 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO grafana');
+    PERFORM dblink_exec('dbname=grafana', 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO grafana');
+    PERFORM dblink_exec('dbname=grafana', 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO grafana');
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error granting permissions to grafana user: %', SQLERRM;
+END $$;
 
 -- Switch to main database context
 \c jsonrpc_bench;
@@ -286,7 +306,7 @@ SELECT
     'system',
     'info',
     'Database initialized successfully',
-    '{"component": "database", "action": "initialization", "timestamp": "' || NOW() || '"}'::jsonb,
+    jsonb_build_object('component', 'database', 'action', 'initialization', 'timestamp', NOW()),
     'resolved'
 FROM historic_runs hr
 LIMIT 1

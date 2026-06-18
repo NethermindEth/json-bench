@@ -4,16 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
-
-// RPCCall represents a single JSON-RPC call
-type RPCCall struct {
-	Method string        `json:"method"`
-	Params []interface{} `json:"params"`
-}
 
 // LoadCallsFromFile loads RPC calls from a file
 func LoadCallsFromFile(filePath string, fileType string) ([]RPCCall, error) {
@@ -42,7 +35,7 @@ func LoadCallsFromFile(filePath string, fileType string) ([]RPCCall, error) {
 
 // loadCallsFromJSON loads RPC calls from a JSON file
 func loadCallsFromJSON(filePath string) ([]RPCCall, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -91,53 +84,4 @@ func loadCallsFromJSONL(filePath string) ([]RPCCall, error) {
 	}
 
 	return calls, nil
-}
-
-// ExpandEndpointsWithFiles expands endpoints that reference files into individual calls
-func ExpandEndpointsWithFiles(endpoints []Endpoint) ([]Endpoint, error) {
-	var expandedEndpoints []Endpoint
-
-	for _, endpoint := range endpoints {
-		if endpoint.File != "" {
-			// Load calls from file
-			calls, err := LoadCallsFromFile(endpoint.File, endpoint.FileType)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load calls from %s: %w", endpoint.File, err)
-			}
-
-			// Create an endpoint for each call, distributing the frequency
-			if len(calls) > 0 {
-				// Parse frequency percentage
-				freq := endpoint.Frequency
-				if freq[len(freq)-1] == '%' {
-					freq = freq[:len(freq)-1]
-				}
-				var totalFreq int
-				fmt.Sscanf(freq, "%d", &totalFreq)
-
-				// Distribute frequency among calls
-				baseFreq := totalFreq / len(calls)
-				remainder := totalFreq % len(calls)
-
-				for i, call := range calls {
-					// Add 1 to the first 'remainder' calls to handle rounding
-					callFreq := baseFreq
-					if i < remainder {
-						callFreq++
-					}
-
-					expandedEndpoints = append(expandedEndpoints, Endpoint{
-						Method:    call.Method,
-						Params:    call.Params,
-						Frequency: fmt.Sprintf("%d%%", callFreq),
-					})
-				}
-			}
-		} else {
-			// Regular endpoint without file
-			expandedEndpoints = append(expandedEndpoints, endpoint)
-		}
-	}
-
-	return expandedEndpoints, nil
 }

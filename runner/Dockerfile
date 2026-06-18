@@ -1,5 +1,5 @@
 # Multi-stage build for Go runner
-FROM golang:1.25.10-alpine AS builder
+FROM golang:1.25.11-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -12,16 +12,20 @@ RUN go mod download
 
 # Copy source code
 COPY runner/ ./runner/
-COPY config/ ./config/
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner
 
-# Final stage - minimal runtime image
-FROM alpine:latest
+# Final stage - minimal runtime image with k6 (base is alpine)
+FROM grafana/k6:1.8.0
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata curl postgresql-client
+# Use root user for dependencies installation
+USER root
+
+# Refresh base image packages so the pinned grafana/k6:1.4.0 picks up
+# patched libcrypto3/libssl3 from Alpine 3.22's update channel.
+RUN apk --no-cache upgrade && \
+    apk --no-cache add ca-certificates tzdata curl postgresql-client
 
 WORKDIR /app
 
@@ -31,7 +35,6 @@ RUN addgroup -g 1001 -S appgroup && \
 
 # Copy binary from builder
 COPY --from=builder /app/jsonrpc-bench-runner /app/jsonrpc-bench-runner
-COPY --from=builder /app/config /app/config
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/results /app/historic && \
@@ -39,10 +42,6 @@ RUN mkdir -p /app/results /app/historic && \
 
 # Switch to non-root user
 USER appuser
-
-# Health check with longer start period and more frequent checks
-HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
-    CMD curl -f http://localhost:8081/api/health || exit 1
 
 # Default entrypoint
 ENTRYPOINT ["/app/jsonrpc-bench-runner"]

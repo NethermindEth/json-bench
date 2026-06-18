@@ -39,13 +39,13 @@ func SaveToHistoric(historicStorage *storage.HistoricStorage, result *types.Benc
 }
 
 // InitializeHistoricStorage creates and initializes historic storage if enabled
-func InitializeHistoricStorage(storageConfigPath string) (*storage.HistoricStorage, error) {
+func InitializeHistoricStorage(storageConfigPath string, logger *logrus.Logger) (*storage.HistoricStorage, error) {
 	if storageConfigPath == "" {
 		return nil, fmt.Errorf("storage configuration path not provided")
 	}
 
 	// Load storage configuration
-	log := logrus.WithField("component", "historic_integration")
+	log := logger.WithField("component", "historic_integration")
 	storageCfg, err := config.LoadStorageConfig(storageConfigPath, log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load storage configuration: %w", err)
@@ -56,7 +56,7 @@ func InitializeHistoricStorage(storageConfigPath string) (*storage.HistoricStora
 	}
 
 	// Create historic storage
-	historicStorage, err := storage.NewHistoricStorage(storageCfg)
+	historicStorage, err := storage.NewHistoricStorage(storageCfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create historic storage: %w", err)
 	}

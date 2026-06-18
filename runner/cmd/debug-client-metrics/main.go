@@ -107,7 +107,7 @@ func debugClientMetrics(runID string, storageConfigPath string, logger *logrus.L
 	}
 
 	if len(clientMetrics) == 0 {
-		fmt.Println("\n⚠️  No client metrics found in full_results")
+		fmt.Println("\n[WARN] No client metrics found in full_results")
 		fmt.Println("This run may not have per-client data stored.")
 	} else {
 		fmt.Printf("\nRaw full_results size: %d bytes\n", len(runInfo.FullResults))
@@ -171,13 +171,13 @@ func debugClientMetrics(runID string, storageConfigPath string, logger *logrus.L
 	fmt.Println("\n\nRecommendations:")
 	fmt.Println("-" + string(make([]byte, 70)) + "-")
 	if len(clientMetrics) == 0 {
-		fmt.Println("❌ No per-client metrics found. Possible causes:")
+		fmt.Println("[FAIL] No per-client metrics found. Possible causes:")
 		fmt.Println("   1. The benchmark was run before per-client tracking was implemented")
 		fmt.Println("   2. The K6 script is not correctly collecting per-client metrics")
 		fmt.Println("   3. The metrics parser failed to extract client-specific data")
 		fmt.Println("\n   Action: Re-run the benchmark with the latest version")
 	} else {
-		fmt.Println("✅ Per-client metrics are available")
+		fmt.Println("[OK] Per-client metrics are available")
 		fmt.Println("   - Data is properly stored in the database")
 		fmt.Println("   - API should return client_metrics in the response")
 		fmt.Println("   - UI should display individual client performance")

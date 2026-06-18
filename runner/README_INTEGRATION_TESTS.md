@@ -5,11 +5,13 @@ This directory contains comprehensive integration tests for the JSON-RPC Benchma
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Go 1.23+
 - Docker (for testcontainers tests)
 - PostgreSQL (for basic tests, optional if using testcontainers)
 
 ### Run All Tests
+
 ```bash
 # Basic integration tests (requires local PostgreSQL)
 make test-integration
@@ -46,6 +48,7 @@ make test-quick
 ## 🎯 Common Use Cases
 
 ### Development Testing
+
 ```bash
 # Test specific functionality
 make test-scenario-1    # Fresh system setup
@@ -55,6 +58,7 @@ make test-websocket    # WebSocket functionality
 ```
 
 ### Performance Validation
+
 ```bash
 # Performance and load testing
 make test-performance
@@ -63,6 +67,7 @@ make bench-performance
 ```
 
 ### CI/CD Pipeline
+
 ```bash
 # Suitable for CI environments
 make ci-test          # Full CI test suite
@@ -70,6 +75,7 @@ make ci-quick         # Quick CI validation
 ```
 
 ### Debugging and Development
+
 ```bash
 # Debug mode with verbose logging
 make test-debug
@@ -80,6 +86,7 @@ make test-race        # Race condition detection
 ## 📊 Test Coverage
 
 ### ✅ Functional Coverage
+
 - Historic run storage and retrieval
 - Trend analysis and regression detection
 - Baseline management and comparisons
@@ -90,6 +97,7 @@ make test-race        # Race condition detection
 - File storage operations
 
 ### ✅ Non-Functional Coverage
+
 - Performance under load (100+ concurrent operations)
 - Memory usage monitoring and limits
 - Concurrent access and race condition testing
@@ -99,6 +107,7 @@ make test-race        # Race condition detection
 - Resource cleanup and garbage collection
 
 ### ✅ Database Coverage
+
 - PostgreSQL-specific features (JSONB, arrays, full-text search)
 - Transaction handling and rollback scenarios
 - Migration up/down operations
@@ -109,6 +118,7 @@ make test-race        # Race condition detection
 ## 🔧 Configuration
 
 ### Environment Variables
+
 ```bash
 export INTEGRATION_TESTS=1        # Enable basic integration tests
 export TESTCONTAINERS_TESTS=1     # Enable testcontainers tests
@@ -116,6 +126,7 @@ export LOG_LEVEL=debug             # Enable debug logging
 ```
 
 ### Database Configuration
+
 ```bash
 # For local PostgreSQL testing
 export TEST_DB_HOST=localhost
@@ -140,6 +151,7 @@ export TEST_DB_PASSWORD=postgres
 ### Common Issues
 
 **Database Connection Failed**
+
 ```bash
 # Check PostgreSQL is running
 pg_ctl status
@@ -148,6 +160,7 @@ make test-containers
 ```
 
 **Docker Not Available**
+
 ```bash
 # Verify Docker installation
 docker --version
@@ -157,12 +170,14 @@ make setup-docker
 ```
 
 **Test Timeouts**
+
 ```bash
 # Increase timeout for long-running tests
 go test -timeout 20m -v ./runner
 ```
 
 ### Cleanup
+
 ```bash
 # Clean up test artifacts and containers
 make clean
@@ -180,12 +195,14 @@ make clean-all
 ## 🤝 Contributing
 
 ### Adding New Tests
+
 1. Follow the `TestScenario{N}_{Description}` naming convention
 2. Include setup, execution, and validation phases
 3. Add configuration to `test_config.yaml`
 4. Update documentation
 
 ### Performance Testing Guidelines
+
 - Set realistic performance thresholds
 - Monitor resource usage (memory, CPU, connections)
 - Include both success and failure scenarios
@@ -194,6 +211,7 @@ make clean-all
 ## 📋 Make Targets Reference
 
 ### Essential Commands
+
 ```bash
 make help               # Show all available targets
 make setup              # Set up test environment
@@ -204,6 +222,7 @@ make clean              # Clean up test artifacts
 ```
 
 ### Scenario-Specific Tests
+
 ```bash
 make test-scenario-1    # Fresh System Setup
 make test-scenario-2    # Trend Analysis
@@ -215,6 +234,7 @@ make test-scenario-7    # System Recovery
 ```
 
 ### Advanced Testing
+
 ```bash
 make test-performance   # Performance and load tests
 make test-race          # Race condition detection

@@ -27,17 +27,27 @@ func (cl *ConfigLoader) LoadTestConfig(filename string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read test config file: %w", err)
 	}
 
+	// Substitute environment variables
+	content := string(data)
+	substituted, err := SubstituteEnvVars(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute environment variables: %w", err)
+	}
+	data = []byte(substituted)
+
 	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal test config: %w", err)
 	}
 
-	// Expand endpoints that reference files
-	expandedEndpoints, err := ExpandEndpointsWithFiles(config.Endpoints)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based endpoints: %w", err)
+	// Load calls that reference files
+	for _, call := range config.Calls {
+		if call.File != "" {
+			if err := call.LoadFile(); err != nil {
+				return nil, fmt.Errorf("failed to load file for call: %w", err)
+			}
+		}
 	}
-	config.Endpoints = expandedEndpoints
 
 	// Validate the configuration
 	if err := validateConfig(&config); err != nil {
@@ -85,6 +95,14 @@ func (cl *ConfigLoader) LoadWithBackwardCompatibility(filename string) (*Config,
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
+	// Substitute environment variables
+	content := string(data)
+	substituted, err := SubstituteEnvVars(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute environment variables: %w", err)
+	}
+	data = []byte(substituted)
+
 	// First, try to unmarshal to check if it contains old-style client definitions
 	var rawConfig map[string]interface{}
 	if err := yaml.Unmarshal(data, &rawConfig); err != nil {
@@ -114,16 +132,17 @@ func (cl *ConfigLoader) LoadWithBackwardCompatibility(filename string) (*Config,
 }
 
 // loadOldStyleConfig handles configurations with embedded client definitions
+// Note: data should already have environment variables substituted
 func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 	// Define a structure that can hold both old and new style configurations
 	type oldStyleConfig struct {
-		TestName          string               `yaml:"test_name"`
-		Description       string               `yaml:"description"`
-		Clients           []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
-		Duration          string               `yaml:"duration"`
-		RPS               int                  `yaml:"rps"`
-		Endpoints         []Endpoint           `yaml:"endpoints"`
-		ValidateResponses bool                 `yaml:"validate_responses"`
+		TestName    string               `yaml:"test_name"`
+		Description string               `yaml:"description"`
+		Clients     []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
+		Duration    string               `yaml:"duration"`
+		RPS         int                  `yaml:"rps"`
+		VUs         int                  `yaml:"vus"`
+		Calls       []*Call              `yaml:"calls"`
 	}
 
 	var oldConfig oldStyleConfig
@@ -133,14 +152,14 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 
 	// Convert to new style config
 	newConfig := &Config{
-		TestName:          oldConfig.TestName,
-		Description:       oldConfig.Description,
-		Duration:          oldConfig.Duration,
-		RPS:               oldConfig.RPS,
-		Endpoints:         oldConfig.Endpoints,
-		ValidateResponses: oldConfig.ValidateResponses,
-		ClientRefs:        make([]string, 0, len(oldConfig.Clients)),
-		ResolvedClients:   make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
+		TestName:        oldConfig.TestName,
+		Description:     oldConfig.Description,
+		Duration:        oldConfig.Duration,
+		RPS:             oldConfig.RPS,
+		VUs:             oldConfig.VUs,
+		Calls:           oldConfig.Calls,
+		ClientRefs:      make([]string, 0, len(oldConfig.Clients)),
+		ResolvedClients: make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
 	}
 
 	// If we have a client registry, register the embedded clients
@@ -163,12 +182,14 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		newConfig.ResolvedClients = append(newConfig.ResolvedClients, client)
 	}
 
-	// Expand endpoints that reference files
-	expandedEndpoints, err := ExpandEndpointsWithFiles(newConfig.Endpoints)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based endpoints: %w", err)
+	// Load calls that reference files
+	for _, call := range newConfig.Calls {
+		if call.File != "" {
+			if err := call.LoadFile(); err != nil {
+				return nil, fmt.Errorf("failed to load file for call: %w", err)
+			}
+		}
 	}
-	newConfig.Endpoints = expandedEndpoints
 
 	// Validate the configuration
 	if err := validateConfig(newConfig); err != nil {

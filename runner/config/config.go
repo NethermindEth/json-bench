@@ -2,59 +2,24 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
-	"strings"
+	"time"
 
 	"github.com/jsonrpc-bench/runner/types"
-	"gopkg.in/yaml.v3"
 )
-
-// Endpoint represents a JSON-RPC method to benchmark
-type Endpoint struct {
-	Name      string        `yaml:"name,omitempty"` // Optional: custom name for this endpoint
-	Method    string        `yaml:"method"`
-	Params    []interface{} `yaml:"params"`
-	Frequency string        `yaml:"frequency"`
-	File      string        `yaml:"file,omitempty"`      // Optional: file containing RPC calls
-	FileType  string        `yaml:"file_type,omitempty"` // Type of file: "json" or "jsonl"
-}
 
 // Config represents the benchmark configuration
 type Config struct {
-	TestName          string                `yaml:"test_name"`
-	Description       string                `yaml:"description"`
-	ClientRefs        []string              `yaml:"clients"`
-	Duration          string                `yaml:"duration"`
-	RPS               int                   `yaml:"rps"`
-	Endpoints         []Endpoint            `yaml:"endpoints"`
-	ValidateResponses bool                  `yaml:"validate_responses"`
-	ResolvedClients   []*types.ClientConfig `yaml:"-"`
-}
-
-// LoadFromFile loads a benchmark configuration from a YAML file
-func LoadFromFile(path string) (*Config, error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
-	}
-
-	// Expand endpoints that reference files
-	expandedEndpoints, err := ExpandEndpointsWithFiles(cfg.Endpoints)
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand file-based endpoints: %w", err)
-	}
-	cfg.Endpoints = expandedEndpoints
-
-	if err := validateConfig(&cfg); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	return &cfg, nil
+	TestName        string                `yaml:"test_name"`
+	Description     string                `yaml:"description"`
+	ClientRefs      []string              `yaml:"clients"`
+	Duration        string                `yaml:"duration"`
+	RPS             int                   `yaml:"rps"`
+	Iterations      int                   `yaml:"iterations"`
+	VUs             int                   `yaml:"vus"`
+	Calls           []*Call               `yaml:"calls"`
+	CallsFile       string                `yaml:"calls_file"` // Optional: use file containing RPC calls instead of generating them
+	ResolvedClients []*types.ClientConfig `yaml:"-"`
+	Outputs         *Outputs              `yaml:"-"`
 }
 
 // validateConfig performs validation on the loaded configuration
@@ -67,23 +32,43 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("at least one client is required")
 	}
 
-	if len(cfg.Endpoints) == 0 {
-		return fmt.Errorf("at least one endpoint is required")
+	if len(cfg.Calls) == 0 && cfg.CallsFile == "" {
+		return fmt.Errorf("at least one call is required")
 	}
 
-	// Validate that frequency percentages add up to 100%
-	totalFreq := 0
-	for _, endpoint := range cfg.Endpoints {
-		freq := strings.TrimSuffix(endpoint.Frequency, "%")
-		var percentage int
-		if _, err := fmt.Sscanf(freq, "%d", &percentage); err != nil {
-			return fmt.Errorf("invalid frequency format for method %s: %s", endpoint.Method, endpoint.Frequency)
+	if cfg.CallsFile == "" {
+		for _, call := range cfg.Calls {
+			if call.Name == "" {
+				return fmt.Errorf("call name is required")
+			}
+
+			if call.File == "" {
+				if call.Method == "" || call.Params == nil {
+					return fmt.Errorf("call must have a method and params defined if no file is provided")
+				}
+			}
 		}
-		totalFreq += percentage
 	}
 
-	if totalFreq != 100 {
-		return fmt.Errorf("endpoint frequencies must add up to 100%%, got %d%%", totalFreq)
+	// Validate duration
+	if cfg.Duration == "" {
+		return fmt.Errorf("duration is required")
+	}
+	_, err := time.ParseDuration(cfg.Duration)
+	if err != nil {
+		return fmt.Errorf("invalid duration format: %w", err)
+	}
+
+	if cfg.VUs <= 0 {
+		return fmt.Errorf("vus must be greater than 0")
+	}
+
+	if cfg.Iterations > 0 && cfg.RPS > 0 {
+		return fmt.Errorf("iterations and rps cannot be used together")
+	}
+
+	if cfg.Iterations <= 0 && cfg.RPS <= 0 {
+		return fmt.Errorf("either iterations or rps must be greater than 0")
 	}
 
 	return nil

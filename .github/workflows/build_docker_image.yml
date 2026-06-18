@@ -13,20 +13,82 @@ on:
     branches: [main]
 
 permissions:
+  contents: read
+  packages: write
   id-token: write
   attestations: write
-  artifact-metadata: write
-  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build_public_image:
-    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@main
-    with:
-      repo_name: "nethermindeth"
-      image_name: "jsonrpc-bench-runner"
-      additional_tags: "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
-      push: "${{ github.event_name != 'pull_request' }}"
-      dockerfile_path: "runner/Dockerfile"
-    secrets:
-      dockerhub_username: ${{ secrets.DOCKER_HUB_USERNAME }}
-      dockerhub_password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+    name: Build and publish Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=ref,event=pr
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build image locally for scan
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: runner/Dockerfile
+          load: true
+          tags: local/runner:scan-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: local/runner:scan-${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Push image to GHCR
+        id: push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: runner/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+      - name: Attest build provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

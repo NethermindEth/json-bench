@@ -28,6 +28,7 @@ type Server interface {
 
 // server implements the API server
 type server struct {
+	addr               string
 	storage            storage.HistoricStorage
 	baselineManager    analysis.BaselineManager
 	trendAnalyzer      analysis.TrendAnalyzer
@@ -42,6 +43,7 @@ type server struct {
 
 // NewServer creates a new API server instance
 func NewServer(
+	addr string,
 	historicStorage storage.HistoricStorage,
 	baselineManager analysis.BaselineManager,
 	trendAnalyzer analysis.TrendAnalyzer,
@@ -50,6 +52,7 @@ func NewServer(
 	log logrus.FieldLogger,
 ) Server {
 	return &server{
+		addr:               addr,
 		storage:            historicStorage,
 		baselineManager:    baselineManager,
 		trendAnalyzer:      trendAnalyzer,
@@ -75,7 +78,7 @@ func (s *server) Start(ctx context.Context) error {
 
 	// Create HTTP server
 	s.httpServer = &http.Server{
-		Addr:         ":8081",
+		Addr:         s.addr,
 		Handler:      router,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,

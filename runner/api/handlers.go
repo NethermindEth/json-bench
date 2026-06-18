@@ -276,6 +276,13 @@ func (h *apiHandlers) HandleGetRun(w http.ResponseWriter, r *http.Request) {
 
 	h.log.WithField("run_id", runID).Debug("Handling get run request")
 
+	if runID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, "Run ID is required")
+		return
+	}
+
+	h.log.WithField("run_id", runID).Debug("Handling get run request")
+
 	run, err := h.storage.GetHistoricRun(ctx, runID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {

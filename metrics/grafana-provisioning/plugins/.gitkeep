@@ -1,0 +1,2 @@
+# This file exists to ensure the plugins directory is tracked by git.
+# Grafana complains if this directory does not exist.

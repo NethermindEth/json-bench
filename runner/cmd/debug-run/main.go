@@ -34,7 +34,7 @@ func main() {
 	fmt.Printf("Client Metrics Count: %d\n", len(results.ClientMetrics))
 
 	if len(results.ClientMetrics) == 0 {
-		fmt.Println("\n⚠️  No client metrics found!")
+		fmt.Println("\n[WARN] No client metrics found!")
 		fmt.Println("Checking if summary exists...")
 
 		summaryPath := outputDir + "/summary.json"
