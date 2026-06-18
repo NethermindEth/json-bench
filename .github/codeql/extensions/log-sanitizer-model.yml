@@ -4,10 +4,46 @@ extensions:
       extensible: neutralModel
     data:
       - [
-          "github.com/jsonrpc-bench/runner/api",
+          "github.com/jsonrpc-bench/runner/internal/sanitize",
           "",
-          "SanitizeLogValue",
+          "LogValue",
           "",
           "summary",
+          "manual",
+        ]
+      - [
+          "github.com/jsonrpc-bench/runner/internal/sanitize",
+          "",
+          "LogError",
+          "",
+          "summary",
+          "manual",
+        ]
+  - addsTo:
+      pack: codeql/go-all
+      extensible: summaryModel
+    data:
+      # Mark sanitize.LogValue as a value-preserving but non-taint-propagating
+      # summary: the strings.Replacer.Replace call inside it strips the bytes
+      # CodeQL recognises as the log-injection vector, so the return value
+      # is safe to use in a logger entry.
+      - [
+          "github.com/jsonrpc-bench/runner/internal/sanitize",
+          "",
+          "LogValue",
+          "func(string) string",
+          "Argument[0]",
+          "ReturnValue",
+          "value",
+          "manual",
+        ]
+      - [
+          "github.com/jsonrpc-bench/runner/internal/sanitize",
+          "",
+          "LogError",
+          "func(error) error",
+          "Argument[0]",
+          "ReturnValue",
+          "value",
           "manual",
         ]

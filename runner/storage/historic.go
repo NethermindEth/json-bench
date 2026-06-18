@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/jsonrpc-bench/runner/config"
+	"github.com/jsonrpc-bench/runner/internal/sanitize"
 	"github.com/jsonrpc-bench/runner/types"
 )
 
@@ -530,7 +531,6 @@ func (h *HistoricStorage) GetHistoricTrends(ctx context.Context, filter types.Tr
 	if !filter.Until.IsZero() {
 		query += fmt.Sprintf(" AND timestamp <= $%d", idx)
 		args = append(args, filter.Until)
-		idx++
 	}
 	query += " ORDER BY timestamp ASC"
 
@@ -661,7 +661,7 @@ func (h *HistoricStorage) DeleteHistoricRun(ctx context.Context, runID string) e
 	if h.basePath != "" {
 		runDir := filepath.Join(h.basePath, runID)
 		if err := os.RemoveAll(runDir); err != nil && !os.IsNotExist(err) {
-			h.log.WithError(err).WithField("run_dir", runDir).Warn("Failed to remove run directory")
+			h.log.WithError(sanitize.LogError(err)).WithField("run_dir", sanitize.LogValue(runDir)).Warn("Failed to remove run directory")
 		}
 	}
 	return nil
@@ -687,7 +687,7 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	current := &types.BenchmarkResult{}
 	if len(currentRun.FullResults) > 0 {
 		if err := json.Unmarshal(currentRun.FullResults, current); err != nil {
-			h.log.WithError(err).WithField("run_id", runID2).Warn("Failed to parse full_results; comparison will use top-level metrics only")
+			h.log.WithError(sanitize.LogError(err)).WithField("run_id", sanitize.LogValue(runID2)).Warn("Failed to parse full_results; comparison will use top-level metrics only")
 			current = nil
 		}
 	}
@@ -695,7 +695,7 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	baseline := &types.BenchmarkResult{}
 	if len(baselineRun.FullResults) > 0 {
 		if err := json.Unmarshal(baselineRun.FullResults, baseline); err != nil {
-			h.log.WithError(err).WithField("run_id", runID1).Warn("Failed to parse baseline full_results; comparison will use top-level metrics only")
+			h.log.WithError(sanitize.LogError(err)).WithField("run_id", sanitize.LogValue(runID1)).Warn("Failed to parse baseline full_results; comparison will use top-level metrics only")
 			baseline = nil
 		}
 	}
