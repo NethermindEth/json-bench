@@ -1,0 +1,7 @@
+name: "json-bench CodeQL config"
+
+packs:
+  - ./
+
+queries:
+  - uses: security-and-quality

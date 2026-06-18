@@ -704,7 +704,7 @@ func (h *WSHub) HandleWebSocketConnection(upgrader *websocket.Upgrader) func(w h
 
 		h.log.WithFields(logrus.Fields{
 			"client_id":   clientID,
-			"remote_addr": remoteAddr,
+			"remote_addr": SanitizeLogValue(remoteAddr),
 		}).Info("WebSocket connection established")
 	}
 }

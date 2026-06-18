@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/jsonrpc-bench/runner/config"
 )
 
 // ParamVariations represents parameter variations for methods
@@ -12,8 +14,11 @@ type ParamVariations map[string][][]interface{}
 
 // LoadParamVariations loads parameter variations from a YAML file
 func LoadParamVariations(filePath string) (ParamVariations, error) {
-	// Read the YAML file
-	data, err := os.ReadFile(filePath)
+	safePath, err := config.SafeReadPath(filePath)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(safePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read parameter variations file: %w", err)
 	}
