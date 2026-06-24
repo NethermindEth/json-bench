@@ -19,6 +19,9 @@ build/
 *.env
 !*.env.example
 
+# Etherscan API key (kept locally, never committed)
+etherscan_api_key
+
 # Test outputs
 test-results/
 results-test/
