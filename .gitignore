@@ -49,3 +49,6 @@ Thumbs.db
 # Snapshots and data directories
 snapshots/
 json-bench-data/
+
+# Vendored upstream corpora (downloaded by rpc-calls/scripts/generate-from-*/init.sh)
+rpc-calls/sources/

@@ -1,0 +1,4 @@
+{"method":"eth_getCode","params":["0xbD9a7da852ff7D99F2093c73E6bcF9d4cdb2086a","latest"]}
+{"method":"eth_getCode","params":["0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413","latest"]}
+{"method":"eth_getCode","params":["0xfffbc244D798123fDe783fCc1C72d3Bb8C189413","latest"]}
+{"method":"eth_getCode","params":["0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"]}
