@@ -1,0 +1,128 @@
+test_name: "eth_call across curated mainnet contracts"
+description: "Exercises every contract fixture under rpc-calls/contracts/ with equal weight. Useful for comparing eth_call throughput across clients on a uniform contract mix."
+clients:
+  - geth
+  - nethermind
+  - reth
+  - erigon
+  - besu
+duration: "2m"
+rps: 100
+vus: 20
+calls:
+  - name: "aave"
+    file: "./rpc-calls/contracts/aave-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "adai"
+    file: "./rpc-calls/contracts/adai-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "ausdc"
+    file: "./rpc-calls/contracts/ausdc-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "azuki"
+    file: "./rpc-calls/contracts/azuki-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "bayc"
+    file: "./rpc-calls/contracts/bayc-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "cdai"
+    file: "./rpc-calls/contracts/cdai-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-btc-usd"
+    file: "./rpc-calls/contracts/chainlink-btc-usd-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-eth-usd"
+    file: "./rpc-calls/contracts/chainlink-eth-usd-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-link-usd"
+    file: "./rpc-calls/contracts/chainlink-link-usd-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "curve-3pool"
+    file: "./rpc-calls/contracts/curve-3pool-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "curve-steth-eth"
+    file: "./rpc-calls/contracts/curve-steth-eth-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "cusdc"
+    file: "./rpc-calls/contracts/cusdc-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "dai"
+    file: "./rpc-calls/contracts/dai-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "ens-namewrapper"
+    file: "./rpc-calls/contracts/ens-namewrapper-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "ens-registry"
+    file: "./rpc-calls/contracts/ens-registry-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "link"
+    file: "./rpc-calls/contracts/link-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "mkr"
+    file: "./rpc-calls/contracts/mkr-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "multicall3"
+    file: "./rpc-calls/contracts/multicall3-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "steth"
+    file: "./rpc-calls/contracts/steth-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uni"
+    file: "./rpc-calls/contracts/uni-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uniswap-v2-usdc-weth"
+    file: "./rpc-calls/contracts/uniswap-v2-usdc-weth-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uniswap-v2-usdt-weth"
+    file: "./rpc-calls/contracts/uniswap-v2-usdt-weth-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uniswap-v3-dai-usdc-0-01"
+    file: "./rpc-calls/contracts/uniswap-v3-dai-usdc-0-01-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uniswap-v3-usdc-weth-0-05"
+    file: "./rpc-calls/contracts/uniswap-v3-usdc-weth-0-05-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uniswap-v3-wbtc-weth-0-3"
+    file: "./rpc-calls/contracts/uniswap-v3-wbtc-weth-0-3-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "usdc"
+    file: "./rpc-calls/contracts/usdc-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "usdt"
+    file: "./rpc-calls/contracts/usdt-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "wbtc"
+    file: "./rpc-calls/contracts/wbtc-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "weth"
+    file: "./rpc-calls/contracts/weth-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 1

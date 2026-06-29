@@ -1,0 +1,65 @@
+test_name: "Realistic mainnet traffic mix (no eth_getLogs)"
+description: "Same shape as realistic-mix.yaml with eth_getLogs removed. The log slot is redistributed proportionally across the remaining methods. Useful when comparing client performance on the rest of the workload without the noise of long-range log scans."
+clients:
+  - geth
+  - nethermind
+  - reth
+  - erigon
+  - besu
+duration: "2m"
+rps: 100
+vus: 20
+calls:
+  - name: "eth_call (head)"
+    file: "./rpc-calls/eth_call-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 430
+  - name: "eth_call (historical)"
+    file: "./rpc-calls/eth_call-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 115
+  - name: "eth_getBlockByNumber (latest)"
+    method: "eth_getBlockByNumber"
+    params:
+      - "latest"
+      - false
+    weight: 108
+  - name: "eth_getBalance (latest)"
+    method: "eth_getBalance"
+    params:
+      - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+      - "latest"
+    weight: 72
+  - name: "eth_chainId"
+    method: "eth_chainId"
+    params: []
+    weight: 60
+  - name: "eth_getBlockReceipts (latest)"
+    method: "eth_getBlockReceipts"
+    params:
+      - "latest"
+    weight: 59
+  - name: "eth_blockNumber"
+    method: "eth_blockNumber"
+    params: []
+    weight: 53
+  - name: "eth_estimateGas (head)"
+    file: "./rpc-calls/eth_estimateGas-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 30
+  - name: "eth_getProof (head)"
+    file: "./rpc-calls/eth_getProof-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 22
+  - name: "eth_getCode (head)"
+    file: "./rpc-calls/eth_getCode-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 18
+  - name: "eth_getStorageAt (head)"
+    file: "./rpc-calls/eth_getStorageAt-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 18
+  - name: "debug_traceCall (historical)"
+    file: "./rpc-calls/debug_traceCall-mainnet.jsonl"
+    file_type: "jsonl"
+    weight: 15
