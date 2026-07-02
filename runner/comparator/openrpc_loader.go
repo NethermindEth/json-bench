@@ -70,6 +70,7 @@ func LoadMethodsFromOpenRPC(specPath string, variationsPath string) (*Comparison
 		Name:                  spec.Info.Title,
 		Description:           spec.Info.Description,
 		Methods:               make([]string, 0),
+		MethodRPCNames:        make(map[string]string),
 		CustomParameters:      make(map[string][]interface{}),
 		ValidateAgainstSchema: true,
 		Concurrency:           5,
@@ -87,6 +88,7 @@ func LoadMethodsFromOpenRPC(specPath string, variationsPath string) (*Comparison
 
 		// Add method to the list
 		config.Methods = append(config.Methods, method.Name)
+		config.MethodRPCNames[method.Name] = method.Name
 		processedMethods[method.Name] = true
 
 		// Check if we have parameter variations for this method
@@ -96,6 +98,7 @@ func LoadMethodsFromOpenRPC(specPath string, variationsPath string) (*Comparison
 			for i, params := range methodVariations {
 				variantName := fmt.Sprintf("%s_variant%d", method.Name, i+1)
 				config.Methods = append(config.Methods, variantName)
+				config.MethodRPCNames[variantName] = method.Name
 				config.CustomParameters[variantName] = params
 			}
 		} else {

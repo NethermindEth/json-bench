@@ -23,12 +23,20 @@ This project runs predefined RPC tests derived from the official Ethereum Execut
 ```dir-tree
 json-bench/
 │
-├── config/                  # YAML test configurations
-│   ├── clients.yaml         # RPC clients configurations
-|   ├── mixed.yaml           # Mixed workload benchmark
-│   ├── read-heavy.yaml      # Read-heavy workload benchmark
-│   ├── storage-example.yaml # Historic storage configuration
-│   └── param_variations.yaml
+├── config/                       # YAML test configurations
+│   ├── clients/                  # RPC client registries
+│   │   └── clients.yaml
+│   ├── benchmark/                # Benchmark workload definitions
+│   │   ├── mixed.yaml
+│   │   └── read-heavy.yaml
+│   ├── compare/                  # `runner compare` request lists
+│   │   ├── defaults.yaml
+│   │   └── example.yaml
+│   ├── compare-openrpc/          # OpenRPC-driven comparison inputs
+│   │   └── param_variations.yaml
+│   └── storage/                  # Historic storage configuration
+│       ├── storage-example.yaml
+│       └── storage-docker.yaml
 │
 ├── runner/                   # Go benchmark runner with historic tracking
 │   ├── main.go              # Thin entry point - delegates to cmd.Execute()
@@ -89,16 +97,16 @@ json-bench/
 
     ```bash
     # Configure your own endpoints in the config files
-    nano config/clients.yaml
+    nano config/clients/clients.yaml
     ```
 
 4. **Run a benchmark:**
 
     ```bash
     # Basic benchmark (no historic tracking)
-    go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml
+    go run ./runner benchmark --config ./config/benchmark/mixed.yaml --clients ./config/clients/clients.yaml
     # With historic tracking (requires PostgreSQL)
-    go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml --historic --storage-config ./config/storage-example.yaml
+    go run ./runner benchmark --config ./config/benchmark/mixed.yaml --clients ./config/clients/clients.yaml --historic --storage-config ./config/storage/storage-example.yaml
 
     # View results
     open outputs/report.html
@@ -137,28 +145,28 @@ Global flags accepted by every subcommand:
 
 ```bash
 # Run a mixed workload benchmark
-go run ./runner benchmark --config ./config/mixed.yaml --clients ./config/clients.yaml
+go run ./runner benchmark --config ./config/benchmark/mixed.yaml --clients ./config/clients/clients.yaml
 
 # Run a read-heavy benchmark
-go run ./runner benchmark --config ./config/read-heavy.yaml --clients ./config/clients.yaml
+go run ./runner benchmark --config ./config/benchmark/read-heavy.yaml --clients ./config/clients/clients.yaml
 
 # Run with a custom output directory and a non-default Prometheus endpoint
 go run ./runner --output ./custom-results benchmark \
-  --config ./config/mixed.yaml \
-  --clients ./config/clients.yaml \
+  --config ./config/benchmark/mixed.yaml \
+  --clients ./config/clients/clients.yaml \
   --prometheus http://prometheus:9090
 
 # Override the remote-write path (defaults to /api/v1/write)
 go run ./runner benchmark \
-  --config ./config/mixed.yaml \
-  --clients ./config/clients.yaml \
+  --config ./config/benchmark/mixed.yaml \
+  --clients ./config/clients/clients.yaml \
   --prometheus http://prometheus:9090 \
   --prometheus-rw-path /custom/remote-write/path
 
 # Generate an HTML report alongside the JSON and CSV exports (off by default)
 go run ./runner benchmark \
-  --config ./config/mixed.yaml \
-  --clients ./config/clients.yaml \
+  --config ./config/benchmark/mixed.yaml \
+  --clients ./config/clients/clients.yaml \
   --html-report
 ```
 
@@ -173,15 +181,15 @@ Enable historic tracking to store results in PostgreSQL and analyze trends over 
 ```bash
 # Persist this benchmark run to PostgreSQL
 go run ./runner benchmark \
-  --config ./config/mixed.yaml \
-  --clients ./config/clients.yaml \
+  --config ./config/benchmark/mixed.yaml \
+  --clients ./config/clients/clients.yaml \
   --historic \
-  --storage-config ./config/storage-example.yaml
+  --storage-config ./config/storage/storage-example.yaml
 
 # Generate a historic-analysis report (no new benchmark)
 go run ./runner historic \
-  --config ./config/mixed.yaml \
-  --storage-config ./config/storage-example.yaml
+  --config ./config/benchmark/mixed.yaml \
+  --storage-config ./config/storage/storage-example.yaml
 ```
 
 ### API Server for Real-time Access
@@ -191,7 +199,7 @@ Start the HTTP API server for real-time data access and WebSocket updates:
 ```bash
 # Start the API server with historic storage
 go run ./runner api \
-  --storage-config ./config/storage-example.yaml \
+  --storage-config ./config/storage/storage-example.yaml \
   --api-addr :8081
 
 # API will be available at http://localhost:8081
@@ -200,15 +208,40 @@ go run ./runner api \
 ### One-shot Cross-Client Comparison
 
 `runner compare` runs a one-shot JSON-RPC response comparison across a
-set of clients defined in `clients.yaml`. It is flags-only (no YAML
-schema for compare) and filesystem-only: results are not written to the
+set of clients defined in `clients.yaml`. It reads the request list from
+a YAML config and is filesystem-only: results are not written to the
 historic-runs database.
+
+The compare config is a curated list of `{method, params}` calls grouped
+by method. Each entry may carry an optional `id` (must be
+`[a-zA-Z0-9_-]+` and unique within its method); when omitted, entries
+are numbered `variant1`, `variant2`, ...
+
+```yaml
+# config/compare/example.yaml
+name: "Ethereum API comparison"
+description: "Cross-client sanity checks"
+calls:
+  eth_blockNumber:
+    - params: []
+  eth_getBalance:
+    - id: "vitalik-latest"
+      params: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "latest"]
+    - id: "vitalik-at-block-4096"
+      params: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "0x1000"]
+  eth_call:
+    - id: "weth-balanceOf"
+      params:
+        - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+          data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"
+        - "latest"
+```
 
 ```bash
 go run ./runner compare \
-  --clients ./config/clients.yaml \
+  --config ./config/compare/example.yaml \
+  --clients ./config/clients/clients.yaml \
   --client-refs geth,nethermind \
-  --methods eth_blockNumber,eth_chainId,eth_gasPrice \
   --output ./comparison-results
 ```
 
@@ -217,9 +250,11 @@ Both artefacts are always produced:
 - `<output>/comparison-results.json`
 - `<output>/comparison-report.html`
 
-`compare` uses the comparator's default empty-params behaviour for each
-method. Methods that need parameter variations should use
-`compare-openrpc`.
+A `config/compare/defaults.yaml` ships with the repo and reproduces the
+old baseline of eight common methods (eth_blockNumber, eth_getBalance,
+eth_call, eth_getBlockByNumber, eth_getTransactionCount, eth_chainId,
+eth_gasPrice, net_version) with the parameters the CLI previously used
+implicitly.
 
 ### OpenRPC-Driven Comparison
 
@@ -232,8 +267,8 @@ not write to the historic-runs database.
 ```bash
 go run ./runner compare-openrpc \
   --spec ./openrpc.json \
-  --variations ./config/param_variations.yaml \
-  --clients ./config/clients.yaml \
+  --variations ./config/compare-openrpc/param_variations.yaml \
+  --clients ./config/clients/clients.yaml \
   --client-refs geth,nethermind \
   --filter eth_blockNumber,eth_getBlockByNumber \
   --output ./openrpc-results
@@ -274,7 +309,8 @@ Additional behaviour changes worth noting:
   exports remain on by default.
 - The legacy `endpoints + frequency` YAML schema is no longer accepted.
   Configs using it must be migrated by hand to the `calls:` schema (see
-  `config/mixed.yaml` for the canonical shape). No migrator is provided.
+  `config/benchmark/mixed.yaml` for the canonical shape). No migrator is
+  provided.
 - The `jsonrpc-benchmark.json` Grafana dashboard has been removed. Its
   Prometheus queries (`method_calls_*`, `rpc_errors_*`, `rpc_calls_*`)
   reference custom counters from the pre-refactor k6 template that are
@@ -381,7 +417,7 @@ Configure PostgreSQL storage for historic tracking. Choose the appropriate confi
 
 ```bash
 # Use storage-example.yaml for local PostgreSQL connection
-go run ./runner benchmark --config ./config/mixed.yaml --historic --storage-config ./config/storage-example.yaml
+go run ./runner benchmark --config ./config/benchmark/mixed.yaml --historic --storage-config ./config/storage/storage-example.yaml
 ```
 
 **Docker Environment:**
@@ -389,13 +425,13 @@ go run ./runner benchmark --config ./config/mixed.yaml --historic --storage-conf
 ```bash
 # Use storage-docker.yaml when running inside Docker containers
 # (This config uses 'postgres' hostname which only exists in Docker network)
-docker run ... api --storage-config ./config/storage-docker.yaml
+docker run ... api --storage-config ./config/storage/storage-docker.yaml
 ```
 
 **Configuration Examples:**
 
 ```yaml
-# config/storage-example.yaml (for local development)
+# config/storage/storage-example.yaml (for local development)
 historic_path: "./historic"
 enable_historic: true
 
@@ -416,7 +452,7 @@ postgresql:
 ```
 
 ```yaml
-# config/storage-docker.yaml (for Docker environment)
+# config/storage/storage-docker.yaml (for Docker environment)
 historic_path: "/app/historic"
 enable_historic: true
 
@@ -478,7 +514,7 @@ calls:
 Test methods with different parameter sets:
 
 ```yaml
-# config/param_variations.yaml
+# config/compare-openrpc/param_variations.yaml
 eth_call:
   - [{"to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"}, "latest"]
   - [{"to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"}, "pending"]

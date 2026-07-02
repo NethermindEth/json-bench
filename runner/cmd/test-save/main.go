@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// Load storage config
-	storageCfg, err := config.LoadStorageConfig("/Users/parithosh/dev/eth2/json-bench/config/storage-example.yaml", logger)
+	storageCfg, err := config.LoadStorageConfig("./config/storage/storage-example.yaml", logger)
 	if err != nil {
 		log.Fatalf("Failed to load storage config: %v", err)
 	}

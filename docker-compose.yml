@@ -140,7 +140,7 @@ services:
       - ./config:/app/config
     command:
       - api
-      - --storage-config=/app/config/storage-docker.yaml
+      - --storage-config=/app/config/storage/storage-docker.yaml
     depends_on:
       postgres:
         condition: service_healthy

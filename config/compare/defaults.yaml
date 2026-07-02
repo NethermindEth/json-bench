@@ -1,0 +1,38 @@
+name: "Ethereum JSON-RPC default comparison"
+description: >
+  Baseline compare config covering the same methods and parameters the
+  legacy `--methods` CSV flag used to send by default.
+
+calls:
+  eth_blockNumber:
+    - params: []
+
+  eth_chainId:
+    - params: []
+
+  eth_gasPrice:
+    - params: []
+
+  net_version:
+    - params: []
+
+  eth_getBalance:
+    - params:
+        - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+        - "latest"
+
+  eth_getTransactionCount:
+    - params:
+        - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+        - "latest"
+
+  eth_getBlockByNumber:
+    - params:
+        - "latest"
+        - false
+
+  eth_call:
+    - params:
+        - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+          data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"
+        - "latest"

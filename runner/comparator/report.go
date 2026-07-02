@@ -27,6 +27,12 @@ type MethodComparisonResult struct {
 	Error              error                  `json:"error,omitempty"`
 }
 
+// ClientEndpoint is a single client's display data for the report header.
+type ClientEndpoint struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
 // ComparisonSummary represents summary statistics for the comparison
 type ComparisonSummary struct {
 	TotalMethods       int `json:"total_methods"`
@@ -44,7 +50,7 @@ type ReportData struct {
 	ComparisonID    string                                         `json:"comparison_id"`
 	Configuration   *ComparisonConfig                              `json:"configuration"`
 	MethodResults   map[string][]MethodComparisonResult            `json:"method_results"`
-	ClientEndpoints []string                                       `json:"client_endpoints"`
+	ClientEndpoints []ClientEndpoint                               `json:"client_endpoints"`
 	ErrorMethods    map[string][]MethodComparisonResult            `json:"error_methods"`
 	DiffMethods     map[string][]MethodComparisonResult            `json:"diff_methods"`
 	MatchMethods    map[string][]MethodComparisonResult            `json:"match_methods"`
@@ -136,7 +142,7 @@ func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outpu
 		ComparisonID:    time.Now().Format("20060102-150405"),
 		Configuration:   &ComparisonConfig{}, // Placeholder
 		MethodResults:   make(map[string][]MethodComparisonResult),
-		ClientEndpoints: make([]string, 0),
+		ClientEndpoints: make([]ClientEndpoint, 0),
 		ErrorMethods:    make(map[string][]MethodComparisonResult),
 		DiffMethods:     make(map[string][]MethodComparisonResult),
 		MatchMethods:    make(map[string][]MethodComparisonResult),
@@ -147,10 +153,15 @@ func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outpu
 	// Add client endpoints
 	if cfg, ok := result.Config.(*config.Config); ok && cfg != nil {
 		for _, client := range cfg.ResolvedClients {
-			reportData.ClientEndpoints = append(reportData.ClientEndpoints, fmt.Sprintf("%s: %s", client.Name, client.URL))
+			reportData.ClientEndpoints = append(reportData.ClientEndpoints, ClientEndpoint{
+				Name: client.Name,
+				URL:  client.URL,
+			})
 		}
 	}
-	sort.Strings(reportData.ClientEndpoints)
+	sort.Slice(reportData.ClientEndpoints, func(i, j int) bool {
+		return reportData.ClientEndpoints[i].Name < reportData.ClientEndpoints[j].Name
+	})
 
 	// Process each response diff into method comparison results
 	for _, diff := range diffs {
@@ -501,15 +512,61 @@ const htmlReportTemplate = `<!DOCTYPE html>
             margin: 0;
             color: #1976d2;
         }
-        .client-list {
-            list-style-type: none;
-            padding: 0;
+        .client-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
         }
-        .client-list li {
-            margin-bottom: 5px;
-            padding: 5px;
-            background-color: #f8f9fa;
-            border-radius: 3px;
+        .client-card {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        .client-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        .client-url {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            color: #555;
+            word-break: break-all;
+        }
+        .empty-state {
+            background: white;
+            padding: 60px 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .empty-state-title {
+            font-size: 1.3em;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .empty-state-hint {
+            font-size: 0.95em;
+            color: #666;
+            max-width: 520px;
+            margin: 0 auto;
+            line-height: 1.55;
+        }
+        .config h2 {
+            font-size: 1.1em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 0 15px 0;
+        }
+        .config {
+            margin-bottom: 30px;
         }
     </style>
 </head>
@@ -545,11 +602,14 @@ const htmlReportTemplate = `<!DOCTYPE html>
 
     <div class="config">
         <h2>Client Endpoints</h2>
-        <ul class="client-list">
+        <div class="client-grid">
             {{range .ClientEndpoints}}
-            <li>{{.}}</li>
+            <div class="client-card">
+                <div class="client-name">{{.Name}}</div>
+                <div class="client-url">{{.URL}}</div>
+            </div>
             {{end}}
-        </ul>
+        </div>
     </div>
 
     <div class="tabs">
@@ -560,11 +620,7 @@ const htmlReportTemplate = `<!DOCTYPE html>
         <button class="tab-button" onclick="openTab('all')">All Methods</button>
     </div>
 
-    <--input.txs=./Evm.Test/testdata/1/txs.json
---input.env=./Evm.Test/testdata/1/env.json
---output.alloc=stdout
---output.result=stdout
---output.body=stdout Errors Tab -->
+    <!-- Errors Tab -->
     <div id="errors" class="tab-content active">
         <h2>Methods with Errors</h2>
         {{range $method, $results := .ErrorMethods}}
@@ -640,14 +696,18 @@ const htmlReportTemplate = `<!DOCTYPE html>
                 {{end}}
             </div>
         </div>
+        {{else}}
+        <div class="empty-state">
+            <div class="empty-state-title">No errors to report</div>
+            <div class="empty-state-hint">
+                Every call returned a well-formed JSON-RPC response and, when enabled, passed schema validation.
+                Open the <strong>Differences</strong>, <strong>Matches</strong>, or <strong>All Methods</strong> tab to see the response data.
+            </div>
+        </div>
         {{end}}
     </div>
 
-    <--input.txs=./Evm.Test/testdata/1/txs.json
---input.env=./Evm.Test/testdata/1/env.json
---output.alloc=stdout
---output.result=stdout
---output.body=stdout Differences Tab -->
+    <!-- Differences Tab -->
     <div id="differences" class="tab-content">
         <h2>Methods with Different Responses</h2>
         {{range $method, $results := .DiffMethods}}
@@ -710,14 +770,17 @@ const htmlReportTemplate = `<!DOCTYPE html>
                 {{end}}
             </div>
         </div>
+        {{else}}
+        <div class="empty-state">
+            <div class="empty-state-title">No differences found</div>
+            <div class="empty-state-hint">
+                Every configured call returned identical results across all clients. Open the <strong>Matches</strong> or <strong>All Methods</strong> tab to review the responses.
+            </div>
+        </div>
         {{end}}
     </div>
 
-    <--input.txs=./Evm.Test/testdata/1/txs.json
---input.env=./Evm.Test/testdata/1/env.json
---output.alloc=stdout
---output.result=stdout
---output.body=stdout Matches Tab -->
+    <!-- Matches Tab -->
     <div id="matches" class="tab-content">
         <h2>Methods with Matching Responses</h2>
         {{range $method, $results := .MatchMethods}}
@@ -767,14 +830,17 @@ const htmlReportTemplate = `<!DOCTYPE html>
                 {{end}}
             </div>
         </div>
+        {{else}}
+        <div class="empty-state">
+            <div class="empty-state-title">No matching responses</div>
+            <div class="empty-state-hint">
+                Every configured call either differed across clients or errored out. Open the <strong>Differences</strong> or <strong>Errors</strong> tab to see what happened.
+            </div>
+        </div>
         {{end}}
     </div>
 
-    <--input.txs=./Evm.Test/testdata/1/txs.json
---input.env=./Evm.Test/testdata/1/env.json
---output.alloc=stdout
---output.result=stdout
---output.body=stdout Scopes Tab -->
+    <!-- Scopes Tab -->
     <div id="scopes" class="tab-content">
         <h2>Methods by Scope</h2>
         {{range $scope := .Scopes}}
@@ -871,11 +937,7 @@ const htmlReportTemplate = `<!DOCTYPE html>
         {{end}}
     </div>
 
-    <--input.txs=./Evm.Test/testdata/1/txs.json
---input.env=./Evm.Test/testdata/1/env.json
---output.alloc=stdout
---output.result=stdout
---output.body=stdout All Methods Tab -->
+    <!-- All Methods Tab -->
     <div id="all" class="tab-content">
         <h2>All Methods</h2>
         {{range $method, $results := .MethodResults}}

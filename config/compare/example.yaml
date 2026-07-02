@@ -1,0 +1,34 @@
+name: "Ethereum API comparison"
+description: >
+  Example compare config demonstrating optional per-call ids, multiple
+  variants for the same method, and complex parameter objects.
+
+calls:
+  eth_blockNumber:
+    - params: []
+
+  eth_chainId:
+    - params: []
+
+  eth_getBalance:
+    - id: "vitalik-latest"
+      params:
+        - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+        - "latest"
+    - id: "vitalik-at-block-4096"
+      params:
+        - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+        - "0x1000"
+
+  eth_getBlockByNumber:
+    - id: "head-headers-only"
+      params: ["latest", false]
+    - id: "head-full-txs"
+      params: ["latest", true]
+
+  eth_call:
+    - id: "weth-balanceOf"
+      params:
+        - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+          data: "0x70a08231000000000000000000000000000000000000000000000000000000000000000a"
+        - "latest"
