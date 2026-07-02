@@ -155,7 +155,7 @@ func collect(methodDir string) (regular, latest []outRecord, err error) {
 	return regular, latest, nil
 }
 
-func writeBucket(path string, records []outRecord) error {
+func writeBucket(path string, records []outRecord) (err error) {
 	if len(records) == 0 {
 		return nil
 	}
@@ -163,7 +163,11 @@ func writeBucket(path string, records []outRecord) error {
 	if err != nil {
 		return fmt.Errorf("open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("close %s: %w", path, cerr)
+		}
+	}()
 	enc := json.NewEncoder(f)
 	for _, r := range records {
 		if err := enc.Encode(r); err != nil {

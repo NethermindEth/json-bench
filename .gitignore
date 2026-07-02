@@ -30,6 +30,7 @@ coverage/
 *.log
 historic/
 outputs/
+runs-live/
 
 # Debug and temporary files
 *.bak
