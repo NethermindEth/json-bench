@@ -1,0 +1,5 @@
+{"method":"eth_call","params":[{"data":"0xddca3f43","to":"0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x0dfe1681","to":"0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168"},"latest"]}
+{"method":"eth_call","params":[{"data":"0xd21220a7","to":"0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x3850c7bd","to":"0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x1a686502","to":"0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168"},"latest"]}

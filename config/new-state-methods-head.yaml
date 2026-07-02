@@ -1,0 +1,32 @@
+test_name: "New state-access methods (head only)"
+description: "Exercises the contract-state RPC methods added in feat/add-benchmarks: eth_estimateGas, eth_getCode, eth_getProof, eth_getStorageAt, plus a baseline of eth_call. All fixtures target `latest` so the workload runs on any synced full node. Useful for isolating client performance on the new methods without diluting them in a broader traffic mix."
+clients:
+  - geth
+  - nethermind
+  - reth
+  - erigon
+  - besu
+duration: "2m"
+rps: 100
+vus: 20
+calls:
+  - name: "eth_call (head)"
+    file: "./rpc-calls/eth_call-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 30
+  - name: "eth_estimateGas (head)"
+    file: "./rpc-calls/eth_estimateGas-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 20
+  - name: "eth_getCode (head)"
+    file: "./rpc-calls/eth_getCode-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 20
+  - name: "eth_getProof (head)"
+    file: "./rpc-calls/eth_getProof-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 15
+  - name: "eth_getStorageAt (head)"
+    file: "./rpc-calls/eth_getStorageAt-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 15

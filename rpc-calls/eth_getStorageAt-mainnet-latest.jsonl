@@ -1,0 +1,6 @@
+{"method":"eth_getStorageAt","params":["0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413","0x2","latest"]}
+{"method":"eth_getStorageAt","params":["0xc1cadaffffffffffffffffffffffffffffffffff","0x0100000000000000000000000000000000000000000000000000000000000000","latest"]}
+{"method":"eth_getStorageAt","params":["0x8cED5ad0d8dA4Ec211C17355Ed3DBFEC4Cf0E5b9","0xasdf","latest"]}
+{"method":"eth_getStorageAt","params":["0x8cED5ad0d8dA4Ec211C17355Ed3DBFEC4Cf0E5b9","0x0","latest"]}
+{"method":"eth_getStorageAt","params":["0xc1cadaffffffffffffffffffffffffffffffffff","0x0100000000000000000000000000000000000000000000000000000000000000"]}
+{"method":"eth_getStorageAt","params":["0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413","0x3","latest"]}

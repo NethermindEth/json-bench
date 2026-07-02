@@ -1,0 +1,6 @@
+{"method":"eth_call","params":[{"data":"0x2b20e397","to":"0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x06fdde03","to":"0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x3f15457f","to":"0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x01ffc9a780ac58cd00000000000000000000000000000000000000000000000000000000","to":"0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x8da5cb5b","to":"0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x01ffc9a7d9b67a2600000000000000000000000000000000000000000000000000000000","to":"0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401"},"latest"]}

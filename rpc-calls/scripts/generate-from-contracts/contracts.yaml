@@ -1,0 +1,421 @@
+# Curated mainnet contracts and the view/pure calls we synthesize for them.
+#
+# Defaults (omitted fields):
+#   chain_id: 1
+#   auto_expand: false
+#   abi_address: <same as address>           # init.sh auto-resolves single-hop proxies
+#   slug: <lowercased name, non-alnum → '-'>
+#
+# Args in YAML are typed values matching the ABI method's input list. The
+# generator validates arity/types against the loaded ABI and fails loudly on
+# mismatch. uint256 args may be supplied as YAML ints or as 0x-/decimal-quoted
+# strings — anything wider than int64 must be a string.
+#
+# arg_registry is consumed only when auto_expand: true (deferred from v1).
+
+arg_registry:
+  addresses:
+    - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"  # vitalik.eth
+    - "0xbe0eb53f46cd790cd13851d5eff43d12404d33e8"  # Binance hot wallet
+    - "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"  # WETH (self-reference)
+  uints:
+    - 0
+    - 1
+    - 100
+    - 1000000
+
+contracts:
+  # ─── ERC-20 ──────────────────────────────────────────────────────────────
+  - name: WETH
+    address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - method: allowance
+        args:
+          - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+          - "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+
+  - name: USDC
+    address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    category: erc20
+    # FiatTokenProxy → FiatTokenV2_2; init.sh resolves the impl automatically.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - method: isBlacklisted
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: paused }
+      - { method: masterMinter }
+      - { method: pauser }
+      - { method: blacklister }
+
+  - name: USDT
+    address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: getOwner }
+      - { method: deprecated }
+      - { method: paused }
+
+  - name: DAI
+    address: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - method: nonces
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: DOMAIN_SEPARATOR }
+
+  - name: LINK
+    address: "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+
+  - name: WBTC
+    address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: owner }
+      - { method: paused }
+
+  - name: UNI
+    address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - method: getCurrentVotes
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+
+  - name: AAVE
+    address: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9"
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+
+  - name: MKR
+    address: "0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2"
+    category: erc20
+    # MKR's name/symbol are bytes32 (not string) — well-known pre-ERC20 quirk.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+
+  - name: stETH
+    address: "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+    category: erc20
+    # Lido OssifiableProxy → impl; init.sh resolves.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: getTotalShares }
+      - { method: getTotalPooledEther }
+      - method: getPooledEthByShares
+        args: ["1000000000000000000"]
+      - { method: isStakingPaused }
+
+  # ─── ERC-721 / NFT ───────────────────────────────────────────────────────
+  - name: BAYC
+    address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D"
+    category: erc721
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: totalSupply }
+      - method: ownerOf
+        args: [1]
+      - method: tokenURI
+        args: [1]
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: MAX_APES }
+
+  - name: ENS NameWrapper
+    address: "0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401"
+    category: erc721
+    # ENS NameWrapper is ERC-1155 (not ERC-721), so it exposes `name` but no
+    # `symbol`/`totalSupply`/`tokenURI`. balanceOf has the ERC-1155 signature.
+    calls:
+      - { method: name }
+      - method: supportsInterface
+        args: ["0x80ac58cd"]   # ERC-721 interface ID
+      - method: supportsInterface
+        args: ["0xd9b67a26"]   # ERC-1155 interface ID
+      - { method: owner }
+      - { method: ens }
+      - { method: registrar }
+
+  - name: Azuki
+    address: "0xED5AF388653567Af2F388E6224dC7C4b3241C544"
+    category: erc721
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: totalSupply }
+      - method: ownerOf
+        args: [1]
+      - method: tokenURI
+        args: [1]
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+
+  # ─── Uniswap V2 pairs ────────────────────────────────────────────────────
+  - name: Uniswap V2 USDC-WETH
+    address: "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc"
+    category: uniswap_v2_pair
+    calls:
+      - { method: token0 }
+      - { method: token1 }
+      - { method: getReserves }
+      - { method: totalSupply }
+      - { method: kLast }
+      - { method: price0CumulativeLast }
+      - { method: price1CumulativeLast }
+
+  - name: Uniswap V2 USDT-WETH
+    address: "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852"
+    category: uniswap_v2_pair
+    calls:
+      - { method: token0 }
+      - { method: token1 }
+      - { method: getReserves }
+      - { method: totalSupply }
+
+  # ─── Uniswap V3 pools ────────────────────────────────────────────────────
+  - name: Uniswap V3 USDC-WETH 0.05%
+    address: "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"
+    category: uniswap_v3_pool
+    calls:
+      - { method: token0 }
+      - { method: token1 }
+      - { method: fee }
+      - { method: liquidity }
+      - { method: slot0 }
+      - { method: tickSpacing }
+      - { method: feeGrowthGlobal0X128 }
+      - { method: feeGrowthGlobal1X128 }
+
+  - name: Uniswap V3 WBTC-WETH 0.3%
+    address: "0xCBCdF9626bC03E24f779434178A73a0B4bad62eD"
+    category: uniswap_v3_pool
+    calls:
+      - { method: token0 }
+      - { method: token1 }
+      - { method: fee }
+      - { method: liquidity }
+      - { method: slot0 }
+      - { method: tickSpacing }
+
+  - name: Uniswap V3 DAI-USDC 0.01%
+    address: "0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168"
+    category: uniswap_v3_pool
+    calls:
+      - { method: token0 }
+      - { method: token1 }
+      - { method: fee }
+      - { method: liquidity }
+      - { method: slot0 }
+
+  # ─── Lending ─────────────────────────────────────────────────────────────
+  - name: cDAI
+    address: "0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643"
+    category: compound_v2
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: exchangeRateStored }
+      - { method: supplyRatePerBlock }
+      - { method: borrowRatePerBlock }
+      - { method: getCash }
+      - { method: totalBorrows }
+      - { method: totalReserves }
+      - { method: reserveFactorMantissa }
+
+  - name: cUSDC
+    address: "0x39AA39c021dfbaE8faC545936693aC917d5E7563"
+    category: compound_v2
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: exchangeRateStored }
+      - { method: supplyRatePerBlock }
+      - { method: borrowRatePerBlock }
+      - { method: getCash }
+
+  - name: aUSDC
+    address: "0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c"
+    category: aave_v3
+    # Aave v3 InitializableImmutableAdminUpgradeabilityProxy → AToken impl.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: UNDERLYING_ASSET_ADDRESS }
+      - { method: scaledTotalSupply }
+      - { method: getIncentivesController }
+      - { method: RESERVE_TREASURY_ADDRESS }
+
+  - name: aDAI
+    address: "0x018008bfb33d285247A21d44E50697654f754e63"
+    category: aave_v3
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: UNDERLYING_ASSET_ADDRESS }
+      - { method: scaledTotalSupply }
+
+  # ─── Curve ───────────────────────────────────────────────────────────────
+  - name: Curve 3pool
+    address: "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7"
+    category: curve
+    calls:
+      - method: coins
+        args: [0]
+      - method: coins
+        args: [1]
+      - method: coins
+        args: [2]
+      - method: balances
+        args: [0]
+      - method: balances
+        args: [1]
+      - method: balances
+        args: [2]
+      - { method: get_virtual_price }
+      - { method: A }
+      - { method: fee }
+      - { method: admin_fee }
+
+  - name: Curve stETH-ETH
+    address: "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022"
+    category: curve
+    calls:
+      - method: coins
+        args: [0]
+      - method: coins
+        args: [1]
+      - method: balances
+        args: [0]
+      - method: balances
+        args: [1]
+      - { method: get_virtual_price }
+      - { method: A }
+      - { method: fee }
+
+  # ─── Infrastructure ──────────────────────────────────────────────────────
+  - name: Multicall3
+    address: "0xcA11bde05977b3631167028862bE2a173976CA11"
+    category: infra
+    calls:
+      - { method: getBlockNumber }
+      - { method: getCurrentBlockTimestamp }
+      - { method: getCurrentBlockCoinbase }
+      - { method: getCurrentBlockDifficulty }
+      - { method: getCurrentBlockGasLimit }
+      - method: getEthBalance
+        args: ["0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"]
+      - { method: getChainId }
+      - { method: getLastBlockHash }
+
+  - name: ENS Registry
+    address: "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
+    category: infra
+    # Args are ENS namehashes. The all-zero hash is the registry root (safe lookup).
+    calls:
+      - method: owner
+        args: ["0x0000000000000000000000000000000000000000000000000000000000000000"]
+      - method: resolver
+        args: ["0x0000000000000000000000000000000000000000000000000000000000000000"]
+      - method: ttl
+        args: ["0x0000000000000000000000000000000000000000000000000000000000000000"]
+
+  - name: Chainlink ETH-USD
+    address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    category: chainlink_aggregator
+    calls:
+      - { method: latestAnswer }
+      - { method: latestRound }
+      - { method: latestTimestamp }
+      - { method: decimals }
+      - { method: description }
+      - { method: version }
+      - { method: aggregator }
+
+  - name: Chainlink BTC-USD
+    address: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c"
+    category: chainlink_aggregator
+    calls:
+      - { method: latestAnswer }
+      - { method: latestRound }
+      - { method: decimals }
+      - { method: description }
+
+  - name: Chainlink LINK-USD
+    address: "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c"
+    category: chainlink_aggregator
+    calls:
+      - { method: latestAnswer }
+      - { method: latestRound }
+      - { method: decimals }
+      - { method: description }
