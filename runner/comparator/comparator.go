@@ -25,11 +25,17 @@ type ComparisonResult struct {
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
-// ComparisonConfig represents the configuration for response comparison
+// ComparisonConfig represents the configuration for response comparison.
+//
+// Methods holds internal identifiers (e.g. "eth_getBalance_variant1" or
+// "eth_getBalance_vitalik-latest"). MethodRPCNames maps each identifier to
+// the JSON-RPC method actually invoked on the wire; when unset, the
+// identifier is used as-is.
 type ComparisonConfig struct {
 	Name                  string                   `json:"name"`
 	Description           string                   `json:"description"`
 	Methods               []string                 `json:"methods"`
+	MethodRPCNames        map[string]string        `json:"method_rpc_names,omitempty"`
 	Clients               []*types.ClientConfig    `json:"clients"`
 	ValidateAgainstSchema bool                     `json:"validate_against_schema"`
 	OutputDir             string                   `json:"output_dir"`
@@ -90,10 +96,13 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 	responses := make(map[string]interface{})
 	schemaErrors := make(map[string][]string)
 
-	// Extract base method name if this is a variant (e.g., eth_call_variant1 -> eth_call)
+	// Recover the real JSON-RPC method name from the identifier; loaders set
+	// MethodRPCNames to point each identifier (e.g. eth_call_variant1) at the
+	// wire-level method (eth_call). Fall back to the identifier itself so
+	// callers that pass a flat []string still work.
 	rpcMethod := method
-	if idx := strings.Index(method, "_variant"); idx > 0 {
-		rpcMethod = method[:idx]
+	if name, ok := c.config.MethodRPCNames[method]; ok && name != "" {
+		rpcMethod = name
 	}
 
 	// Make JSON-RPC calls to all clients
@@ -217,20 +226,20 @@ func (c *Comparator) RunComparisons() ([]ComparisonResult, error) {
 	errCh := make(chan error, len(c.config.Methods))
 
 	for _, method := range c.config.Methods {
-		// Get parameters for this method
-		var params []interface{}
-		if customParams, ok := c.config.CustomParameters[method]; ok && len(customParams) > 0 {
-			params = customParams
-		} else {
-			// Use default parameters based on method
-			params = getDefaultParams(method)
+		// Loaders populate CustomParameters for every identifier they emit;
+		// the empty-slice fallback preserves behaviour for callers that pass
+		// bare method names without a matching CustomParameters entry (the
+		// OpenRPC loader does this for 0-arg methods and for base names when
+		// per-method variations are also present).
+		params := c.config.CustomParameters[method]
+		if params == nil {
+			params = []interface{}{}
 		}
 
 		wg.Add(1)
 		go func(method string, params []interface{}) {
 			defer wg.Done()
 
-			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
@@ -310,34 +319,3 @@ func (c *Comparator) GetResults() []ComparisonResult {
 	return c.results
 }
 
-// Helper functions for default parameters
-
-// getDefaultParams returns default parameters for common Ethereum JSON-RPC methods
-func getDefaultParams(method string) []interface{} {
-	switch method {
-	case "eth_blockNumber":
-		return []interface{}{}
-	case "eth_getBalance":
-		return []interface{}{"0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "latest"}
-	case "eth_call":
-		return []interface{}{
-			map[string]interface{}{
-				"to":   "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
-				"data": "0x70a08231000000000000000000000000000000000000000000000000000000000000000a",
-			},
-			"latest",
-		}
-	case "eth_getBlockByNumber":
-		return []interface{}{"latest", false}
-	case "eth_getTransactionCount":
-		return []interface{}{"0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "latest"}
-	case "eth_chainId":
-		return []interface{}{}
-	case "eth_gasPrice":
-		return []interface{}{}
-	case "net_version":
-		return []interface{}{}
-	default:
-		return []interface{}{}
-	}
-}

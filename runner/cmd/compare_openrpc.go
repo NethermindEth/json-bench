@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -123,12 +122,14 @@ func applyMethodFilter(cfg *comparator.ComparisonConfig, methodsToInclude []stri
 
 	filteredMethods := make([]string, 0, len(cfg.Methods))
 	filteredParams := make(map[string][]interface{})
+	filteredRPCNames := make(map[string]string)
 	for _, method := range cfg.Methods {
-		// The OpenRPC loader emits variant names as <method>_variant<N>, so the
-		// filter must match on the base name as well as the full variant name.
+		// Match on both the wire-level RPC name (from MethodRPCNames) and the
+		// identifier itself so `--filter eth_call` still selects
+		// `eth_call_variant1`, `eth_call_variant2`, etc.
 		baseName := method
-		if idx := strings.Index(method, "_variant"); idx > 0 {
-			baseName = method[:idx]
+		if name, ok := cfg.MethodRPCNames[method]; ok && name != "" {
+			baseName = name
 		}
 		if !methodMap[baseName] && !methodMap[method] {
 			continue
@@ -137,7 +138,11 @@ func applyMethodFilter(cfg *comparator.ComparisonConfig, methodsToInclude []stri
 		if params, ok := cfg.CustomParameters[method]; ok {
 			filteredParams[method] = params
 		}
+		if name, ok := cfg.MethodRPCNames[method]; ok {
+			filteredRPCNames[method] = name
+		}
 	}
 	cfg.Methods = filteredMethods
 	cfg.CustomParameters = filteredParams
+	cfg.MethodRPCNames = filteredRPCNames
 }

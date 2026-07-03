@@ -41,7 +41,7 @@ func main() {
 	// Step 3: Load storage config and save
 	fmt.Println("\n=== Step 3: Saving to historic storage ===")
 	logger := logrus.New()
-	storageCfg, err := config.LoadStorageConfig("/Users/parithosh/dev/eth2/json-bench/config/storage-example.yaml", logger)
+	storageCfg, err := config.LoadStorageConfig("./config/storage/storage-example.yaml", logger)
 	if err != nil {
 		log.Fatalf("Failed to load storage config: %v", err)
 	}

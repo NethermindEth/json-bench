@@ -31,7 +31,7 @@ Use the Go CLI tool to run a benchmark:
 go build -o benchmark ./runner/main.go
 
 # Run a benchmark with a predefined configuration
-./benchmark -config ./config/read-heavy.yaml
+./benchmark -config ./config/benchmark/read-heavy.yaml
 ```
 
 ### 3. View the Results

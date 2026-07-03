@@ -41,7 +41,7 @@ go build -o cmd/debug-p99/debug-p99 ./cmd/debug-p99
 ./debug-p99 -run-id "123e4567-e89b-12d3-a456-426614174000"
 
 # Debug with custom storage configuration
-./debug-p99 -run-id "123e4567-e89b-12d3-a456-426614174000" -storage-config ../../config/storage.yaml
+./debug-p99 -run-id "123e4567-e89b-12d3-a456-426614174000" -storage-config ../../config/storage/storage-example.yaml
 
 # Debug with verbose output
 ./debug-p99 -run-id "123e4567-e89b-12d3-a456-426614174000" -verbose
