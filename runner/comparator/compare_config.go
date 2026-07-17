@@ -18,11 +18,19 @@ type compareCall struct {
 
 // compareFile is the on-disk shape of a compare YAML config.
 type compareFile struct {
-	Name        string                   `yaml:"name"`
-	Description string                   `yaml:"description"`
-	Calls       yaml.Node                `yaml:"calls"`
+	Name        string           `yaml:"name"`
+	Description string           `yaml:"description"`
+	Calls       yaml.Node        `yaml:"calls"`
+	Comparison  *comparisonBlock `yaml:"comparison"`
 	// Populated from Calls after decoding; preserves insertion order.
 	calls []methodCalls `yaml:"-"`
+}
+
+// comparisonBlock is the optional `comparison:` section declaring expected
+// differences and the block override.
+type comparisonBlock struct {
+	BlockOverride string           `yaml:"block_override"`
+	Rules         []ComparisonRule `yaml:"rules"`
 }
 
 // methodCalls preserves the order of methods as they appear in the YAML.
@@ -74,6 +82,16 @@ func LoadCompareConfig(path string) (*ComparisonConfig, error) {
 		Methods:          make([]string, 0),
 		MethodRPCNames:   make(map[string]string),
 		CustomParameters: make(map[string][]interface{}),
+	}
+
+	if file.Comparison != nil {
+		cfg.BlockOverride = file.Comparison.BlockOverride
+		for i, rule := range file.Comparison.Rules {
+			if !ValidRuleKind(rule.Kind) {
+				return nil, fmt.Errorf("compare config: comparison.rules[%d]: unknown kind %q (want ignore, numeric_tolerance, error_code_only or error_presence_only)", i, rule.Kind)
+			}
+		}
+		cfg.Rules = file.Comparison.Rules
 	}
 
 	for _, m := range file.calls {

@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -20,6 +20,14 @@ var (
 	openrpcValidateSchema bool
 	openrpcConcurrency    int
 	openrpcTimeout        int
+
+	openrpcDiffOnly         bool
+	openrpcOmitMatching     bool
+	openrpcMaxResponseBytes int
+	openrpcMaxRetries       int
+	openrpcRetryBaseDelay   time.Duration
+	openrpcFailOnDiff       bool
+	openrpcSkipAboveHead    bool
 )
 
 var compareOpenRPCCmd = &cobra.Command{
@@ -38,6 +46,15 @@ func init() {
 	compareOpenRPCCmd.Flags().BoolVar(&openrpcValidateSchema, "validate-schema", false, "Validate responses against the OpenRPC schema")
 	compareOpenRPCCmd.Flags().IntVar(&openrpcConcurrency, "concurrency", 5, "Concurrent requests")
 	compareOpenRPCCmd.Flags().IntVar(&openrpcTimeout, "timeout", 30, "Per-request timeout in seconds")
+
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcDiffOnly, "diff-only", false, "Exclude identical calls from the output")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcOmitMatching, "omit-matching-responses", false, "Drop full responses; keep only diff entries")
+	compareOpenRPCCmd.Flags().IntVar(&openrpcMaxResponseBytes, "max-response-bytes", 0, "Truncate embedded response bodies larger than N bytes (0 = no limit)")
+	compareOpenRPCCmd.Flags().IntVar(&openrpcMaxRetries, "max-retries", 0, "Max transport attempts (0 = per-client max_retries, else 5)")
+	compareOpenRPCCmd.Flags().DurationVar(&openrpcRetryBaseDelay, "retry-base-delay", 0, "Base backoff between transport retries (0 = 200ms)")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcFailOnDiff, "fail-on-diff", false, "Exit non-zero when post-filter differences remain")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcSkipAboveHead, "skip-above-head", false, "Skip calls pinned to a block above the lowest client head")
+
 	_ = compareOpenRPCCmd.MarkFlagRequired("spec")
 	_ = compareOpenRPCCmd.MarkFlagRequired("clients")
 	_ = compareOpenRPCCmd.MarkFlagRequired("client-refs")
@@ -81,6 +98,12 @@ func runCompareOpenRPC(cmd *cobra.Command, args []string) error {
 	cfg.TimeoutSeconds = openrpcTimeout
 	cfg.OutputDir = outputDir
 	cfg.Verbose = openrpcCurl
+	cfg.DiffOnly = openrpcDiffOnly
+	cfg.OmitMatchingResponses = openrpcOmitMatching
+	cfg.MaxResponseBytes = openrpcMaxResponseBytes
+	cfg.MaxRetries = openrpcMaxRetries
+	cfg.RetryBaseDelayMs = int(openrpcRetryBaseDelay.Milliseconds())
+	cfg.SkipAboveHead = openrpcSkipAboveHead
 
 	if openrpcFilter != "" {
 		applyMethodFilter(cfg, splitCSV(openrpcFilter))
@@ -99,19 +122,7 @@ func runCompareOpenRPC(cmd *cobra.Command, args []string) error {
 	}
 	logger.Infof("Completed comparison of %d methods", len(results))
 
-	jsonPath := filepath.Join(outputDir, "comparison-results.json")
-	if err := comp.SaveResults(jsonPath); err != nil {
-		return fmt.Errorf("failed to save comparison results: %w", err)
-	}
-	logger.Infof("Comparison results saved to %s", jsonPath)
-
-	htmlPath := filepath.Join(outputDir, "comparison-report.html")
-	if err := comp.GenerateHTMLReport(htmlPath); err != nil {
-		return fmt.Errorf("failed to generate comparison HTML report: %w", err)
-	}
-	logger.Infof("Comparison HTML report generated at %s", htmlPath)
-
-	return nil
+	return finishComparison(comp, openrpcFailOnDiff)
 }
 
 func applyMethodFilter(cfg *comparator.ComparisonConfig, methodsToInclude []string) {

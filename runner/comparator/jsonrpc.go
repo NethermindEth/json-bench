@@ -41,8 +41,11 @@ func formatCurlCommand(url string, requestJSON []byte) string {
 		string(requestJSON), url)
 }
 
-// makeJSONRPCCall makes a JSON-RPC call to the specified endpoint
-func makeJSONRPCCall(url, method string, params []interface{}, timeoutSeconds int, verbose bool) (map[string]interface{}, error) {
+// makeJSONRPCCall makes a JSON-RPC call to the specified endpoint, retrying
+// transport errors and 5xx responses with exponential backoff up to
+// maxAttempts. A 200 response carrying a JSON-RPC error object is returned as a
+// valid response (not retried); a 4xx is a hard failure (not retried).
+func makeJSONRPCCall(url, method string, params []interface{}, timeoutSeconds int, verbose bool, maxAttempts int, baseDelay time.Duration) (map[string]interface{}, error) {
 	// Create request
 	request := JSONRPCRequest{
 		JSONRPC: "2.0",
@@ -67,48 +70,65 @@ func makeJSONRPCCall(url, method string, params []interface{}, timeoutSeconds in
 		Timeout: time.Duration(timeoutSeconds) * time.Second,
 	}
 
-	// Create HTTP request
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestJSON))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	if maxAttempts < 1 {
+		maxAttempts = 1
 	}
 
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(backoffDelay(baseDelay, attempt))
+		}
 
-	// Send request
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestJSON))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("HTTP request failed: %w", err)
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("failed to read response body: %w", err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, string(body))
+			if resp.StatusCode >= 500 {
+				continue
+			}
+			return nil, lastErr
+		}
+
+		var rawResponse map[string]interface{}
+		if err := json.Unmarshal(body, &rawResponse); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return rawResponse, nil
 	}
-	defer resp.Body.Close()
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
+	return nil, lastErr
+}
 
-	// Check HTTP status
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var rawResponse map[string]interface{}
-	if err := json.Unmarshal(body, &rawResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	// Return raw response for comparison
-	return rawResponse, nil
+// backoffDelay returns the exponential backoff for a given (1-based) retry
+// attempt: base, 2*base, 4*base, ...
+func backoffDelay(base time.Duration, attempt int) time.Duration {
+	return base * time.Duration(1<<uint(attempt-1))
 }
 
 // BatchJSONRPCRequest represents a batch JSON-RPC request
 type BatchJSONRPCRequest []JSONRPCRequest
 
-// makeBatchJSONRPCCall makes a batch JSON-RPC call to the specified endpoint
-func makeBatchJSONRPCCall(url string, requests []JSONRPCRequest, timeoutSeconds int, verbose bool) ([]map[string]interface{}, error) {
+// makeBatchJSONRPCCall makes a batch JSON-RPC call to the specified endpoint,
+// retrying transport errors and 5xx responses with exponential backoff.
+func makeBatchJSONRPCCall(url string, requests []JSONRPCRequest, timeoutSeconds int, verbose bool, maxAttempts int, baseDelay time.Duration) ([]map[string]interface{}, error) {
 	// Marshal request to JSON
 	requestJSON, err := json.Marshal(requests)
 	if err != nil {
@@ -125,39 +145,49 @@ func makeBatchJSONRPCCall(url string, requests []JSONRPCRequest, timeoutSeconds 
 		Timeout: time.Duration(timeoutSeconds) * time.Second,
 	}
 
-	// Create HTTP request
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestJSON))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	if maxAttempts < 1 {
+		maxAttempts = 1
 	}
 
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(backoffDelay(baseDelay, attempt))
+		}
 
-	// Send request
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(requestJSON))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("HTTP request failed: %w", err)
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("failed to read response body: %w", err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, string(body))
+			if resp.StatusCode >= 500 {
+				continue
+			}
+			return nil, lastErr
+		}
+
+		var rawResponses []map[string]interface{}
+		if err := json.Unmarshal(body, &rawResponses); err != nil {
+			return nil, fmt.Errorf("failed to parse batch response: %w", err)
+		}
+		return rawResponses, nil
 	}
-	defer resp.Body.Close()
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Check HTTP status
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var rawResponses []map[string]interface{}
-	if err := json.Unmarshal(body, &rawResponses); err != nil {
-		return nil, fmt.Errorf("failed to parse batch response: %w", err)
-	}
-
-	// Return raw responses for comparison
-	return rawResponses, nil
+	return nil, lastErr
 }
