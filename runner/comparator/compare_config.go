@@ -33,6 +33,64 @@ type comparisonBlock struct {
 	Rules         []ComparisonRule `yaml:"rules"`
 }
 
+// rulesFile is the on-disk shape of a standalone --rules file. The rules may
+// be nested under a `comparison:` key (matching a compare config) or given at
+// the document root for convenience.
+type rulesFile struct {
+	Comparison    *comparisonBlock `yaml:"comparison"`
+	BlockOverride string           `yaml:"block_override"`
+	Rules         []ComparisonRule `yaml:"rules"`
+}
+
+// validateRuleKinds returns an error describing the first rule with an unknown
+// kind, using ctx to identify where the rule came from.
+func validateRuleKinds(rules []ComparisonRule, ctx string) error {
+	for i, rule := range rules {
+		if !ValidRuleKind(rule.Kind) {
+			return fmt.Errorf("%s: rules[%d]: unknown kind %q (want ignore, numeric_tolerance, error_code_only or error_presence_only)", ctx, i, rule.Kind)
+		}
+	}
+	return nil
+}
+
+// LoadComparisonRules loads a --rules file holding a `comparison:` block (or a
+// bare rules/block_override at the root) and returns the parsed rules and block
+// override for merging into a config in either --config or --from-jsonl mode.
+func LoadComparisonRules(path string) ([]ComparisonRule, string, error) {
+	safePath, err := config.SafeReadPath(path)
+	if err != nil {
+		return nil, "", err
+	}
+	data, err := os.ReadFile(safePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read rules file: %w", err)
+	}
+
+	var file rulesFile
+	if err := yaml.Unmarshal(data, &file); err != nil {
+		return nil, "", fmt.Errorf("failed to parse rules file: %w", err)
+	}
+
+	rules := file.Rules
+	blockOverride := file.BlockOverride
+	if file.Comparison != nil {
+		if len(file.Comparison.Rules) > 0 {
+			rules = file.Comparison.Rules
+		}
+		if file.Comparison.BlockOverride != "" {
+			blockOverride = file.Comparison.BlockOverride
+		}
+	}
+
+	if len(rules) == 0 && blockOverride == "" {
+		return nil, "", fmt.Errorf("rules file %q defines no rules or block_override", path)
+	}
+	if err := validateRuleKinds(rules, "rules file"); err != nil {
+		return nil, "", err
+	}
+	return rules, blockOverride, nil
+}
+
 // methodCalls preserves the order of methods as they appear in the YAML.
 type methodCalls struct {
 	Method string
@@ -86,10 +144,8 @@ func LoadCompareConfig(path string) (*ComparisonConfig, error) {
 
 	if file.Comparison != nil {
 		cfg.BlockOverride = file.Comparison.BlockOverride
-		for i, rule := range file.Comparison.Rules {
-			if !ValidRuleKind(rule.Kind) {
-				return nil, fmt.Errorf("compare config: comparison.rules[%d]: unknown kind %q (want ignore, numeric_tolerance, error_code_only or error_presence_only)", i, rule.Kind)
-			}
+		if err := validateRuleKinds(file.Comparison.Rules, "compare config: comparison"); err != nil {
+			return nil, err
 		}
 		cfg.Rules = file.Comparison.Rules
 	}

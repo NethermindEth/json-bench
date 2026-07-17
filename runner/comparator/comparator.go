@@ -14,6 +14,11 @@ import (
 	"github.com/jsonrpc-bench/runner/types"
 )
 
+// DefaultDiffOnlyMaxResponseBytes is the response-body cap applied when
+// --diff-only is used without an explicit body-trimming flag, so the report
+// stays small by default. Callers can opt out to retain full bodies.
+const DefaultDiffOnlyMaxResponseBytes = 4096
+
 // ComparisonResult represents the result of comparing responses from different clients
 type ComparisonResult struct {
 	Method          string                 `json:"method"`
@@ -36,6 +41,15 @@ func (r ComparisonResult) hasDifferences() bool {
 // post-filter differences, no transport failures, and no schema errors.
 func (r ComparisonResult) isIdentical() bool {
 	return len(r.Differences) == 0 && len(r.TransportErrors) == 0 && len(r.SchemaErrors) == 0
+}
+
+// isEnvDifference reports whether a differing call's difference stems from an
+// environment/capability error (see classifyError) on some client rather than
+// a real result mismatch. A response is either a result or an error, so a
+// classified error on any client means the difference is that error, not a
+// correctness regression.
+func (r ComparisonResult) isEnvDifference() bool {
+	return r.hasDifferences() && len(r.ErrorClass) > 0
 }
 
 // ComparisonConfig represents the configuration for response comparison.
@@ -497,11 +511,14 @@ func truncateResponses(responses map[string]interface{}, maxBytes int) map[strin
 	return out
 }
 
-// Summary tallies the results by outcome category.
+// Summary tallies the results by outcome category. Differ counts real result
+// mismatches; DifferEnv counts mismatches attributable to an environment or
+// capability error (see classifyError).
 type Summary struct {
 	Total          int
 	Identical      int
 	Differ         int
+	DifferEnv      int
 	TransportError int
 	SchemaError    int
 	EnvError       map[string]int
@@ -514,7 +531,11 @@ func (c *Comparator) Summarize() Summary {
 	for _, r := range c.results {
 		switch {
 		case r.hasDifferences():
-			s.Differ++
+			if r.isEnvDifference() {
+				s.DifferEnv++
+			} else {
+				s.Differ++
+			}
 		case len(r.TransportErrors) > 0:
 			s.TransportError++
 		case len(r.SchemaErrors) > 0:
@@ -529,11 +550,34 @@ func (c *Comparator) Summarize() Summary {
 	return s
 }
 
-// HasDifferences reports whether any call has post-filter differences (used by
-// --fail-on-diff).
+// HasDifferences reports whether any call has post-filter differences,
+// including environment/expected ones.
 func (c *Comparator) HasDifferences() bool {
 	for _, r := range c.results {
 		if r.hasDifferences() {
+			return true
+		}
+	}
+	return false
+}
+
+// HasRealDifferences reports whether any call has a real result mismatch (not
+// attributable to an environment/capability error). This is what --fail-on-diff
+// trips on by default.
+func (c *Comparator) HasRealDifferences() bool {
+	for _, r := range c.results {
+		if r.hasDifferences() && !r.isEnvDifference() {
+			return true
+		}
+	}
+	return false
+}
+
+// HasEnvDifferences reports whether any differing call is attributable to an
+// environment/capability error.
+func (c *Comparator) HasEnvDifferences() bool {
+	for _, r := range c.results {
+		if r.isEnvDifference() {
 			return true
 		}
 	}
@@ -591,4 +635,17 @@ func (c *Comparator) GenerateReport(outputPath string) error {
 // GetResults returns all comparison results
 func (c *Comparator) GetResults() []ComparisonResult {
 	return c.results
+}
+
+// MergeComparisonRules layers rules from a --rules file on top of the rules
+// already on the config. Layered rules are evaluated first, so they take
+// precedence over config rules on the same path.
+func (c *ComparisonConfig) MergeComparisonRules(rules []ComparisonRule) {
+	if len(rules) == 0 {
+		return
+	}
+	merged := make([]ComparisonRule, 0, len(rules)+len(c.Rules))
+	merged = append(merged, rules...)
+	merged = append(merged, c.Rules...)
+	c.Rules = merged
 }

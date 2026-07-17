@@ -45,7 +45,7 @@ func TestLoadCorpusConfig(t *testing.T) {
 `,
 	})
 
-	cfg, err := LoadCorpusConfig(dir, 0, 42)
+	cfg, err := LoadCorpusConfig(dir, 0, 42, "")
 	if err != nil {
 		t.Fatalf("LoadCorpusConfig: %v", err)
 	}
@@ -59,6 +59,59 @@ func TestLoadCorpusConfig(t *testing.T) {
 	}
 }
 
+func TestLoadCorpusConfigRecursesAndReadsJSON(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{
+		"top.jsonl":  `{"method":"eth_getCode","params":["0xabc","0x10"]}` + "\n",
+		"array.json": `[{"method":"eth_call","params":[{"to":"0x1"},"0x10"]},{"method":"eth_call","params":[{"to":"0x2"},"0x11"]}]`,
+	})
+	// A nested subdirectory should be walked too.
+	if err := os.MkdirAll(filepath.Join(dir, "contracts"), 0o755); err != nil {
+		t.Fatalf("mkdir contracts: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "contracts", "weth.jsonl"), []byte(`{"method":"eth_getStorageAt","params":["0xabc","0x0","0x10"]}`+"\n"), 0o600); err != nil {
+		t.Fatalf("write nested: %v", err)
+	}
+
+	cfg, err := LoadCorpusConfig(dir, 0, 42, "")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig: %v", err)
+	}
+	methods := map[string]int{}
+	for _, id := range cfg.Methods {
+		methods[cfg.MethodRPCNames[id]]++
+	}
+	if methods["eth_getCode"] != 1 {
+		t.Errorf("expected 1 eth_getCode from top-level .jsonl, got %d", methods["eth_getCode"])
+	}
+	if methods["eth_call"] != 2 {
+		t.Errorf("expected 2 eth_call from .json array, got %d", methods["eth_call"])
+	}
+	if methods["eth_getStorageAt"] != 1 {
+		t.Errorf("expected 1 eth_getStorageAt from nested subdir, got %d", methods["eth_getStorageAt"])
+	}
+}
+
+func TestLoadCorpusConfigFeeHistoryPinning(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{
+		"fee.jsonl": `{"method":"eth_feeHistory","params":["0x5","latest",[]]}` + "\n",
+	})
+
+	// Without a block override, eth_feeHistory is head-dependent and excluded,
+	// leaving an empty corpus.
+	if _, err := LoadCorpusConfig(dir, 0, 42, ""); err == nil {
+		t.Error("expected eth_feeHistory to be excluded without a block override")
+	}
+
+	// With a block override it is pinnable and kept.
+	cfg, err := LoadCorpusConfig(dir, 0, 42, "0x1406f40")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig with block override: %v", err)
+	}
+	if len(cfg.Methods) != 1 || cfg.MethodRPCNames[cfg.Methods[0]] != "eth_feeHistory" {
+		t.Errorf("expected eth_feeHistory kept when pinned, got %v", cfg.Methods)
+	}
+}
+
 func TestLoadCorpusConfigSampling(t *testing.T) {
 	lines := ""
 	for i := 0; i < 10; i++ {
@@ -66,7 +119,7 @@ func TestLoadCorpusConfigSampling(t *testing.T) {
 	}
 	dir := writeCorpus(t, map[string]string{"eth_getBalance.jsonl": lines})
 
-	cfg, err := LoadCorpusConfig(dir, 3, 42)
+	cfg, err := LoadCorpusConfig(dir, 3, 42, "")
 	if err != nil {
 		t.Fatalf("LoadCorpusConfig: %v", err)
 	}
@@ -75,7 +128,7 @@ func TestLoadCorpusConfigSampling(t *testing.T) {
 	}
 
 	// Sampling is deterministic for a fixed seed.
-	cfg2, _ := LoadCorpusConfig(dir, 3, 42)
+	cfg2, _ := LoadCorpusConfig(dir, 3, 42, "")
 	for i, id := range cfg.Methods {
 		a := fmt.Sprintf("%v", cfg.CustomParameters[id])
 		b := fmt.Sprintf("%v", cfg2.CustomParameters[cfg2.Methods[i]])
@@ -87,7 +140,7 @@ func TestLoadCorpusConfigSampling(t *testing.T) {
 
 func TestLoadCorpusConfigAllExcluded(t *testing.T) {
 	dir := writeCorpus(t, map[string]string{"only.jsonl": `{"method":"eth_getProof","params":[]}` + "\n"})
-	if _, err := LoadCorpusConfig(dir, 0, 42); err == nil {
+	if _, err := LoadCorpusConfig(dir, 0, 42, ""); err == nil {
 		t.Error("expected error when corpus is empty after exclusions")
 	}
 }

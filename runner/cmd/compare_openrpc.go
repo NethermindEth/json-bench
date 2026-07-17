@@ -22,11 +22,13 @@ var (
 	openrpcTimeout        int
 
 	openrpcDiffOnly         bool
+	openrpcKeepBodies       bool
 	openrpcOmitMatching     bool
 	openrpcMaxResponseBytes int
 	openrpcMaxRetries       int
 	openrpcRetryBaseDelay   time.Duration
 	openrpcFailOnDiff       bool
+	openrpcFailOnEnv        bool
 	openrpcSkipAboveHead    bool
 )
 
@@ -47,12 +49,14 @@ func init() {
 	compareOpenRPCCmd.Flags().IntVar(&openrpcConcurrency, "concurrency", 5, "Concurrent requests")
 	compareOpenRPCCmd.Flags().IntVar(&openrpcTimeout, "timeout", 30, "Per-request timeout in seconds")
 
-	compareOpenRPCCmd.Flags().BoolVar(&openrpcDiffOnly, "diff-only", false, "Exclude identical calls from the output")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcDiffOnly, "diff-only", false, "Exclude identical calls from the output (caps response bodies unless --keep-response-bodies)")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcKeepBodies, "keep-response-bodies", false, "With --diff-only, keep full response bodies instead of truncating them")
 	compareOpenRPCCmd.Flags().BoolVar(&openrpcOmitMatching, "omit-matching-responses", false, "Drop full responses; keep only diff entries")
 	compareOpenRPCCmd.Flags().IntVar(&openrpcMaxResponseBytes, "max-response-bytes", 0, "Truncate embedded response bodies larger than N bytes (0 = no limit)")
-	compareOpenRPCCmd.Flags().IntVar(&openrpcMaxRetries, "max-retries", 0, "Max transport attempts (0 = per-client max_retries, else 5)")
+	compareOpenRPCCmd.Flags().IntVar(&openrpcMaxRetries, "max-retries", 0, "Max transport attempts per request (0 = use the client's max_retries from clients.yaml, or 5 if unset)")
 	compareOpenRPCCmd.Flags().DurationVar(&openrpcRetryBaseDelay, "retry-base-delay", 0, "Base backoff between transport retries (0 = 200ms)")
-	compareOpenRPCCmd.Flags().BoolVar(&openrpcFailOnDiff, "fail-on-diff", false, "Exit non-zero when post-filter differences remain")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcFailOnDiff, "fail-on-diff", false, "Exit non-zero when real (non-environment) differences remain")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcFailOnEnv, "fail-on-env-diff", false, "Also exit non-zero on environment/capability differences (compose with --fail-on-diff for strict mode)")
 	compareOpenRPCCmd.Flags().BoolVar(&openrpcSkipAboveHead, "skip-above-head", false, "Skip calls pinned to a block above the lowest client head")
 
 	_ = compareOpenRPCCmd.MarkFlagRequired("spec")
@@ -104,6 +108,7 @@ func runCompareOpenRPC(cmd *cobra.Command, args []string) error {
 	cfg.MaxRetries = openrpcMaxRetries
 	cfg.RetryBaseDelayMs = int(openrpcRetryBaseDelay.Milliseconds())
 	cfg.SkipAboveHead = openrpcSkipAboveHead
+	applyDiffOnlyDefaults(cfg, openrpcKeepBodies)
 
 	if openrpcFilter != "" {
 		applyMethodFilter(cfg, splitCSV(openrpcFilter))
@@ -122,7 +127,7 @@ func runCompareOpenRPC(cmd *cobra.Command, args []string) error {
 	}
 	logger.Infof("Completed comparison of %d methods", len(results))
 
-	return finishComparison(comp, openrpcFailOnDiff)
+	return finishComparison(comp, openrpcFailOnDiff, openrpcFailOnEnv)
 }
 
 func applyMethodFilter(cfg *comparator.ComparisonConfig, methodsToInclude []string) {
