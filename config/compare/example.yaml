@@ -3,6 +3,34 @@ description: >
   Example compare config demonstrating optional per-call ids, multiple
   variants for the same method, and complex parameter objects.
 
+# Optional. Declares differences that are expected (and therefore not real
+# findings), plus a static block to pin latest/pending tags to. Everything
+# here is optional; omit the whole block to reproduce the default behavior.
+comparison:
+  # Rewrite latest/pending block tags to a fixed block and append a block
+  # argument to eth_call/eth_estimateGas/etc. calls that omit one, so archive
+  # nodes at different heads can be compared.
+  # block_override: "0x1406f40"
+  rules:
+    # eth_estimateGas drifts by a few gas units between versions; treat two
+    # quantities as equal when within `abs` units OR `rel` fraction of each
+    # other. (eth_estimateGas already gets a built-in 10% tolerance by default.)
+    - method: eth_estimateGas
+      path: result
+      kind: numeric_tolerance
+      abs: 32
+      rel: 0.10
+    # totalDifficulty is a known serialization difference between clients.
+    - path: result.totalDifficulty
+      kind: ignore
+    # Array wildcards: ignore a field on every transaction in the block.
+    - method: eth_getBlockByNumber
+      path: result.transactions[*].v
+      kind: ignore
+    # Compare only the error code, not the (benign) message wording.
+    - method: eth_call
+      kind: error_code_only
+
 calls:
   eth_blockNumber:
     - params: []

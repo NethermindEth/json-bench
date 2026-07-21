@@ -37,8 +37,13 @@ type DiffEntry struct {
 	Reference string      `json:"reference,omitempty"`
 }
 
-// compareJSONRPCResponses compares two JSON-RPC responses and returns their differences
-func compareJSONRPCResponses(resp1, resp2 map[string]interface{}) (map[string]interface{}, error) {
+// compareJSONRPCResponses compares two JSON-RPC responses and returns their
+// differences, applying the rules carried by ctx. Passing a nil ctx compares
+// with no rules (the pre-rules behavior).
+func compareJSONRPCResponses(ctx *diffContext, resp1, resp2 map[string]interface{}) (map[string]interface{}, error) {
+	if ctx == nil {
+		ctx = newDiffContext("", nil)
+	}
 	differences := make(map[string]interface{})
 
 	// Check if both have result or error fields
@@ -67,7 +72,7 @@ func compareJSONRPCResponses(resp1, resp2 map[string]interface{}) (map[string]in
 
 	// If both have results, compare them
 	if hasResult1 && hasResult2 {
-		resultDiffs, err := deepCompare("result", result1, result2)
+		resultDiffs, err := deepCompare(ctx, "result", result1, result2)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compare results: %w", err)
 		}
@@ -77,15 +82,30 @@ func compareJSONRPCResponses(resp1, resp2 map[string]interface{}) (map[string]in
 		}
 	}
 
-	// If both have errors, compare them
+	// If both have errors, compare them subject to the error rules.
 	if hasError1 && hasError2 {
-		errorDiffs, err := deepCompare("error", error1, error2)
-		if err != nil {
-			return nil, fmt.Errorf("failed to compare errors: %w", err)
-		}
-
-		if len(errorDiffs) > 0 {
-			differences["error_differences"] = errorDiffs
+		switch {
+		case ctx.rules.errorPresenceOnly:
+			// Both responses errored; treat as equal regardless of code/message.
+		case ctx.rules.errorCodeOnly:
+			code1, _ := errorCode(error1)
+			code2, _ := errorCode(error2)
+			if code1 != code2 {
+				differences["error_differences"] = []DiffEntry{{
+					Path:   "error.code",
+					Type:   DiffTypeValueMismatch,
+					Value1: code1,
+					Value2: code2,
+				}}
+			}
+		default:
+			errorDiffs, err := deepCompare(ctx, "error", error1, error2)
+			if err != nil {
+				return nil, fmt.Errorf("failed to compare errors: %w", err)
+			}
+			if len(errorDiffs) > 0 {
+				differences["error_differences"] = errorDiffs
+			}
 		}
 	}
 
@@ -93,7 +113,12 @@ func compareJSONRPCResponses(resp1, resp2 map[string]interface{}) (map[string]in
 }
 
 // deepCompare recursively compares two values and returns their differences
-func deepCompare(path string, val1, val2 interface{}) ([]DiffEntry, error) {
+func deepCompare(ctx *diffContext, path string, val1, val2 interface{}) ([]DiffEntry, error) {
+	// An ignore rule drops this path (and its whole subtree) from comparison.
+	if ctx.rules.matchesIgnore(path) {
+		return nil, nil
+	}
+
 	// Handle nil values
 	if val1 == nil && val2 == nil {
 		return nil, nil
@@ -125,10 +150,10 @@ func deepCompare(path string, val1, val2 interface{}) ([]DiffEntry, error) {
 	// Compare based on type
 	switch val1.(type) {
 	case map[string]interface{}:
-		return compareObjects(path, val1.(map[string]interface{}), val2.(map[string]interface{}))
+		return compareObjects(ctx, path, val1.(map[string]interface{}), val2.(map[string]interface{}))
 
 	case []interface{}:
-		return compareArrays(path, val1.([]interface{}), val2.([]interface{}))
+		return compareArrays(ctx, path, val1.([]interface{}), val2.([]interface{}))
 
 	case string, float64, bool, int, int64:
 		// Special case for Ethereum hex strings: treat 0x and 0x0000...0000 as equal
@@ -140,6 +165,12 @@ func deepCompare(path string, val1, val2 interface{}) ([]DiffEntry, error) {
 					if (str1 == "0x" && isZeroHex(str2)) || (str2 == "0x" && isZeroHex(str1)) {
 						// Consider them equal
 						return nil, nil
+					}
+					// A numeric_tolerance rule treats close-enough quantities as equal.
+					if rule, ok := ctx.rules.toleranceFor(path); ok {
+						if applicable, equal := withinTolerance(str1, str2, rule); applicable && equal {
+							return nil, nil
+						}
 					}
 				}
 			}
@@ -180,7 +211,7 @@ func deepCompare(path string, val1, val2 interface{}) ([]DiffEntry, error) {
 }
 
 // compareObjects compares two objects and returns their differences
-func compareObjects(path string, obj1, obj2 map[string]interface{}) ([]DiffEntry, error) {
+func compareObjects(ctx *diffContext, path string, obj1, obj2 map[string]interface{}) ([]DiffEntry, error) {
 	var differences []DiffEntry
 
 	// Get all keys from both objects
@@ -208,6 +239,11 @@ func compareObjects(path string, obj1, obj2 map[string]interface{}) ([]DiffEntry
 			keyPath = key
 		}
 
+		// An ignore rule drops this key entirely, including missing/extra cases.
+		if ctx.rules.matchesIgnore(keyPath) {
+			continue
+		}
+
 		val1, exists1 := obj1[key]
 		val2, exists2 := obj2[key]
 
@@ -233,7 +269,7 @@ func compareObjects(path string, obj1, obj2 map[string]interface{}) ([]DiffEntry
 		}
 
 		// Recursively compare values
-		diffs, err := deepCompare(keyPath, val1, val2)
+		diffs, err := deepCompare(ctx, keyPath, val1, val2)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compare %s: %w", keyPath, err)
 		}
@@ -245,7 +281,7 @@ func compareObjects(path string, obj1, obj2 map[string]interface{}) ([]DiffEntry
 }
 
 // compareArrays compares two arrays and returns their differences
-func compareArrays(path string, arr1, arr2 []interface{}) ([]DiffEntry, error) {
+func compareArrays(ctx *diffContext, path string, arr1, arr2 []interface{}) ([]DiffEntry, error) {
 	var differences []DiffEntry
 
 	// Compare array lengths
@@ -267,7 +303,7 @@ func compareArrays(path string, arr1, arr2 []interface{}) ([]DiffEntry, error) {
 		// Compare elements up to the minimum length
 		for i := 0; i < minLen; i++ {
 			itemPath := fmt.Sprintf("%s[%d]", path, i)
-			diffs, err := deepCompare(itemPath, arr1[i], arr2[i])
+			diffs, err := deepCompare(ctx, itemPath, arr1[i], arr2[i])
 			if err != nil {
 				return nil, fmt.Errorf("failed to compare %s: %w", itemPath, err)
 			}
@@ -281,7 +317,7 @@ func compareArrays(path string, arr1, arr2 []interface{}) ([]DiffEntry, error) {
 	// If lengths are the same, compare all elements
 	for i := 0; i < len(arr1); i++ {
 		itemPath := fmt.Sprintf("%s[%d]", path, i)
-		diffs, err := deepCompare(itemPath, arr1[i], arr2[i])
+		diffs, err := deepCompare(ctx, itemPath, arr1[i], arr2[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed to compare %s: %w", itemPath, err)
 		}

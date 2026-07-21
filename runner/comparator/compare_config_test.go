@@ -161,6 +161,59 @@ calls:
 	}
 }
 
+func TestLoadCompareConfig_ComparisonBlock(t *testing.T) {
+	path := writeCompareFixture(t, `
+name: "with rules"
+comparison:
+  block_override: "0x1406f40"
+  rules:
+    - method: eth_estimateGas
+      path: result
+      kind: numeric_tolerance
+      rel: 0.1
+    - path: result.totalDifficulty
+      kind: ignore
+    - method: eth_getStorageAt
+      kind: error_code_only
+calls:
+  eth_blockNumber:
+    - params: []
+`)
+	cfg, err := LoadCompareConfig(path)
+	if err != nil {
+		t.Fatalf("LoadCompareConfig: %v", err)
+	}
+	if cfg.BlockOverride != "0x1406f40" {
+		t.Errorf("BlockOverride = %q, want 0x1406f40", cfg.BlockOverride)
+	}
+	if len(cfg.Rules) != 3 {
+		t.Fatalf("Rules len = %d, want 3", len(cfg.Rules))
+	}
+	if cfg.Rules[0].Kind != RuleNumericTolerance || cfg.Rules[0].Rel != 0.1 || cfg.Rules[0].Method != "eth_estimateGas" {
+		t.Errorf("rule[0] round-trip failed: %+v", cfg.Rules[0])
+	}
+	if cfg.Rules[1].Kind != RuleIgnore || cfg.Rules[1].Path != "result.totalDifficulty" {
+		t.Errorf("rule[1] round-trip failed: %+v", cfg.Rules[1])
+	}
+}
+
+func TestLoadCompareConfig_UnknownRuleKind(t *testing.T) {
+	path := writeCompareFixture(t, `
+name: "bad rule"
+comparison:
+  rules:
+    - path: result
+      kind: bogus
+calls:
+  eth_blockNumber:
+    - params: []
+`)
+	_, err := LoadCompareConfig(path)
+	if err == nil || !strings.Contains(err.Error(), "unknown kind") {
+		t.Fatalf("expected unknown kind error, got %v", err)
+	}
+}
+
 func TestLoadCompareConfig_Errors(t *testing.T) {
 	cases := []struct {
 		name    string

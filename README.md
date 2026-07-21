@@ -245,16 +245,102 @@ go run ./runner compare \
   --output ./comparison-results
 ```
 
-Both artefacts are always produced:
+These artefacts are always produced:
 
 - `<output>/comparison-results.json`
 - `<output>/comparison-report.html`
+- `<output>/comparison-provenance.json` — the effective config (client refs,
+  active rules, block override, output/retry settings, sample counts) so a
+  report is self-describing and reproducible.
 
 A `config/compare/defaults.yaml` ships with the repo and reproduces the
 old baseline of eight common methods (eth_blockNumber, eth_getBalance,
 eth_call, eth_getBlockByNumber, eth_getTransactionCount, eth_chainId,
 eth_gasPrice, net_version) with the parameters the CLI previously used
 implicitly.
+
+#### Declaring expected differences (`comparison:` block)
+
+Cross-client (and cross-version) runs surface many *expected* differences —
+a serialization change like `totalDifficulty`, sub-percent `eth_estimateGas`
+drift, or a namespace that is disabled on one node. Declare these in an
+optional `comparison:` block so they stop flooding the report:
+
+```yaml
+comparison:
+  # Rewrite latest/pending tags to a static block and append a block arg to
+  # calls that omit one, so archive nodes at different heads are comparable.
+  block_override: "0x1406f40"
+  rules:
+    # Treat two hex quantities as equal within abs units OR rel fraction.
+    # (eth_estimateGas already gets a built-in 10% tolerance by default.)
+    - method: eth_estimateGas
+      path: result
+      kind: numeric_tolerance
+      abs: 32
+      rel: 0.10
+    # Drop a path entirely; `[*]` matches any array index.
+    - path: result.totalDifficulty
+      kind: ignore
+    - method: eth_getBlockByNumber
+      path: result.transactions[*].v
+      kind: ignore
+    # Compare only the error code, not the (benign) message wording.
+    - method: eth_call
+      kind: error_code_only    # also: error_presence_only
+```
+
+Rule kinds: `ignore`, `numeric_tolerance` (`abs`/`rel`), `error_code_only`,
+`error_presence_only`. A rule with no `method` applies to all methods; no
+`path` applies to the whole response value. Everything in the block is
+optional and defaults reproduce the prior behavior.
+
+The same block can live in a **standalone file** passed with `--rules`, which
+merges over the config's own rules and works in corpus mode too:
+
+```bash
+go run ./runner compare \
+  --from-jsonl ./rpc-calls --sample 400 \
+  --rules ./config/compare/archive-rules.yaml \
+  --block-override 0x1406f40 \
+  --clients ./config/clients/clients.yaml --client-refs old,new \
+  --diff-only --fail-on-diff --concurrency 4
+```
+
+#### Building a config from a corpus (`--from-jsonl`)
+
+Instead of `--config`, point `--from-jsonl <dir>` at a corpus directory. It
+recurses and reads both line-delimited `*.jsonl` files and `*.json` files
+holding a JSON array of `{method, params}` objects. `--sample N` keeps at
+most N calls per method (deterministic; control the seed with
+`--sample-seed`). Head-dependent and unstorable methods (`eth_getProof`,
+`eth_gasPrice`, `eth_syncing`, `eth_blockNumber`, `eth_maxPriorityFeePerGas`,
+the `debug_` namespace) are excluded; `eth_feeHistory` is kept only when a
+block override pins its `newestBlock`.
+
+#### Smaller reports and CI gating
+
+- `--diff-only` excludes identical calls. To keep the report small it also
+  caps response bodies (`4096` bytes) unless you pass `--keep-response-bodies`
+  to retain them or `--omit-matching-responses` to drop them entirely.
+  `--max-response-bytes N` sets an explicit cap.
+- The run prints a category summary: identical / differ (real) / differ
+  (env/expected) / transport-error / schema-error / skipped, plus per-class
+  environment/capability error counts.
+- `--fail-on-diff` exits non-zero on **real** differences only (environment/
+  capability differences are excluded by default); add `--fail-on-env-diff`
+  for strict mode that also fails on those.
+- `--skip-above-head` queries each client's head and skips calls pinned to a
+  higher block, so a less-synced node does not produce false differences.
+
+#### Robustness against throttling nodes
+
+Transport errors and 5xx responses are retried with exponential backoff.
+`--max-retries` sets the attempt budget (falls back to a client's
+`max_retries` in `clients.yaml`, or 5 if unset) and `--retry-base-delay` the
+base backoff. A call that still fails is recorded per-call and the run
+continues, so a single dead endpoint never discards an otherwise good run.
+Keep `--concurrency` low (≤4) against nodes that throttle connection bursts.
 
 ### OpenRPC-Driven Comparison
 

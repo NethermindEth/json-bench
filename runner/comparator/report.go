@@ -70,9 +70,12 @@ func formatJSON(obj interface{}) (string, error) {
 
 // GenerateHTMLReport generates an HTML report from the comparison results
 func (c *Comparator) GenerateHTMLReport(outputPath string) error {
+	// Honor the lean-output options so the report stays small.
+	results := c.resultsForOutput()
+
 	// Convert comparison results to response diffs
-	responseDiffs := make([]types.ResponseDiff, len(c.results))
-	for i, result := range c.results {
+	responseDiffs := make([]types.ResponseDiff, len(results))
+	for i, result := range results {
 		// Extract client names
 		clientNames := make([]string, 0, len(result.Responses))
 		for client := range result.Responses {
