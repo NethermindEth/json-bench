@@ -19,15 +19,23 @@ import (
 )
 
 func CollectClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
-	if cfg.Outputs.PrometheusRW != nil {
+	if cfg.Outputs != nil && cfg.Outputs.PrometheusRW != nil {
 		return collectPrometheusClientsMetrics(cfg, timestamp, summaryPath, logger)
 	}
-	return nil, fmt.Errorf("no outputs configured")
+	return collectSummaryClientsMetrics(cfg, summaryPath, logger)
 }
 
-func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
-	clientsMetrics := make(map[string]*types.ClientMetrics, len(cfg.Calls))
+// collectSummaryClientsMetrics builds client metrics without Prometheus by
+// filling every client/method pair from k6's summary.json.
+func collectSummaryClientsMetrics(cfg *config.Config, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
+	clientsMetrics := newClientsMetricsSkeleton(cfg)
+	applySummaryFallback(clientsMetrics, cfg, summaryPath, logger)
+	finalizeClientMetrics(clientsMetrics)
+	return clientsMetrics, nil
+}
 
+func newClientsMetricsSkeleton(cfg *config.Config) map[string]*types.ClientMetrics {
+	clientsMetrics := make(map[string]*types.ClientMetrics, len(cfg.ResolvedClients))
 	for _, client := range cfg.ResolvedClients {
 		clientsMetrics[client.Name] = &types.ClientMetrics{
 			Name:              client.Name,
@@ -43,6 +51,11 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			},
 		}
 	}
+	return clientsMetrics
+}
+
+func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
+	clientsMetrics := newClientsMetricsSkeleton(cfg)
 
 	// Parse prometheus endpoint. The query API lives at the base URL; the
 	// remote-write target on cfg.Outputs.PrometheusRW.Endpoint already has
@@ -178,6 +191,15 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 
 	applySummaryFallback(clientsMetrics, cfg, summaryPath, logger)
 
+	finalizeClientMetrics(clientsMetrics)
+
+	return clientsMetrics, nil
+}
+
+// finalizeClientMetrics recomputes per-client totals, aggregate latency and
+// throughput from the collected per-method data, regardless of whether that
+// data came from Prometheus or the summary.json fallback.
+func finalizeClientMetrics(clientsMetrics map[string]*types.ClientMetrics) {
 	for _, client := range clientsMetrics {
 		// Recalculate totals based on method data to ensure accuracy
 		var totalRequests int64
@@ -244,8 +266,6 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 			}
 		}
 	}
-
-	return clientsMetrics, nil
 }
 
 func calculateStdDev(values types.MetricSummary) float64 {

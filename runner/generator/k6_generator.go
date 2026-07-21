@@ -265,7 +265,7 @@ func GenerateK6Cmd(
 
 // configureOutputs configures the outputs for the k6 command
 func configureOutputs(cfg *config.Config, cmd *exec.Cmd) *exec.Cmd {
-	if cfg.Outputs.PrometheusRW != nil {
+	if cfg.Outputs != nil && cfg.Outputs.PrometheusRW != nil {
 		cmd.Args = append(cmd.Args, "--out", "experimental-prometheus-rw")
 		cmd.Env = append(cmd.Env,
 			fmt.Sprintf("K6_PROMETHEUS_RW_SERVER_URL=%s", cfg.Outputs.PrometheusRW.Endpoint),

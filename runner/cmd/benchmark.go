@@ -41,7 +41,7 @@ var benchmarkCmd = &cobra.Command{
 func init() {
 	benchmarkCmd.Flags().StringVar(&benchmarkConfigPath, "config", "", "Path to YAML configuration file")
 	benchmarkCmd.Flags().StringVar(&benchmarkClientsPath, "clients", "", "Path to clients configuration file (optional)")
-	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusURL, "prometheus", "http://localhost:9090", "Prometheus base URL (used directly for queries; remote-write path is appended)")
+	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusURL, "prometheus", "", "Prometheus base URL (optional; used directly for queries, remote-write path is appended). When empty, remote-write is disabled and metrics are collected from k6's summary.json")
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPath, "prometheus-rw-path", "/api/v1/write", "Path appended to --prometheus to form the remote-write target")
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWUser, "prometheus-rw-user", "", "Prometheus basic-auth username (optional)")
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPass, "prometheus-rw-pass", "", "Prometheus basic-auth password (optional)")
@@ -55,9 +55,6 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 
 	if benchmarkConfigPath == "" {
 		return fmt.Errorf("--config is required")
-	}
-	if benchmarkPrometheusURL == "" {
-		return fmt.Errorf("--prometheus is required")
 	}
 	if benchmarkEnableHistoric && benchmarkStorageConfigPath == "" {
 		return fmt.Errorf("--storage-config is required when --historic is set")
@@ -73,20 +70,21 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	queryURL := strings.TrimRight(benchmarkPrometheusURL, "/")
-	rwPath := benchmarkPrometheusRWPath
-	if !strings.HasPrefix(rwPath, "/") {
-		rwPath = "/" + rwPath
-	}
-	cfg.Outputs = &config.Outputs{
-		PrometheusRW: &config.PrometheusRW{
+	cfg.Outputs = &config.Outputs{}
+	if benchmarkPrometheusURL != "" {
+		queryURL := strings.TrimRight(benchmarkPrometheusURL, "/")
+		rwPath := benchmarkPrometheusRWPath
+		if !strings.HasPrefix(rwPath, "/") {
+			rwPath = "/" + rwPath
+		}
+		cfg.Outputs.PrometheusRW = &config.PrometheusRW{
 			Endpoint: queryURL + rwPath,
 			QueryURL: queryURL,
 			BasicAuth: config.BasicAuth{
 				Username: benchmarkPrometheusRWUser,
 				Password: benchmarkPrometheusRWPass,
 			},
-		},
+		}
 	}
 
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
