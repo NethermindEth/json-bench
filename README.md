@@ -144,13 +144,13 @@ Global flags accepted by every subcommand:
 ### Basic Benchmarking
 
 ```bash
-# Run a mixed workload benchmark
+# Run a mixed workload benchmark (no Prometheus; metrics come from k6's summary.json)
 go run ./runner benchmark --config ./config/benchmark/mixed.yaml --clients ./config/clients/clients.yaml
 
 # Run a read-heavy benchmark
 go run ./runner benchmark --config ./config/benchmark/read-heavy.yaml --clients ./config/clients/clients.yaml
 
-# Run with a custom output directory and a non-default Prometheus endpoint
+# Opt into Prometheus remote-write by passing an endpoint
 go run ./runner --output ./custom-results benchmark \
   --config ./config/benchmark/mixed.yaml \
   --clients ./config/clients/clients.yaml \
@@ -169,6 +169,11 @@ go run ./runner benchmark \
   --clients ./config/clients/clients.yaml \
   --html-report
 ```
+
+`--prometheus` is optional and disabled by default. When it is omitted (or
+empty), k6 remote-write is not enabled and per-client metrics are collected from
+k6's `summary.json` instead. Passing an endpoint opts into remote-write and
+post-run PromQL queries.
 
 `benchmark` always writes `outputs/results.json` and `outputs/results.csv`.
 The HTML report at `outputs/report.html` is opt-in via `--html-report`.
@@ -391,6 +396,9 @@ clear error. The mapping is:
 
 Additional behaviour changes worth noting:
 
+- `--prometheus` is now optional and disabled by default. Omit it to run
+  without remote-write (metrics are read from k6's `summary.json`); pass an
+  endpoint to opt into Prometheus.
 - The benchmark `report.html` is opt-in via `--html-report`. JSON and CSV
   exports remain on by default.
 - The legacy `endpoints + frequency` YAML schema is no longer accepted.
@@ -477,8 +485,9 @@ For advanced time-series analysis and alerting, you can use Grafana:
 
 #### Scraping node-side metrics
 
-This tool only ships k6 client-side metrics (`k6_http_req_*`) to Prometheus.
-It does **not** scrape the Geth/Nethermind/etc. clients under test — bring
+When Prometheus is enabled, this tool only ships k6 client-side metrics
+(`k6_http_req_*`) to it. It does **not** scrape the Geth/Nethermind/etc.
+clients under test — bring
 your own observability for server-side metrics. To add them, point your own
 Prometheus at the node's metrics endpoint (each EL client publishes one):
 

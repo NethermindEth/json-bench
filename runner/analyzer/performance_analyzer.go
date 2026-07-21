@@ -64,7 +64,10 @@ func (pa *PerformanceAnalyzer) calculatePerformanceScores(clients map[string]*ty
 			totalThroughput += method.Throughput
 			methodCount++
 		}
-		avgThroughput := totalThroughput / float64(methodCount)
+		var avgThroughput float64
+		if methodCount > 0 {
+			avgThroughput = totalThroughput / float64(methodCount)
+		}
 		allThroughputs = append(allThroughputs, avgThroughput)
 
 		allErrorRates = append(allErrorRates, client.ErrorRate)
