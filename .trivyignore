@@ -1,0 +1,14 @@
+# Trivy ignore list for the Docker image scan (see
+# .github/workflows/build_docker_image.yml). Keep this list small and
+# documented, and remove entries as soon as the upstream fix is available.
+
+# CVE-2026-39822 — Go stdlib os.Root symlink-following vulnerability (HIGH).
+# This is a Go toolchain/stdlib issue, not application code. Two Go binaries
+# in the image were flagged:
+#   * app/jsonrpc-bench-runner — our binary. FIXED by rebuilding with a patched
+#     toolchain (runner/Dockerfile now uses golang:1.25.12-alpine).
+#   * usr/bin/k6 — provided by the upstream grafana/k6 base image, compiled
+#     with Go 1.26.4. We cannot recompile it; it will clear once grafana/k6
+#     ships a base image built with Go >= 1.26.5. Remove this entry then (and
+#     consider bumping the grafana/k6 base tag in runner/Dockerfile).
+CVE-2026-39822
