@@ -12,3 +12,12 @@
 #     ships a base image built with Go >= 1.26.5. Remove this entry then (and
 #     consider bumping the grafana/k6 base tag in runner/Dockerfile).
 CVE-2026-39822
+
+# GHSA-hrxh-6v49-42gf — gRPC-Go: xDS RBAC and HTTP/2 vulnerabilities (HIGH).
+# Lives in the upstream grafana/k6 base image's usr/bin/k6 binary, which
+# bundles google.golang.org/grpc < 1.82.1. We cannot patch it: no k6 release
+# yet ships grpc >= 1.82.1 (latest k6 v2.1.0 still uses 1.81.1) and we do not
+# build k6 from source. The affected paths (gRPC xDS/RBAC server authorization)
+# are not exercised — this suite benchmarks JSON-RPC over HTTP and never uses
+# k6's gRPC module. Remove this entry once k6 bumps grpc.
+GHSA-hrxh-6v49-42gf
