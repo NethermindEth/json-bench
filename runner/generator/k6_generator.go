@@ -85,6 +85,26 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 		}
 	}
 
+	// Register always-true per-client x per-method submetric thresholds so k6's
+	// --summary-export emits a per-scenario (client) breakdown for each method:
+	// k6 only includes a tag-filtered submetric in summary.json when a threshold
+	// is defined on it. These conditions can never fail, so they never affect the
+	// k6 exit code. Keys are UNQUOTED and use {scenario:C,req_name:M} ordering
+	// because k6 stores the submetric name verbatim and metrics/summary_fallback.go
+	// (lookupSubmetric) matches that exact string. Grows as clients x methods x 3.
+	for _, client := range cfg.ResolvedClients {
+		for _, call := range cfg.Calls {
+			identifier := call.Name
+			if identifier == "" {
+				identifier = call.Method
+			}
+			selector := fmt.Sprintf("{scenario:%s,req_name:%s}", client.Name, identifier)
+			config.Options.Thresholds["http_req_duration"+selector] = []string{"max>=0"}
+			config.Options.Thresholds["http_reqs"+selector] = []string{"count>=0"}
+			config.Options.Thresholds["http_req_failed"+selector] = []string{"rate>=0"}
+		}
+	}
+
 	// Add scenario to config for each client
 	for _, client := range cfg.ResolvedClients {
 		tags := make(map[string]string)
