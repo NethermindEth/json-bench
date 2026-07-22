@@ -17,13 +17,13 @@ COPY runner/ ./runner/
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner
 
 # Final stage - minimal runtime image with k6 (base is alpine)
-FROM grafana/k6:1.8.0
+FROM grafana/k6:2.1.0
 
 # Use root user for dependencies installation
 USER root
 
-# Refresh base image packages so the pinned grafana/k6:1.4.0 picks up
-# patched libcrypto3/libssl3 from Alpine 3.22's update channel.
+# Refresh base image packages so the pinned grafana/k6:2.1.0 picks up
+# patched libcrypto3/libssl3 from Alpine's update channel.
 RUN apk --no-cache upgrade && \
     apk --no-cache add ca-certificates tzdata curl postgresql-client
 
