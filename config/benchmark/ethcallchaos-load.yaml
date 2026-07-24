@@ -1,0 +1,12 @@
+test_name: "EthCallChaos corpus load"
+description: "Adversarial eth_call mix evolved by EthCallChaos (bounded <300ms), replayed at a target rps to compare how each client handles load. clients/rps/vus are set by the runner."
+clients:
+  - nethermind
+duration: "30s"
+rps: 100
+vus: 100
+calls:
+  - name: "ethcallchaos-corpus"
+    file: "./rpc-calls/ethcallchaos-corpus.jsonl"
+    file_type: "jsonl"
+    weight: 1
