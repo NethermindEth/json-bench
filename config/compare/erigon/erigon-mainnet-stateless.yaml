@@ -1,0 +1,28 @@
+name: erigon-mainnet-stateless
+description: "Ported from erigontech/rpc-tests (source rpc-tests 214c13799371e832a90d92781f83b0fe2d143d68); bucket 'stateless'. Runs on: any node. Differential (client-vs-client) \u2014 pair with erigon-mainnet-rules.yaml."
+calls:
+  eth_baseFee:
+  - id: test_01
+    params: []
+  eth_blobBaseFee:
+  - id: test_01
+    params: []
+  eth_blockNumber:
+  - id: test_01
+    params: []
+  eth_capabilities:
+  - id: test_01
+    params: []
+  eth_chainId:
+  - id: test_01
+    params: []
+  eth_protocolVersion:
+  - id: test_1
+    params: []
+  net_version:
+  - id: test_1
+    params: []
+  web3_sha3:
+  - id: test_1
+    params:
+    - '0x00'
