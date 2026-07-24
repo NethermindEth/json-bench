@@ -1,5 +1,5 @@
-name: erigon-mainnet-historical-state
-description: "Ported from erigontech/rpc-tests (source rpc-tests 214c13799371e832a90d92781f83b0fe2d143d68); bucket 'historical-state'. Runs on: ARCHIVE node only (full/head nodes prune historical state). Differential (client-vs-client) \u2014 pair with erigon-mainnet-rules.yaml."
+name: erigon-mainnet
+description: "Ported from erigontech/rpc-tests (source rpc-tests 214c13799371e832a90d92781f83b0fe2d143d68). standard eth_/debug_ methods; compares cleanly across clients. Every test retargeted to block 'latest' \u2014 runnable on any synced node. Differential; pair with erigon-mainnet-rules.yaml."
 calls:
   debug_accountAt:
   - id: test_01
@@ -95,7 +95,7 @@ calls:
   debug_accountRange:
   - id: test_01
     params:
-    - '0x472579'
+    - latest
     - '0x79a4d706e4bc7fd8ff9d0593a1311386a7a981ea'
     - 3
     - false
@@ -103,7 +103,7 @@ calls:
     - false
   - id: test_02
     params:
-    - '0x47257A'
+    - latest
     - '0x76b490cc1edf6a8e57c58dfb6d2769995dddaea6'
     - 3
     - false
@@ -111,7 +111,7 @@ calls:
     - false
   - id: test_03
     params:
-    - '0x52A0B3'
+    - latest
     - '0x9202584ac2a5081c6d1f27d637d1dd1fb2aec6b7'
     - 3
     - false
@@ -119,7 +119,7 @@ calls:
     - false
   - id: test_04
     params:
-    - '0x636939'
+    - latest
     - '0x79a4d418f7887dd4d5123a41b6c8c186686ae8cb'
     - 6
     - false
@@ -127,7 +127,7 @@ calls:
     - false
   - id: test_05
     params:
-    - '0xF4240'
+    - latest
     - '0xb2930b35844a230f00e51431acae96fe543a0347'
     - 5
     - false
@@ -135,7 +135,7 @@ calls:
     - false
   - id: test_06
     params:
-    - '0x3D08FF'
+    - latest
     - '0xece701c76bd00d1c3f96410a0c69ea8dfcf5f34e'
     - 1
     - true
@@ -143,7 +143,7 @@ calls:
     - false
   - id: test_07
     params:
-    - '0x3D08FF'
+    - latest
     - '0xece701c76bd00d1c3f96410a0c69ea8dfcf5f34e'
     - 6
     - true
@@ -151,7 +151,7 @@ calls:
     - false
   - id: test_08
     params:
-    - '0x3D08FF'
+    - latest
     - '0xece701c76bd00d1c3f96410a0c69ea8dfcf5f34e'
     - 1
     - false
@@ -159,7 +159,7 @@ calls:
     - false
   - id: test_10
     params:
-    - '0x3D08FF'
+    - latest
     - '0xece701c7c7c70d1c3f96410a0c69ea8dfcf5f34e'
     - 1
     - true
@@ -167,15 +167,7 @@ calls:
     - false
   - id: test_11
     params:
-    - '0x3D08FF'
-    - '0xece701c7c7c70d1c3f96410a0c69ea8dfcf5f34e'
-    - 10
-    - true
-    - false
-    - false
-  - id: test_13
-    params:
-    - '0x7A1200'
+    - latest
     - '0xece701c7c7c70d1c3f96410a0c69ea8dfcf5f34e'
     - 10
     - true
@@ -183,15 +175,7 @@ calls:
     - false
   - id: test_14
     params:
-    - '0x895445'
-    - '0x01838a3747dc170a67db968c8ce50cdde8e3bc7c'
-    - 1
-    - true
-    - false
-    - false
-  - id: test_15
-    params:
-    - '0x795445'
+    - latest
     - '0x01838a3747dc170a67db968c8ce50cdde8e3bc7c'
     - 1
     - true
@@ -199,39 +183,15 @@ calls:
     - false
   - id: test_16
     params:
-    - '0x6D08FF'
+    - latest
     - '0xece701c7c7c70d1c3f96410a0c69ea8dfcf5f34e'
     - 6
     - true
     - true
     - false
-  - id: test_18
-    params:
-    - '0x4DC8FF'
-    - '0xece701c76bd00d1c3f96410a0c69ea8dfcf5f34e'
-    - 1
-    - false
-    - true
-    - false
-  - id: test_19
-    params:
-    - '0x4fff7A'
-    - '0x76b490cc1edf6a8e57c58dfb6d2769995dddaea6'
-    - 3
-    - false
-    - false
-    - false
-  - id: test_20
-    params:
-    - '0x5470B3'
-    - '0x9202584ac2a5081c6d1f27d637d1dd1fb2aec6b7'
-    - 3
-    - false
-    - false
-    - false
   - id: test_21
     params:
-    - '0x472579'
+    - latest
     - '0x79a4d706e4Bc7fD8fF9d0593A1311386a7A981ea'
     - 3
     - false
@@ -239,7 +199,7 @@ calls:
     - false
   - id: test_22
     params:
-    - '0x47257A'
+    - latest
     - '0x76b490CC1eDf6a8E57c58DFb6D2769995DdDaEA6'
     - 3
     - false
@@ -247,7 +207,7 @@ calls:
     - false
   - id: test_23
     params:
-    - '0x52A0B3'
+    - latest
     - '0x9202584Ac2A5081C6d1F27d637d1DD1Fb2AEc6B7'
     - 3
     - false
@@ -255,7 +215,7 @@ calls:
     - false
   - id: test_24
     params:
-    - '0x636939'
+    - latest
     - '0x79A4d418F7887dd4d5123A41b6c8C186686aE8cB'
     - 6
     - false
@@ -263,57 +223,12 @@ calls:
     - false
   - id: test_25
     params:
-    - '0xF4240'
+    - latest
     - '0xb2930B35844a230f00E51431aCAe96Fe543a0347'
     - 5
     - false
     - false
     - false
-  debug_getModifiedAccountsByHash:
-  - id: test_01
-    params:
-    - '0x447145ebe4c8f20dd16cb2597082d763f1a567bccfa9a600d48a9ce62ce9ec47'
-    - '0x7ace4fa61b991c347546d9a3ef1d5f09ffdd177b144c07e3866916fa80acb44f'
-  - id: test_02
-    params:
-    - '0xfac3d3f228c3c0acb871068da38da8848234c2504fdf3dfca52ca2129143ab77'
-    - '0xb1dc410ec382c7cc177e1cec46e6f4e5e329b21e7d06def7cadcf8983a8393c9'
-  - id: test_03
-    params:
-    - '0xf8e1751a21c5b0a117cfd5426d5ed4b8547018c41cde666efc5b6d6ba4f363e2'
-    - '0xfca9e8d0558181f229f2182adfd17063b50bd3f92ff37168eecbbb2fc03cd5e7'
-  - id: test_04
-    params:
-    - '0x9bd94399952e621eb9ab6a142b4cd7b49fc78226d2de08405ca62a7ca4abe05b'
-    - '0x6c60b57f2404f0f9a5b315ac63c0d40aa2c29284c6d778a5d9122e6add8ddab6'
-  - id: test_08
-    params:
-    - '0x8206a2865a011124f6e4490ca316df6896820875ca4c85ba7e98d0a620993d20'
-    - '0xac87197d498466af4551c762f02a79684cc4dffb8fa354adccfb2e4decd1852e'
-  - id: test_09
-    params:
-    - '0x181f842e1c3c07cde36c8bd7d22deba938fb7e117f05e6d86a953b6fe2239833'
-    - '0xf9e747f663db1c99096e65f342bd0f87a6541d09f2b4e50e5d614f8e4fd12be0'
-  - id: test_10
-    params:
-    - '0xcf001e43bcde51c40dc85bd5e6693352a25395a47944490ea13ab11ede58f087'
-    - '0x0f184ebe58f127da0b424f045106b31a91ec578819658ef1709bb8837cdea264'
-  - id: test_11
-    params:
-    - '0xfa3b411fb3ffbe2b63e130ead65f48e586674568d639f42d8f1eba0e5b11eb4e'
-    - '0x6fd50d8ec6629407e16774b6f92ac3ca597348f21c5c7cf0a8b61e58ece48075'
-  - id: test_12
-    params:
-    - '0x7465fe5eda99a817de2b93e99b55cb3500f79cc490a9a1259223132ef1088e12'
-    - '0x4652e6613e9a0d1aca34f3fea847326971ef80cc8d44430162033bceef143f8a'
-  - id: test_14
-    params:
-    - '0x6337cce772ab13f8bd9e3daf00f04ee22db9a0e2dfa24af58707e10a88099dfc'
-    - '0xec4c36baac3306cd20c19f6f6aaa0225be6ef61a7adf42b2c5d1f2a1cdb622ad'
-  - id: test_19
-    params:
-    - '0xfac3d3f228c3c0acb871068da38da8848234c2504fdf3dfca52ca2129143ab77'
-    - '0xfcc045fd08e4c099e09e93c9bcb8aba78c3b5fa8fb55f08619c5dd301c600c32'
   debug_getModifiedAccountsByNumber:
   - id: test_01
     params:
@@ -363,6 +278,40 @@ calls:
     params:
     - 1000000
     - 1000001
+  debug_getRawBlock:
+  - id: test_01
+    params:
+    - latest
+  debug_getRawHeader:
+  - id: test_01
+    params:
+    - latest
+  debug_getRawReceipts:
+  - id: test_01
+    params:
+    - latest
+  - id: test_07
+    params:
+    - '0x5beb18a1746bc0f84fc98648fa2a76a182eef5be01aa27be289e3e84af6b6228'
+  debug_getRawTransaction:
+  - id: test_01
+    params:
+    - '0xb79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267'
+  - id: test_02
+    params:
+    - '0xbb4b3fc2b746877dce70862850602f1d19bd890ab4db47e6b7ee1da1fe578a0d'
+  - id: test_03
+    params:
+    - '0x5a4bf6970980a9381e6d6c78d96ab278035bbff58c383ffe96a0a2bbc7c02a4b'
+  - id: test_04
+    params:
+    - '0x839b04a2d65f87e657bab2676c8bde2f157e508896f5c5cf950a7b896a17e065'
+  - id: test_05
+    params:
+    - '0x593c253f267d6e12ea500923bcc9973f6ae85f7c30fcab0ddb3042f63d1e891c'
+  - id: test_06
+    params:
+    - '0xffffff3f267d6e12ea500923bcc9973f6ae85f7c30fcab0ddb3042f63d1e891c'
   debug_storageRangeAt:
   - id: test_01
     params:
@@ -469,169 +418,61 @@ calls:
     - '0x0000000000b3F879cb30FE243b4Dfee438691c04'
     - '0x0000000000000000000000000000000000000000000000000000000000000000'
     - 1
-  debug_traceBlockByHash:
-  - id: test_01
-    params:
-    - '0x9bd94399952e621eb9ab6a142b4cd7b49fc78226d2de08405ca62a7ca4abe05b'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_02
-    params:
-    - '0x2c0280c9eccb5fb1d3b1502e698c61a103a970d87477378e2665f01b1fff9185'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_04
-    params:
-    - '0x83fb419c231fc0219179089c6558d865ceb1575267ac2f1841c95a55c9ecb58d'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_07
-    params:
-    - '0xcf001e43bcde51c40dc85bd5e6693352a25395a47944490ea13ab11ede58f087'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_16
-    params:
-    - '0x5d5837b5ce6768939d5d356a62b3435df0b6edbec6d0ed079fa15c97b1f2077a'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_17
-    params:
-    - '0xcdda6558876388493a61ba0ad63cdb1018dc364eb16bc085cdf77767f692d278'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_18
-    params:
-    - '0xe1d15a58f7af830e076c88ffa5b6f9e804e2cebff0dfa1f9d7407ca375a3727a'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_19
-    params:
-    - '0x9d0c56b2748ed146c4e96232af5dca991368df76c630f029cff2517d920b1cfe'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_21
-    params:
-    - '0x6bd00da56a6570abc41cd583f8ee1bfb109bfa72c2df93e50e78035aebb15be0'
-    - tracer: flatCallTracer
-  - id: test_22
-    params:
-    - '0x2f03aaee0f707fdc7bc8841b7b32fdc49bbba3f163a0a966d18bf8420e6a30d8'
-    - tracer: flatCallTracer
   debug_traceBlockByNumber:
   - id: test_01
     params:
-    - '0x6029B0'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
-  - id: test_02
+  - id: test_24
     params:
-    - '0xE4E226'
+    - latest
     - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_04
-    params:
-    - '0x1879A3'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_07
-    params:
-    - '0x6138FA'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_16
-    params:
-    - '0xFA0A5'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_17
-    params:
-    - '0xE1A05'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_18
-    params:
-    - '0xE6055'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_19
-    params:
-    - '0xF0466'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_21
-    params:
-    - '0x1875B9'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_23
-    params:
-    - earliest
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
+      disableStack: true
+      disableStorage: true
   - id: test_28
     params:
     - latestExecuted
     - enableMemory: false
       disableStack: true
       disableStorage: true
-  - id: test_31
-    params:
-    - '0x1879A0'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
   - id: test_32
     params:
-    - '0x1048427'
+    - latest
     - tracer: prestateTracer
       tracerConfig:
         diffMode: true
-  - id: test_45
+  - id: test_42
     params:
-    - '0x1048429'
-    - tracer: flatCallTracer
-  - id: test_46
+    - latest
+    - enableMemory: false
+      disableStack: false
+      disableStorage: false
+      tracer: prestateTracer
+      tracerConfig:
+        diffMode: true
+  - id: test_43
     params:
-    - '0xE4E22B'
-    - tracer: flatCallTracer
-  - id: test_48
+    - latest
+    - enableMemory: false
+      disableStack: false
+      disableStorage: false
+      tracer: prestateTracer
+      tracerConfig:
+        diffMode: false
+        disableCode: true
+  - id: test_44
     params:
-    - '0x16E36A'
-    - tracer: flatCallTracer
-  - id: test_49
-    params:
-    - '0x1875BB'
-    - tracer: flatCallTracer
-  - id: test_50
-    params:
-    - '0xD7DC6'
-    - tracer: flatCallTracer
-  - id: test_51
-    params:
-    - '0x172c50b'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
       tracer: callTracer
+  - id: test_45
+    params:
+    - latest
+    - tracer: flatCallTracer
   debug_traceCall:
   - id: test_01
     params:
@@ -640,7 +481,7 @@ calls:
       gas: '0x33869'
       gasPrice: '0x1F'
       value: '0x0'
-    - '0x4366AC'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
@@ -664,7 +505,7 @@ calls:
       gasPrice: '0x1'
       to: '0xc92047CeC2355293A9e3710e32851F3509e7313E'
       value: '0x0'
-    - '0x52a0b3'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
@@ -676,7 +517,7 @@ calls:
       gasPrice: '0x2DC6C0'
       to: '0xAE6814472DAc803B82d4Ea4588Cf7aF8B2b12d1d'
       value: '0x0'
-    - '0x5F7CF1'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
@@ -687,7 +528,7 @@ calls:
       gas: '0x33869'
       gasPrice: '0x871FF62626'
       value: '0x0'
-    - '0x1312CAA'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
@@ -699,19 +540,7 @@ calls:
       gasPrice: '0x372672DC6C0'
       to: '0xAE6814472DAc803B82d4Ea4588Cf7aF8B2b12d1d'
       value: '0x0'
-    - '0x1312D01'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_13
-    params:
-    - data: '0x41c0e1b505684bf5'
-      from: '0xFBb1b73C4f0BDa4f67dcA266ce6Ef42f520fBB98'
-      gas: '0x18912'
-      gasPrice: '0x372672DC6C0'
-      to: '0xAE6814472DAc803B82d4Ea4588Cf7aF8B2b12d1d'
-      value: '0x0'
-    - '0x1312D02'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
@@ -723,19 +552,7 @@ calls:
       gasPrice: '0x372672DC6a0'
       to: '0xAE6814472DAc803B82d4Ea4588Cf7aF8B2b12d1d'
       value: '0x0'
-    - '0x1312D03'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_15
-    params:
-    - data: '0x41c0e1b505684bf5'
-      from: '0xFBb1b73C4f0BDa4f67dcA266ce6Ef42f520fBB98'
-      gas: '0x18912'
-      gasPrice: '0x372672DC6a0'
-      to: '0xAE6814472DAc803B82d4Ea4588Cf7aF8B2b12d1d'
-      value: '0x0'
-    - '0x1312D05'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
@@ -747,7 +564,7 @@ calls:
       gasPrice: '0x1DAD1E397'
       to: '0x16c4ECbE41856FfA7874b5e039C958a94F85DC40'
       value: '0x100'
-    - '0x1425556'
+    - latest
     - TxIndex: '0x43'
       enableMemory: false
       disableStack: false
@@ -760,7 +577,7 @@ calls:
       gasPrice: '0x1DAD1E397'
       to: '0x16c4ECbE41856FfA7874b5e039C958a94F85DC40'
       value: '0x100'
-    - '0x1425556'
+    - latest
     - TxIndex: '0x45'
       enableMemory: false
       disableStack: false
@@ -773,7 +590,7 @@ calls:
       gasPrice: '0x20'
       to: '0x70faa28A6B8d6829a4b1E649d26eC9a2a39ba413'
       value: '0x1381'
-    - '0x4366AB'
+    - latest
     - enableMemory: false
       disableStack: false
       disableStorage: false
@@ -785,7 +602,7 @@ calls:
       gasPrice: '0x20'
       to: '0x70faa28A6B8d6829a4b1E649d26eC9a2a39ba413'
       value: '0x1381'
-    - '0x4366AC'
+    - latest
     - TxIndex: '0x4'
       enableMemory: false
       disableStack: false
@@ -798,7 +615,7 @@ calls:
       gasPrice: '0x20'
       to: '0x70faa28A6B8d6829a4b1E649d26eC9a2a39ba413'
       value: '0x1381'
-    - '0x4366AC'
+    - latest
     - TxIndex: '0x6'
       enableMemory: false
       disableStack: false
@@ -811,11 +628,23 @@ calls:
       gasPrice: '0x20'
       to: '0x70faa28A6B8d6829a4b1E649d26eC9a2a39ba413'
       value: '0x1381'
-    - '0x4366AC'
+    - latest
     - TxIndex: '0x15'
       enableMemory: false
       disableStack: false
       disableStorage: false
+  - id: test_22
+    params:
+    - data: '0x41c0e1b505684bf5'
+      from: '0xC1cBA74D5ac02531aBfaB6353dB26EC7c572BebA'
+      gas: '0x19891'
+      gasPrice: '0x29900DC6C0'
+      to: '0xAE6814472DAc803B82d4Ea4588Cf7aF8B2b12d1d'
+      value: '0x0'
+    - latest
+    - enableMemory: false
+      disableStack: true
+      disableStorage: true
   - id: test_23
     params:
     - input: '0x12aa3caf000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd09000000000000000000000000fc116ea24f002f600e363bdce4b91715fe5e0392000000000000000000000000eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd090000000000000000000000008727c4aed1bc733bcd6fabf6627791c10d1a969f0000000000000000000000000000000000000000000000000001c6bf5263400000000000000000000000000000000000000000000000000001df77587da4dbdb0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000015300000000000000000000000000000000013500011f0000e300006800004e802026678dcdfc116ea24f002f600e363bdce4b91715fe5e0392382ffce2287252f930e1c8dc9328dac5bf282ba10000000000000000000000000000000000000000000000000000048c273950000020d6bdbf78fc116ea24f002f600e363bdce4b91715fe5e03920c20fc116ea24f002f600e363bdce4b91715fe5e0392b5b3245e2dcfca6474e3b8588e6bafee9b6834966ae4071118002dc6c0b5b3245e2dcfca6474e3b8588e6bafee9b68349600000000000000000000000000000000000000000000000001df77587da4dbdbfc116ea24f002f600e363bdce4b91715fe5e03924101c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200042e1a7d4d0000000000000000000000000000000000000000000000000000000000000000c0611111111254eeb25477b68fb85ed929f73a960582000000000000000000000000009a635db5'
@@ -825,7 +654,7 @@ calls:
       to: '0x1111111254eeb25477b68fb85ed929f73a960582'
       maxFeePerGas: '0x1c7847c'
       value: '0x0'
-    - '0x130054d'
+    - latest
     - tracer: callTracer
       tracerConfig:
         onlyTopCall: false
@@ -841,7 +670,7 @@ calls:
       to: '0x1111111254eeb25477b68fb85ed929f73a960582'
       maxFeePerGas: '0x1c7847cdb'
       value: '0x0'
-    - '0x130054d'
+    - latest
     - tracer: callTracer
       tracerConfig:
         onlyTopCall: false
@@ -857,7 +686,7 @@ calls:
       to: '0x1111111254eeb25477b68fb85ed929f73a960582'
       maxFeePerGas: '0x1c7847c'
       value: '0x0'
-    - '0x130054d'
+    - latest
     - tracer: callTracer
       tracerConfig:
         onlyTopCall: false
@@ -871,7 +700,7 @@ calls:
       to: '0x3328F7f4A1D1C57c35df56bBf0c9dCAFCA309C49'
       data: '0x0162e2d000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001600000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488d0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008e00000000000000000000000000000000000000000000000000000000683f4533000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000d39368a84a07f6f52a63e7872d90fdbcbd7553b4'
       value: '0x16345785D8A0000'
-    - '0x1593F06'
+    - latest
     - tracer: callTracer
       tracerConfig:
         onlyTopCall: true
@@ -911,7 +740,7 @@ calls:
         - '0x000000000000000000000000000000000000000000000000000000000000000c'
         - '0x0000000000000000000000000000000000000000000000000000000000000008'
         - '0x0000000000000000000000000000000000000000000000000000000000000006'
-    - '0x159905F'
+    - latest
     - tracer: callTracer
       tracerConfig:
         onlyTopCall: true
@@ -923,7 +752,7 @@ calls:
       data: '0xe60e338d70e74a160cf77f11ff8f3dccb83c5aa167c4ca4b83dedfe9ca3ca3eaf6d6f01b2d2bcc7f0000000001d9e8d06df87d690000000001e1355f0fe3c6ec00000000000000000000000000000000000000000037e46fd7cb3ceb878b4a66'
       value: '0x1'
       gas: '0x32187'
-    - '0x159DEFF'
+    - latest
     - tracer: callTracer
       tracerConfig:
         onlyTopCall: true
@@ -952,7 +781,7 @@ calls:
       nonce: '0x2c0721'
       type: '0x2'
       value: '0x29'
-    - '0x1368418'
+    - latest
     - tracer: prestateTracer
       txIndex: '0x77'
   - id: test_31
@@ -967,7 +796,7 @@ calls:
       nonce: '0x2c0721'
       type: '0x2'
       value: '0x29'
-    - '0x1368418'
+    - latest
     - tracer: prestateTracer
       txIndex: '0x0'
   - id: test_32
@@ -982,13 +811,140 @@ calls:
       nonce: '0x2c0721'
       type: '0x2'
       value: '0x29'
-    - '0x1368418'
+    - latest
     - tracer: prestateTracer
+  - id: test_33
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
+      gas: '0x493E0'
+      data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
+    - latest
+    - enableMemory: false
+      disableStack: true
+      disableStorage: true
+  - id: test_34
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009'
+      gas: '0x5208'
+      gasPrice: '0x2CB417800'
+      value: '0x229322'
+    - latest
+    - enableMemory: false
+      disableStack: true
+      disableStorage: true
+  - id: test_35
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009'
+      gas: '0x5208'
+      gasPrice: '0x2CB417800'
+      value: '0x229322'
+    - latest
+    - tracer: callTracer
+      tracerConfig:
+        onlyTopCall: false
+  - id: test_36
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
+      gas: '0x493E0'
+      data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
+    - latest
+    - tracer: callTracer
+  - id: test_37
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
+      gas: '0x493E0'
+      data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
+    - latest
+    - tracer: 4byteTracer
+  - id: test_38
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009'
+      gas: '0x5208'
+      gasPrice: '0x2CB417800'
+      value: '0x229322'
+    - latest
+    - tracer: prestateTracer
+  - id: test_39
+    params:
+    - data: '0xf242432a000000000000000000000000d3181ddbb2cea7b4954b8d4a05dbf85d8fc36aef000000000000000000000000e44249550d8a03737f185e054a686e55577f38400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000'
+      from: '0x7b98421B9314E3Ffc0B7a593DBa2FBBd3b789c7D'
+      to: '0xe3782B8688ad2b0D5ba42842d400F7AdF310F88d'
+      gas: '0xDDD002'
+      gasPrice: '0x2098A67800'
+      value: '0x0'
+    - latest
+    - tracer: callTracer
+  - id: test_40
+    params:
+    - data: '0xf242432a000000000000000000000000d3181ddbb2cea7b4954b8d4a05dbf85d8fc36aef000000000000000000000000e44249550d8a03737f185e054a686e55577f38400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000'
+      from: '0x7b98421B9314E3Ffc0B7a593DBa2FBBd3b789c7D'
+      to: '0xe3782B8688ad2b0D5ba42842d400F7AdF310F88d'
+      gas: '0xDDD002'
+      gasPrice: '0x2098A67800'
+      value: '0x0'
+    - latest
+    - tracer: callTracer
+      tracerConfig:
+        onlyTopCall: true
+  - id: test_41
+    params:
+    - from: '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1'
+      to: '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6'
+      data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
+    - latest
+    - tracer: callTracer
+      tracerConfig:
+        onlyTopCall: true
+  - id: test_42
+    params:
+    - from: '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1'
+      to: '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6'
+      data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
+    - latest
+    - enableMemory: false
+      tracer: callTracer
+      stateOverrides:
+        '0xdAC17F958D2ee523a2206206994597C13D831ec7':
+          stateDiff:
+            '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+            '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+        '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6':
+          stateDiff:
+            '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+            '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+        '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1':
+          nonce: '0x1'
+          balance: '0x2386f26fc10000'
+  - id: test_43
+    params:
+    - from: '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1'
+      to: '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6'
+      data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
+    - latest
+    - enableMemory: false
+      stateOverrides:
+        '0xdAC17F958D2ee523a2206206994597C13D831ec7':
+          stateDiff:
+            '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+            '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+        '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6':
+          stateDiff:
+            '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+            '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+        '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1':
+          nonce: '0x1'
+          balance: '0x2386f26fc10000'
   - id: test_44
     params:
     - from: null
       to: '0x1234567812345678123456781234567812345678'
-    - '0x1368418'
+    - latest
     - enableMemory: false
       stateOverrides:
         '0x1234567812345678123456781234567812345678':
@@ -1000,7 +956,7 @@ calls:
     - from: '0x0000000000000000000000000000000000000000'
       to: '0x0000000000000000000000000000000000000002'
       data: 0x
-    - '0x15EF3C0'
+    - latest
     - tracer: callTracer
       stateOverrides:
         '0x0000000000000000000000000000000000000002':
@@ -1010,7 +966,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0x0000000000000000000000000000000000000002'
       data: 0x
-    - '0x419CE0'
+    - latest
     - tracer: callTracer
       stateOverrides:
         '0x0000000000000000000000000000000000000002':
@@ -1025,7 +981,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0x0000000000000000000000000000000000000002'
       data: 0x
-    - '0x419CE0'
+    - latest
     - tracer: callTracer
       blockOverrides:
         number: '0x57'
@@ -1041,7 +997,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0xc100000000000000000000000000000000000000'
       data: 0x
-    - '0x419CE0'
+    - latest
     - tracer: callTracer
       blockOverrides:
         number: '0x57'
@@ -1057,7 +1013,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0xd100000000000000000000000000000000000000'
       data: '0x6057361d'
-    - '0x15EF3C0'
+    - latest
     - tracer: callTracer
       blockOverrides:
         baseFeePerGas: '0x3B9ACA00'
@@ -1071,7 +1027,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0xd100000000000000000000000000000000000000'
       data: '0x2e1a7d4d'
-    - '0x15EF3C0'
+    - latest
     - tracer: callTracer
       blockOverrides:
         time: '0x65913200'
@@ -1085,7 +1041,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0xf100000000000000000000000000000000000000'
       data: 0x
-    - '0x15EF3C0'
+    - latest
     - tracer: callTracer
       blockOverrides:
         coinbase: '0x0000000000000000000000000000000000000000'
@@ -1100,7 +1056,7 @@ calls:
     - from: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F'
       to: '0xdAC17F958D2ee523a2206206994597C13D831ec7'
       data: '0x70a0823100000000000000000000000071c7656ec7ab88b098defb751b7401b5f6d8976f'
-    - '0x112A880'
+    - latest
     - tracer: muxTracer
       tracerConfig:
         callTracer: {}
@@ -1111,7 +1067,7 @@ calls:
     - from: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F'
       to: '0xdAC17F958D2ee523a2206206994597C13D831ec7'
       data: '0x70a0823100000000000000000000000071c7656ec7ab88b098defb751b7401b5f6d8976f'
-    - '0x112A880'
+    - latest
     - tracer: 4byteTracer
   - id: test_54
     params:
@@ -1122,7 +1078,7 @@ calls:
       to: '0x1111111254eeb25477b68fb85ed929f73a960582'
       maxFeePerGas: '0x1c7847c'
       value: '0x0'
-    - '0x130054d'
+    - latest
     - tracer: flatCallTracer
       blockOverrides:
         baseFeePerGas: '0xffffff'
@@ -1161,7 +1117,7 @@ calls:
       gasPrice: '0x1D905C0'
       to: '0x9a2d163aB40F88C625Fd475e807Bbc3556566f80'
       value: '0x0'
-    - '0x5279A7'
+    - latest
     - tracer: flatCallTracer
       enableMemory: false
       disableStack: true
@@ -1174,7 +1130,7 @@ calls:
       gasPrice: '0xF4240'
       to: '0xB3BCa6F5052c7e24726b44da7403b56A8A1b98f8'
       value: '0x0'
-    - '0x5279A6'
+    - latest
     - tracer: flatCallTracer
       enableMemory: false
       disableStack: false
@@ -1187,7 +1143,7 @@ calls:
       gasPrice: '0xF4240'
       to: '0xB3BCa6F5052c7e24726b44da7403b56A8A1b98f8'
       value: '0x0'
-    - '0x5279A6'
+    - latest
     - tracer: callTracer
       enableMemory: false
       disableStack: false
@@ -1200,7 +1156,7 @@ calls:
       gasPrice: '0x2825B0'
       to: '0xF09404cf54C48763b56F96C8080AAa72bD407Cb7'
       value: '0x0'
-    - '0x5F7CF1'
+    - latest
     - tracer: flatCallTracer
       enableMemory: false
       disableStack: false
@@ -1388,497 +1344,15 @@ calls:
     - stateOverrides:
         '0x01230334cdeb19cb0f3b017e46994e393312c3c6':
           balance: '0x1'
-  debug_traceTransaction:
+  eth_baseFee:
   - id: test_01
-    params:
-    - '0x4438834aa595a9b8f0ab97cde0946f163f57ca4dff78ee93a9daa660c43e8666'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_04
-    params:
-    - '0xf032a435c6f9c21aae2c5009499a811e7a42133e89e941758a067159b465aef2'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_08
-    params:
-    - '0xd94d8fc4e1e37cd3094390e25b85856ddde5df4e1474c3910945ffa87e46f7d4'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_09
-    params:
-    - '0x667909407803fd910af1a25622c3a5db35df86b479d88b62acc3e4d43afd3b27'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_103
-    params:
-    - '0x25e8dbdd82ccc7d11e63e9b9ae1798121084b7fe2be11eaf507a80055d0c2438'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_109
-    params:
-    - '0x6c929e1c3d860ee225d7f3a7addf9e3f740603d243260536dfa2f3cf02b51de4'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_113
-    params:
-    - '0x17110b530f003fa6a86b2b66b3687fb5ac6067ea3e1f9b9cb748e1d2072bde19'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_12
-    params:
-    - '0x2ef0dd3ec03b108ae84e9355a783d5399a7b7f7dde9c1c519f8693b15aaad5da'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_120
-    params:
-    - '0x1d6f7671718fd92532f76addde2aa584d9f92b2017931f0175218cb7ca6286de'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_124
-    params:
-    - '0x1f0db00a976d65288b56aada66f32e68984fde619acff8c7866817266b7dc0f3'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_127
-    params:
-    - '0xe55072bfbe599f866015f2c4a27bab1654c2c78f3ac7a2573ecf4b0e7c163a2d'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_129
-    params:
-    - '0x5122a589669c0b0e45d1f30ffc64b87e3f03f8133d01788946592c80a6c0225a'
-    - enableMemory: false
-      disableStack: false
-      disableStorage: false
-  - id: test_134
-    params:
-    - '0x7e3cb663f28f6db257f46794be4117fa29ad342f44ae4bdab13ffef577aac9d4'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_135
-    params:
-    - '0x0ccb5dbd09a9bafc30d7e40aa760f4154a0c0b594e83248ce5d5c02d39852cbb'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: callTracer
-      tracerConfig:
-        WithLog: true
-  - id: test_136
-    params:
-    - '0xa620dc5f3badfb1178ab04f5e1141c9458c0ae9da9080786bdabedc147351f30'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: callTracer
-      tracerConfig:
-        WithLog: true
-  - id: test_137
-    params:
-    - '0xbeb3d09a644dc0772719f498172af05ed8cd337aaf83c2b5aee43be34fcb9dfb'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: callTracer
-      tracerConfig:
-        WithLog: true
-  - id: test_138
-    params:
-    - '0xa278205118a242c87943b9ed83aacafe9906002627612ac3672d8ea224e38181'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: callTracer
-      tracerConfig:
-        WithLog: true
-  - id: test_139
-    params:
-    - '0x89fd14f57848c96e9a47a84f3330dbf070d001e269d3c61e1e8e6a3ed6782176'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_14
-    params:
-    - '0x5b68647fe0243381dbeb1b7a30cbf2112c8919a293ea4437e2f23007592a0b4a'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_140
-    params:
-    - '0xf57414989193e5e5ce57bd041a267868b02955a7c7e68401ab8510c3695d25c3'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-  - id: test_141
-    params:
-    - '0xe99d668cb5ea5a2c06bf5d7ff12a75b8f7331d21e8ffeaf00c43156b57b9a7e0'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-  - id: test_142
-    params:
-    - '0x5324db52c944d1da01715f3ddc870950fba4502b93b8e6113cf1925d4729cd10'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-  - id: test_143
-    params:
-    - '0x441fe6abb0799b7f551f4e025a4302a0ebfd9254619f06345fdeca8e16bfbe55'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-  - id: test_144
-    params:
-    - '0x2926d6e3d2c28a56f5ea1c684da782b6737913466d1edb50ede5434b6063a95a'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-        disableStorage: true
-        disableCode: true
-  - id: test_145
-    params:
-    - '0x6b84e7458b3a9a29cfb5d7cc52d925ffdf1d8f871a05cb13403b8ad2ae2ce74f'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-  - id: test_146
-    params:
-    - '0x869375ae54514d47a6e0ae73e92926801f5fe1174b8f7216586145fa94a030d5'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-  - id: test_147
-    params:
-    - '0x913cc6e3b6aba24db51ef201334cd400dd7480f6226ca0bec15b5f80db8d93ca'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-  - id: test_148
-    params:
-    - '0x913cc6e3b6aba24db51ef201334cd400dd7480f6226ca0bec15b5f80db8d93ca'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: true
-        disableCode: true
-  - id: test_149
-    params:
-    - '0xcff3fb2b94ba2ee3730f3ca3347ca366abe80d9fbb6576a95d3fc278b9411f22'
-    - tracer: prestateTracer
-      tracerConfig:
-        diffMode: false
-        disableCode: true
-  - id: test_15
-    params:
-    - '0x0e380fe0ff24b1cbc954d8d781e08828ae7fea7c2d497849f98b5a310d5908a2'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_150
-    params:
-    - '0x0000000002970588a933c72e44f5a91c4e6d6c3e8f9e4f69b78c2e9c27d73a56'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: callTracer
-  - id: test_151
-    params:
-    - '0x74fb60c5d3c61a3118614aae8e3d94c8fe25ec5d5e7f342d73d1b304ccada483'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: prestateTracer
-      tracerConfig:
-        diffMode: false
-        disableCode: true
-  - id: test_152
-    params:
-    - '0x59299b761c52755ef6b88fb96c44e93f16c5608ff7ae105bf170cbd88e70879f'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: callTracer
-      tracerConfig: {}
-  - id: test_153
-    params:
-    - '0x74fb60c5d3c61a3118614aae8e3d94c8fe25ec5d5e7f342d73d1b304ccada483'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-      tracer: flatCallTracer
-  - id: test_154
-    params:
-    - '0xf57414989193e5e5ce57bd041a267868b02955a7c7e68401ab8510c3695d25c3'
-    - tracer: flatCallTracer
-  - id: test_155
-    params:
-    - '0x1c19a6e5089ff08b39144162f105f2d5519268f5360dab733d1b4f029503fdbe'
-    - disableStorage: true
-      enableMemory: false
-      disableStack: true
-  - id: test_19
-    params:
-    - '0x1ae5f96a8b446ddd51e96019472f7a31fcad3d2e774373ecfbb2ba94ff72fc04'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_20
-    params:
-    - '0x9e2783b3c42dea792faf9b636aeba0b4384bc0ec19f1a47d931ffee686869637'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_21
-    params:
-    - '0x3f97c969ddf71f515ce5373b1f8e76e9fd7016611d8ce455881009414301789e'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_22
-    params:
-    - '0x99558d18808c317e596caedc217184cbaec1b44a2d05ada659f1e61b4009895c'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_23
-    params:
-    - '0x5d683ba4c3e27fb59a8f12cd414992cd8a5e1ec111210bceccd879f3d89aa2bc'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_24
-    params:
-    - '0x188075ad78ca83b3acfc8d63374f487d33a26a34b5c84d92b90ab2b8aac775f6'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_25
-    params:
-    - '0x34f759136509221ebad1f7da3d031a0ee42feb7d833a08ea1c91cc8c2fadacc5'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_26
-    params:
-    - '0x152fb5917b913621ce4273f1970186127be5f1f4327075e9afb5affef4f9c2f8'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_27
-    params:
-    - '0xe0a8144b5e324db1c08cb96ad69d69bf0ab328387c7831289a443b8d022ac84d'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_33
-    params:
-    - '0x6c929e1c3d860ee225d7f3a7addf9e3f740603d243260536dfa2f3cf02b51de4'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_34
-    params:
-    - '0xf212d20e70d4e2c6e135f5bf392a4c346a7e3b52b4ceb3161b9564c8947b9f39'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_36
-    params:
-    - '0xacb09f1c58f6cec5e6a9a2411b00ca16b2fff8d92bf74457a80361e99d82dc0b'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_39
-    params:
-    - '0x45215aa0da9b7597d233d96b6f7c4ac311edaba77a99ecc6471c59663554914f'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_43
-    params:
-    - '0x729498b3e9ceedf3b79f162acf9276ce277b444f274134f764fc9bc7481cb54b'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_44
-    params:
-    - '0x34fe986227f215b2290924862b1dd4e664e5f13ee069c4eaf22c72c4ce2467fd'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_45
-    params:
-    - '0x3ade058f675eebff50159747dd482f549512f5d99316ff1ec8533f74c6106467'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_46
-    params:
-    - '0x42ebf1a9b7e72d29ff0a7900eeb30dfa32e5ed2efd56cf01520b242e9b7dc515'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_47
-    params:
-    - '0xcb0ab00672aff770f232c7259f274be08f5eecb59189e524f3bbfff50bb76eef'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_48
-    params:
-    - '0xf8955ee466ee24a7d28110a387542c372afd30dedebcbb30dcf98f675bc5b46f'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_49
-    params:
-    - '0xc6db78015a40b31e7b7186964620be81d28a1bbb937cf996e16a14727712109d'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_50
-    params:
-    - '0xa3e8ecfe377d3b96619e2c5ec4a72171a855f89e0872fa849326d43180b590b1'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_51
-    params:
-    - '0x3d68138ea16145c3683c31563cd9a3cd086c3dbf23a081703c9c304360f6ab75'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_52
-    params:
-    - '0xce4a656c5f968e1b7e60634d89758af8ce6b18fe82b13fc8bddf247666677599'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_53
-    params:
-    - '0x8f3287bce7f81be31dd35734f0e36f89c800fc89fd41c3ed98087b0961bacbab'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_54
-    params:
-    - '0xfc224618c8d668076b173c3b5dc568a26c67f073f5f47f3b8c1f64bd622919bc'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_55
-    params:
-    - '0xb43bd6f380dc015baa696f69d16173a2c2a2774713f0f02fe32b7b20a1f379bf'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_56
-    params:
-    - '0xd7de53f2f8ac124f0ae4e84872e0e599287cc7294a6188b38b5fcfddc884dab0'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_57
-    params:
-    - '0x94ffcdab6f8a4770d7a253d54f4c745120c8d61cd9a4e39fc56caac294f01a36'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_58
-    params:
-    - '0xc1dd5d9edf3bd18195b9fae4ccaf8168ca5661ec68317abb950f35370f898e85'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_59
-    params:
-    - '0xe53ab1e10560e37bf4dfdfa25eec9a4b06d0fbc96c0d388731dd3b8e98881e5c'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_60
-    params:
-    - '0x0252480147a09b1b2c18e5dad2648143710e2cd3e391d1ce44a5a4cf39deb07d'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_61
-    params:
-    - '0x9a0da084ef60eedfedfc1d49d4494fef5afd7ff8a4089467139f73907d1c6aa3'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_62
-    params:
-    - '0x75f027631056616468a13d3bf83c08a2f7ce803bb20b8d980c9d73bdbd5ce355'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_64
-    params:
-    - '0x8c7f0cb78ac01ebdea1e2b9ac056e35bce125bd327fa7b45cd3dee0e6a37b743'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_65
-    params:
-    - '0x9ef9bbd18328aaa84bb8d3d955a2c7bcf954a01b650bc5b2ab1395dfab8f4bd5'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_77
-    params:
-    - '0x4e827812e371c96e82c741a0344d4037dff57c38abf7c7501a99a042ebeb2c2a'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_87
-    params:
-    - '0xff8fdcd975d1c4f7ded80777727480c7f499e72a9ac9c51aca2dc66e0f77dad4'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_88
-    params:
-    - '0x63952eb7c146c2143db56238b339486cd541aa23e677d71479633cb3685822e0'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_93
-    params:
-    - '0x7ca27ac11355fcf7fa966c1e0f5be1f866475d258be1459a01d7e1bf91275371'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_94
-    params:
-    - '0x7f456e68e02393dd9fa3fd852c779df6dbfd710042c2cc19eced476a35b4a870'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_96
-    params:
-    - '0x1f0db00a976d65288b56aada66f32e68984fde619acff8c7866817266b7dc0f3'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
-  - id: test_99
-    params:
-    - '0x86282c293a76b1bf1c595b5685ac03d89816103010fb6bc715a889607d96fe02'
-    - enableMemory: false
-      disableStack: true
-      disableStorage: true
+    params: []
+  eth_blobBaseFee:
+  - id: test_01
+    params: []
+  eth_blockNumber:
+  - id: test_01
+    params: []
   eth_call:
   - id: test_01
     params:
@@ -1887,7 +1361,7 @@ calls:
       gas: '0x5208'
       gasPrice: '0x2CB417800'
       value: '0x229322'
-    - '0x89543F'
+    - latest
   - id: test_02
     params:
     - data: '0xf242432a000000000000000000000000d3181ddbb2cea7b4954b8d4a05dbf85d8fc36aef000000000000000000000000e44249550d8a03737f185e054a686e55577f38400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000'
@@ -1896,7 +1370,7 @@ calls:
       gas: '0xDDD2'
       gasPrice: '0x2098A67800'
       value: '0x0'
-    - '0xD59F7F'
+    - latest
   - id: test_03
     params:
     - from: '0x7b98421B9314E3Ffc0B7a593DBa2FBBd3b789c7D'
@@ -1904,7 +1378,7 @@ calls:
       gas: '0x407E3'
       gasPrice: '0x512C2C504'
       data: '0x1cff79cd0000000000000000000000004f91ad1a0397b763fc653b4cfe4f836915bfcd8400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064f5537ede0000000000000000000000007fc66500c84a76ad7e9c93437bfc5ac33e2ddae9000000000000000000000000a69babef1ca67a37ffaf7a485dfff3382056e78c0000000000000000000000000000000000000000000000179f3efc4c2c77000000000000000000000000000000000000000000000000000000000000'
-    - '0x112A880'
+    - latest
   - id: test_05
     params:
     - from: '0xae2Fc483527B8EF99EB5D9B44875F005ba1FaE13'
@@ -1912,7 +1386,7 @@ calls:
       gas: '0x292F7'
       gasPrice: '0x4DBD52333'
       data: '0x3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064ea275300000000000000000000000000000000000000000000000000000000000000010800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000100000000000000000000000000a24286057f40611d034f1c56db946c21a69a971c00000000000000000000000000000000000000000000000000a8c0ff92d4c0000000000000000000000000000000000000000000000023d7599921838737b73700000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000ef1fa4de244be696ea009d351227c791fda3caa4'
-    - '0x112A883'
+    - latest
   - id: test_06
     params:
     - from: '0xC920bB401bF1dAb5f1e49B2fD1BcF5198Ff98768'
@@ -1920,7 +1394,7 @@ calls:
       gas: '0x3C5FD'
       gasPrice: '0x6B8AB7333'
       data: '0xb6f9de95000000000000000000000000000000000000000000000000000063f6afbfd67a0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000c920bb401bf1dab5f1e49b2fd1bcf5198ff987680000000000000000000000000000000000000000000000000000000064ea27290000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000002de6b0e3947a35aa897d0cb7e4e5c25aba89c6b7'
-    - '0x112A883'
+    - latest
   - id: test_07
     params:
     - from: '0x244A93D0f7F27b845060abEd22B23aD914C71B54'
@@ -1928,7 +1402,7 @@ calls:
       gas: '0xE234'
       gasPrice: '0x1D91CA3600'
       data: '0xca120b1f000000000000000000000000244a93d0f7f27b845060abed22b23ad914c71b54eaafa8798f3f2c657b5f86f543682ec694db0344b923fe7a508c522d22938945000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000087df2103941187dc230eab1a148a587cb8a03afb00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000002'
-    - '0x112A883'
+    - latest
   - id: test_08
     params:
     - from: '0xdb534BAB6b7d0690f412395B18bD3df078ECfe2d'
@@ -1936,7 +1410,7 @@ calls:
       gas: '0xC2A5'
       gasPrice: '0x80BEFC0'
       data: '0x095ea7b3000000000000000000000000a87eaf82f287a2c67cb74130906d5ac01f2f925100000000000000000000000000000000000000000000000000000000126af740'
-    - '0xB71B00'
+    - latest
   - id: test_09
     params:
     - from: '0x8Fe9C787995D12b6EF3a9448aA944593DaC93C6c'
@@ -1944,7 +1418,7 @@ calls:
       gas: '0x668E2'
       gasPrice: '0x1FE5D61A00'
       data: '0xe7fc646500000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000028000000000000000000000000000000000000000000000000000000000000002e0000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000026c0000000000000000000000000000000000000000000000000000000000000244000000000000000000000000000000000000000000000000000000000000021500000000000000000000000000000000000000000000000000000000000001b5000000000000000000000000000000000000000000000000000000000000025800000000000000000000000000000000000000000000000000000000000000a700000000000000000000000000000000000000000000000000000000000000c8000000000000000000000000000000000000000000000000000000000000006b0000000000000000000000000000000000000000000000000000000000000085000000000000000000000000000000000000000000000000000000000000009e0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000019900000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000123000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000001690000000000000000000000000000000000000000000000000000000000000152000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000f400000000000000000000000000000000000000000000000000000000000000d400000000000000000000000000000000000000000000000000000000000000d800000000000000000000000000000000000000000000000000000000000000d9'
-    - '0xB71b00'
+    - latest
   - id: test_10
     params:
     - from: '0xb37b548519983b0eEc623a11df42644a25068c09'
@@ -1953,7 +1427,7 @@ calls:
       value: '0x572ED37DDCBA5D'
       gasPrice: '0x3A532E174'
       data: '0xf7a1696300000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000b37b548519983b0eec623a11df42644a25068c090000000000000000000000000000000000000000000000000000000009679ab8885582c4b208e7b07b74c76bf81cee1b63a6d77210acd546e6758d54761228cd0000000000000000000000004976fb03c32e5b8cfe2b6ccb31c09ba78ebaba41000000000000000000000000b37b548519983b0eec623a11df42644a25068c0900000000000000000000000000000000000000000000000000000000000000086672616363696f6e000000000000000000000000000000000000000000000000'
-    - '0xE4E1C0'
+    - latest
   - id: test_11
     params:
     - from: '0x3D0768da09CE77d25e2d998E6a7b6eD4b9116c2D'
@@ -1961,7 +1435,7 @@ calls:
       gas: '0x23685'
       gasPrice: '0xDB5AAA975'
       data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0xBF7A'
+    - latest
   - id: test_12
     params:
     - from: '0xA1E4380A3B1f749673E270229993eE55F35663b4'
@@ -1969,7 +1443,7 @@ calls:
       gas: '0x15F90'
       gasPrice: '0xDA9079780'
       data: '0xcfae3217'
-    - '0xC11F'
+    - latest
   - id: test_13
     params:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
@@ -1977,23 +1451,7 @@ calls:
       gas: '0x493E0'
       gasPrice: '0xBA43B7400'
       data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x1C72D'
-  - id: test_14
-    params:
-    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
-      to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
-      gas: '0x493E0'
-      gasPrice: '0xBA43B7400'
-      data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x12C135B'
-  - id: test_15
-    params:
-    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
-      to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
-      gas: '0x493E0'
-      gasPrice: '0xBA43B7400'
-      data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x12A5C9C'
+    - latest
   - id: test_17
     params:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
@@ -2002,23 +1460,14 @@ calls:
       maxFeePerGas: '0xBA43B7400'
       maxPriorityFeePerGas: '0x43B7400'
       data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x12A5C9C'
-  - id: test_18
-    params:
-    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
-      to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
-      gas: '0x493E0'
-      maxFeePerGas: '0xBA43B7400'
-      maxPriorityFeePerGas: '0x43B7400'
-      data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x1000000'
+    - latest
   - id: test_19
     params:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gas: '0x493E0'
       data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x1000000'
+    - latest
   - id: test_21
     params:
     - from: '0xEF04bc7821433f080461BBAE815182E3d7bBb61A'
@@ -2026,7 +1475,7 @@ calls:
       gas: '0x5208'
       gasPrice: '0x2CB417800'
       value: '0x229322'
-    - '0x89543F'
+    - latest
     - '0xEF04bc7821433f080461BBAE815182E3d7bBb61A':
         balance: '0x0'
         nonce: '0x71'
@@ -2037,7 +1486,7 @@ calls:
       gas: '0x5208'
       gasPrice: '0x2CB417800'
       value: '0x229322'
-    - '0x89543F'
+    - latest
     - '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009':
         code: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
         balance: '0x7278882'
@@ -2049,7 +1498,7 @@ calls:
       gas: '0x5208'
       gasPrice: '0x2CB417800'
       value: '0x229322'
-    - '0x89543F'
+    - latest
     - '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009':
         code: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
         balance: '0x7278882'
@@ -2065,22 +1514,30 @@ calls:
       gas: '0x5208'
       gasPrice: '0x2CB417800'
       value: '0x229322'
-    - '0x89543F'
+    - latest
     - '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1':
         code: '0x6060604052361561001f5760e060020a6000350463f5537ede8114610030575b610062600034111561006457610002565b6100626004356024356044356000805433600160a060020a039081169116141561010557600034111561006657610002565b005b565b7fa9059cbb000000000000000000000000000000000000000000000000000000006060908152600160a060020a03808516606452608484905285929083169163a9059cbb9160a4916020916044908290876161da5a03f115610002575050604080518481529051600160a060020a03861692917fd0ed88a3f042c6bbb1e3ea406079b5f2b4b198afccaa535d837f4c63abbc4de6919081900360200190a35b5050505056'
         nonce: '0x2'
-  - id: test_25
-    params:
-    - from: '0xEF04bc7821433f080461BBAE815182E3d7bBb61A'
-      to: '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009'
-      gas: '0x5208'
-      gasPrice: '0x2CB417800'
-      value: '0x229322'
-    - '0xFFFFFFFF'
   - id: test_27
     params:
     - to: '0x3df625042350422329eb751c67d9b0523feeb2c7'
       data: '0xa0b7967b'
+  - id: test_28
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009'
+      gas: '0x5208'
+      gasPrice: '0x2CB417800'
+      value: '0x229322'
+    - latest
+  - id: test_29
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+      gas: '0xC2A5000'
+      gasPrice: '0x80B0EFC0'
+      data: '0x095ea7b3000000000000000000000000a87eaf82f287a2c67cb74130906d5ac01f2f925100000000000000000000000000000000000000000000000000000000126af740'
+    - latest
   - id: test_30
     params:
     - from: '0xEF04bc7821433f080461BBAE815182E3d7bBb61A'
@@ -2088,7 +1545,7 @@ calls:
       gas: '0x7A1200'
       value: '0x0'
       data: '0x70a08231000000000000000000000000ef04bc7821433f080461bbae815182e3d7bbb61a'
-    - '0x89543F'
+    - latest
     - {}
     - number: '0x89543F'
       timestamp: '0x68E0F100'
@@ -2099,7 +1556,7 @@ calls:
       to: '0x00000688768803Bbd44095770895ad27ad6b0d95'
       data: '0xf497df75e26b997716bc2fe71aa3286e0665c7d2301190e3e5e3d676f179aa7ab81eeb8400000000000000000000000050fc97526ba0878eb9aa87812b2074f4e600f9e9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062d0a8458ed7719fdaf978fe5929c6d342b0bfce000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000006678ec0dbc575c20000000000000000000000000000000000000000000000000000035058159c62ca9e24a80000000000000000000000000000000006767d82a00000000000000000000b3e76cb88f37002141d6a54af40ee6aa2ae915f0edec20b5939534cc94cdc19ecdcff026298a528223ceeb6852423f237024bba7284fc34e2db9918a4eae84c80000000000000000000000000000000000000000000028f5d1f68737b4fca91a8000010f0003740000000000000000000000000000000000154c4676b3e329ca00000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000483000000ef0000005e0000005e0000005e0000005e0000002f0000000000000000fb2809a5314473e1165f6b58018e20ed8f07b840000c92000014df6767d76a0000b400d0ed00bccf0090000c920024fb2809a5314473e1165f6b58018e20ed8f07b840000c92000014df6767d76a0000b400d0ed00bccf0090000c920024fb2809a5314473e1165f6b58018e20ed8f07b8406767d752b09498030ae3416b66dc0000b8394f2220fac7e6ade60000339fb574bdc56763f9950000d18bd45f0b94f54a968f0000d61b892b2ad6249011850000ade19567bb538035ed360000617556ed277ab3223378000095770895ad27ad6b0d9500006a637b6b08ebe78b9da500006de5e0e428ac771d77b500005000000688768803bbd44095770895ad27ad6b0d9500000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000002644dcebcba000000000000000000000000000000000000000000000000000000006767d7e000000000000000000000000000000688768803bbd44095770895ad27ad6b0d95000000000000000000000000807cf9a772d5a3f9cefbc1192e939d62f0d9bd38000000000000000000000000000000000000000000000000181374bb9c0866f400000000000000000000000062d0a8458ed7719fdaf978fe5929c6d342b0bfce000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000028f5d1f68737b4fca91a00000000000000000000000000000000000000000000000015526314823acae400000000000000000000000000000688768803bbd44095770895ad27ad6b0d950000000000000000000000000000000000000000000000000000000000000000fb9be256d0bc2a1aa87c773fd95a4df00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000004198c6fc4439fb19b8beb90d01c6fc967301fb5617821c8e080bfb34e0a6cfa5bf6af36783ad7d0ce3f177e35199f459b654587be5b528463ba75270af1990b32f1c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
       maxFeePerGas: '0x1cf04482e'
-    - '0x147689E'
+    - latest
     - {}
     - time: '0x6767d797'
   - id: test_32
@@ -2109,7 +1566,7 @@ calls:
       gas: '0x7A1200'
       value: '0x0'
       data: '0x70a08231000000000000000000000000ef04bc7821433f080461bbae815182e3d7bbb61a'
-    - '0x900000'
+    - latest
     - '0xEF04bc7821433f080461BBAE815182E3d7bBb61A':
         balance: '0x2000000000000000000000'
     - number: '0x900000'
@@ -2122,7 +1579,7 @@ calls:
       gas: '0x7A1200'
       value: '0x0'
       data: '0x18160ddd'
-    - '0xA00000'
+    - latest
     - {}
     - number: '0xA00000'
       timestamp: '0x69A1C5C0'
@@ -2134,7 +1591,7 @@ calls:
       gas: '0x7A1200'
       value: '0x0'
       data: '0x18160ddd'
-    - '0xB00000'
+    - latest
     - '0x1f9840a85d5af5aa8990d1f03bba0bdf2cd1f6a1':
         storage:
           '0x0000000000000000000000000000000000000000000000000000000000000000': '0x100000000000000000000000000000000'
@@ -2148,7 +1605,7 @@ calls:
       gas: '0x7A1200'
       value: '0x0'
       data: '0x70a08231000000000000000000000000ef04bc7821433f080461bbae815182e3d7bbb61a'
-    - '0xC00000'
+    - latest
     - '0x4debB0dF4da8D1f51EF67B727c3F1c0eCC7ed009':
         storage:
           '0x0000000000000000000000000000000000000000000000000000000000000001': '0x50000000000000000000000000000000'
@@ -2156,12 +1613,40 @@ calls:
       timestamp: '0x69A3D0A0'
       gasLimit: '0xFFFFFF'
       miner: '0x000000000000000000000000000000000000dEaD'
+  - id: test_36
+    params:
+    - from: '0xEF04bc7821433f080461BBAE815182E3d7bBb61A'
+      to: '0x1f9840a85d5af5aa8990d1f03bba0bdf2cd1f6a1'
+      gas: '0x7A1200'
+      value: '0x0'
+      data: '0x18160ddd'
+    - latest
+    - '0xEF04bc7821433f080461BBAE815182E3d7bBb61A':
+        balance: '0x500000000000000000000'
+    - timestamp: '0x90000000'
+  - id: test_37
+    params:
+    - from: '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1'
+      to: '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6'
+      data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
+    - latest
+    - '0xdAC17F958D2ee523a2206206994597C13D831ec7':
+        stateDiff:
+          '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+      '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6':
+        stateDiff:
+          '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+      '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1':
+        nonce: '0x1'
+        balance: '0x2386f26fc10000'
   - id: test_38
     params:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0x0000000000000000000000000000000000000002'
       data: 0x
-    - '0x419CE0'
+    - latest
     - '0xc000000000000000000000000000000000000000':
         balance: '0x1dcd6500'
       '0xc100000000000000000000000000000000000000':
@@ -2174,7 +1659,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0x0000000000000000000000000000000000000001'
       data: '0x4544534100000000000000000000000000000000000000000000000000000000'
-    - '0x419CE0'
+    - latest
     - '0x0000000000000000000000000000000000000001':
         code: '0x60206000f3'
         balance: '0x0'
@@ -2185,7 +1670,7 @@ calls:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0x0000000000000000000000000000000000000003'
       data: 0x
-    - '0x419CE0'
+    - latest
     - '0x0000000000000000000000000000000000000003':
         movePrecompileToAddress: '0x0000000000000000000000000000000000000003'
   eth_callBundle:
@@ -2483,6 +1968,12 @@ calls:
     - blockNumber: '0x52a0b3'
       transactionIndex: -1
     - '0xE93381fB4c4F14bDa253907b18faD305D799241a': {}
+  eth_capabilities:
+  - id: test_01
+    params: []
+  eth_chainId:
+  - id: test_01
+    params: []
   eth_createAccessList:
   - id: test_01
     params:
@@ -2491,14 +1982,14 @@ calls:
       gas: '0x5208'
       gasPrice: '0x2CB417800'
       value: '0x229322'
-    - '0x89543F'
+    - latest
   - id: test_02
     params:
     - from: '0x9E61cCD162172Ae8f209549E13660b1d6d9786fc'
       to: '0x4E841622b6b31ccddb31a1C19918174a69e997Ad'
       gas: '0x5208'
       gasPrice: '0x514A36F39'
-    - '0x112A880'
+    - latest
   - id: test_03
     params:
     - from: '0x7b98421B9314E3Ffc0B7a593DBa2FBBd3b789c7D'
@@ -2506,7 +1997,7 @@ calls:
       gas: '0x407E3'
       gasPrice: '0x512C2C504'
       data: '0x1cff79cd0000000000000000000000004f91ad1a0397b763fc653b4cfe4f836915bfcd8400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064f5537ede0000000000000000000000007fc66500c84a76ad7e9c93437bfc5ac33e2ddae9000000000000000000000000a69babef1ca67a37ffaf7a485dfff3382056e78c0000000000000000000000000000000000000000000000179f3efc4c2c77000000000000000000000000000000000000000000000000000000000000'
-    - '0x112A87f'
+    - latest
   - id: test_04
     params:
     - from: '0x7b98421B9314E3Ffc0B7a593DBa2FBBd3b789c7D'
@@ -2514,7 +2005,7 @@ calls:
       gas: '0x407E3'
       gasPrice: '0x512C2C504'
       data: '0x1cff79cd0000000000000000000000004f91ad1a0397b763fc653b4cfe4f836915bfcd8400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064f5537ede0000000000000000000000007fc66500c84a76ad7e9c93437bfc5ac33e2ddae9000000000000000000000000a69babef1ca67a37ffaf7a485dfff3382056e78c0000000000000000000000000000000000000000000000179f3efc4c2c77000000000000000000000000000000000000000000000000000000000000'
-    - '0x112A880'
+    - latest
     - {}
     - false
   - id: test_05
@@ -2524,7 +2015,7 @@ calls:
       gas: '0x292F7'
       gasPrice: '0x4DBD52333'
       data: '0x3593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064ea275300000000000000000000000000000000000000000000000000000000000000010800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000100000000000000000000000000a24286057f40611d034f1c56db946c21a69a971c00000000000000000000000000000000000000000000000000a8c0ff92d4c0000000000000000000000000000000000000000000000023d7599921838737b73700000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000ef1fa4de244be696ea009d351227c791fda3caa4'
-    - '0x112A883'
+    - latest
   - id: test_06
     params:
     - from: '0xC920bB401bF1dAb5f1e49B2fD1BcF5198Ff98768'
@@ -2532,7 +2023,7 @@ calls:
       gas: '0x3C5FD'
       gasPrice: '0x6B8AB7333'
       data: '0xb6f9de95000000000000000000000000000000000000000000000000000063f6afbfd67a0000000000000000000000000000000000000000000000000000000000000080000000000000000000000000c920bb401bf1dab5f1e49b2fd1bcf5198ff987680000000000000000000000000000000000000000000000000000000064ea27290000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000002de6b0e3947a35aa897d0cb7e4e5c25aba89c6b7'
-    - '0x112A883'
+    - latest
   - id: test_07
     params:
     - from: '0x244A93D0f7F27b845060abEd22B23aD914C71B54'
@@ -2540,7 +2031,7 @@ calls:
       gas: '0xE234'
       gasPrice: '0x1D91CA3600'
       data: '0xca120b1f000000000000000000000000244a93d0f7f27b845060abed22b23ad914c71b54eaafa8798f3f2c657b5f86f543682ec694db0344b923fe7a508c522d22938945000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000087df2103941187dc230eab1a148a587cb8a03afb00000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000002'
-    - '0x112A883'
+    - latest
   - id: test_08
     params:
     - from: '0xdb534BAB6b7d0690f412395B18bD3df078ECfe2d'
@@ -2548,7 +2039,7 @@ calls:
       gas: '0xC2A5'
       gasPrice: '0x80BEFC0'
       data: '0x095ea7b3000000000000000000000000a87eaf82f287a2c67cb74130906d5ac01f2f925100000000000000000000000000000000000000000000000000000000126af740'
-    - '0xB71B00'
+    - latest
   - id: test_09
     params:
     - from: '0x8Fe9C787995D12b6EF3a9448aA944593DaC93C6c'
@@ -2556,7 +2047,7 @@ calls:
       gas: '0x668E2'
       gasPrice: '0x1FE5D61A00'
       data: '0xe7fc646500000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000028000000000000000000000000000000000000000000000000000000000000002e0000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000026c0000000000000000000000000000000000000000000000000000000000000244000000000000000000000000000000000000000000000000000000000000021500000000000000000000000000000000000000000000000000000000000001b5000000000000000000000000000000000000000000000000000000000000025800000000000000000000000000000000000000000000000000000000000000a700000000000000000000000000000000000000000000000000000000000000c8000000000000000000000000000000000000000000000000000000000000006b0000000000000000000000000000000000000000000000000000000000000085000000000000000000000000000000000000000000000000000000000000009e0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000019900000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000123000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000001690000000000000000000000000000000000000000000000000000000000000152000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000f400000000000000000000000000000000000000000000000000000000000000d400000000000000000000000000000000000000000000000000000000000000d800000000000000000000000000000000000000000000000000000000000000d9'
-    - '0xB71B00'
+    - latest
   - id: test_10
     params:
     - from: '0xb37b548519983b0eEc623a11df42644a25068c09'
@@ -2565,7 +2056,7 @@ calls:
       value: '0x572ED37DDCBA5D'
       gasPrice: '0x3A532E174'
       data: '0xf7a1696300000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000b37b548519983b0eec623a11df42644a25068c090000000000000000000000000000000000000000000000000000000009679ab8885582c4b208e7b07b74c76bf81cee1b63a6d77210acd546e6758d54761228cd0000000000000000000000004976fb03c32e5b8cfe2b6ccb31c09ba78ebaba41000000000000000000000000b37b548519983b0eec623a11df42644a25068c0900000000000000000000000000000000000000000000000000000000000000086672616363696f6e000000000000000000000000000000000000000000000000'
-    - '0xE4E1C0'
+    - latest
   - id: test_11
     params:
     - from: '0x3D0768da09CE77d25e2d998E6a7b6eD4b9116c2D'
@@ -2573,7 +2064,7 @@ calls:
       gas: '0x23685'
       gasPrice: '0xDB5AAA975'
       data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0xBF7A'
+    - latest
   - id: test_12
     params:
     - from: '0xA1E4380A3B1f749673E270229993eE55F35663b4'
@@ -2581,7 +2072,7 @@ calls:
       gas: '0x15F90'
       gasPrice: '0xDA9079780'
       data: '0xcfae3217'
-    - '0xC11F'
+    - latest
   - id: test_13
     params:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
@@ -2589,7 +2080,7 @@ calls:
       gas: '0x493E0'
       gasPrice: '0xBA43B7400'
       data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x1C72D'
+    - latest
   - id: test_14
     params:
     - from: '0x6ed5a435495480774dfc44cc5bc85333f1b0646a'
@@ -2597,7 +2088,7 @@ calls:
       gas: '0xBB42'
       gasPrice: '0x2f0d4d499'
       data: '0x42842e0e0000000000000000000000006ed5a435495480774dfc44cc5bc85333f1b0646a0000000000000000000000008411a8ba27d7f582c2860758bf2f901b851c30d300000000000000000000000000000000000000000000000000000000000001b1'
-    - '0xf423ff'
+    - latest
   - id: test_15
     params:
     - from: '0xf661e21b71a9ca331e251e51a412857d2b61d8f8'
@@ -2605,14 +2096,14 @@ calls:
       gas: '0x7a120'
       gasPrice: '0xd7d40ace3'
       value: '0xde0b6b3a7640000'
-    - '0x11573'
+    - latest
   - id: test_16
     params:
     - from: '0xa9ac1233699bdae25abebae4f9fb54dbb1b44700'
       gas: '0x493e0'
       gasPrice: '0xba43b7400'
       data: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
-    - '0x1fe0b'
+    - latest
   - id: test_17
     params:
     - from: '0x6c96769a08ddefa92e06de0a32089272c57f79b2'
@@ -2621,7 +2112,15 @@ calls:
       gasPrice: '0x34bcab274'
       data: '0x000000020000000000000000000000000000000000000000000000000000000003e366320000000000000000000000000000000000000000000000005ea06407f0408000aaaebe6fe48e54f431b0c390cfaf0b017d09d42dc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000bb800000000000000000000000000000000000000000000000000210fa439a7fc04'
       value: '0xe4e1c0'
-    - '0xe4e1bf'
+    - latest
+  - id: test_20
+    params:
+    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+      to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+      gas: '0xC2A005'
+      gasPrice: '0x8000BEFC0'
+      data: '0x095ea7b3000000000000000000000000a87eaf82f287a2c67cb74130906d5ac01f2f925100000000000000000000000000000000000000000000000000000000126af740'
+    - latest
   - id: test_21
     params:
     - from: '0x7b98421B9314E3Ffc0B7a593DBa2FBBd3b789c7D'
@@ -2629,13 +2128,30 @@ calls:
       gas: '0x407E3'
       gasPrice: '0x512C2C504'
       data: '0x1cff79cd0000000000000000000000004f91ad1a0397b763fc653b4cfe4f836915bfcd8400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064f5537ede0000000000000000000000007fc66500c84a76ad7e9c93437bfc5ac33e2ddae9000000000000000000000000a69babef1ca67a37ffaf7a485dfff3382056e78c0000000000000000000000000000000000000000000000179f3efc4c2c77000000000000000000000000000000000000000000000000000000000000'
-    - '0x112A880'
+    - latest
     - '0x7b98421B9314E3Ffc0B7a593DBa2FBBd3b789c7D':
         balance: '0x6f05b59d3b20000'
       '0xFA103c21ea2DF71DFb92B0652F8B1D795e51cdEf':
         code: '0x602a60005260206000f3'
         state:
           '0x0000000000000000000000000000000000000000000000000000000000000000': '0x00000000000000000000000000000000000000000000000000000000DEADBEEF'
+  - id: test_22
+    params:
+    - from: '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1'
+      to: '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6'
+      data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
+    - latest
+    - '0xdAC17F958D2ee523a2206206994597C13D831ec7':
+        stateDiff:
+          '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+      '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6':
+        stateDiff:
+          '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+      '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1':
+        nonce: '0x1'
+        balance: '0x1000A386f26fc10000'
   eth_estimateGas:
   - id: test_01
     params:
@@ -2714,19 +2230,13 @@ calls:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0xE401C0'
-  - id: test_14
-    params:
-    - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
-      to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
-      gasPrice: '0xBA43B7400'
-    - '0xFFFFFFFF'
+    - latest
   - id: test_15
     params:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0x41b57c'
+    - latest
     - '0xB5772B3A6Be702D0387770C64bf17e36a4D38188':
         balance: '0x165AF8666'
   - id: test_16
@@ -2734,7 +2244,7 @@ calls:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0x41b57c'
+    - latest
     - '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1':
         balance: '0x165AF8666'
         nonce: '0x71'
@@ -2743,7 +2253,7 @@ calls:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0x41b57c'
+    - latest
     - '0xa9ac1233699bdae25abebae4f9fb54dbb1b44700':
         balance: '0x0'
         nonce: '0x0'
@@ -2752,7 +2262,7 @@ calls:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0x41b57c'
+    - latest
     - '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1':
         code: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
         balance: '0x7278882'
@@ -2762,7 +2272,7 @@ calls:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0x41b57c'
+    - latest
     - '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1':
         code: '0x60606040526040516102b43803806102b48339016040526060805160600190602001505b5b33600060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908302179055505b806001600050908051906020019082805482825590600052602060002090601f01602090048101928215609e579182015b82811115609d5782518260005055916020019190600101906081565b5b50905060c5919060a9565b8082111560c1576000818150600090555060010160a9565b5090565b50505b506101dc806100d86000396000f30060606040526000357c01000000000000000000000000000000000000000000000000000000009004806341c0e1b514610044578063cfae32171461005157610042565b005b61004f6004506100ca565b005b61005c60045061015e565b60405180806020018281038252838181518152602001915080519060200190808383829060006004602084601f0104600302600f01f150905090810190601f1680156100bc5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16141561015b57600060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b5b565b60206040519081016040528060008152602001506001600050805480601f016020809104026020016040519081016040528092919081815260200182805480156101cd57820191906000526020600020905b8154815290600101906020018083116101b057829003601f168201915b505050505090506101d9565b90560000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000c48656c6c6f20576f726c64210000000000000000000000000000000000000000'
         balance: '0x7278882'
@@ -2776,7 +2286,7 @@ calls:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0x61b57c'
+    - latest
     - '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1':
         code: '0x6060604052361561001f5760e060020a6000350463f5537ede8114610030575b610062600034111561006457610002565b6100626004356024356044356000805433600160a060020a039081169116141561010557600034111561006657610002565b005b565b7fa9059cbb000000000000000000000000000000000000000000000000000000006060908152600160a060020a03808516606452608484905285929083169163a9059cbb9160a4916020916044908290876161da5a03f115610002575050604080518481529051600160a060020a03861692917fd0ed88a3f042c6bbb1e3ea406079b5f2b4b198afccaa535d837f4c63abbc4de6919081900360200190a35b5050505056'
         nonce: '0x2'
@@ -2793,7 +2303,7 @@ calls:
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
       data: '0x01234567'
-    - '0xE401C0'
+    - latest
     - '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1':
         code: '0x6001600055'
         nonce: '0x3'
@@ -2802,7 +2312,7 @@ calls:
     - from: '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
-    - '0xE401C0'
+    - latest
     - {}
     - timestamp: '0x667FB2B0'
       gasLimit: '0x3D0900'
@@ -2812,203 +2322,767 @@ calls:
       to: '0x252568abdeb9de59fd8963dfcd87be2db65f1ce1'
       gasPrice: '0xBA43B7400'
       data: '0x01234567'
-    - '0xE401C0'
+    - latest
     - '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700':
         balance: '0x56bc75e2d63100000'
     - baseFeePerGas: '0x400000000'
+  - id: test_27
+    params:
+    - from: '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1'
+      to: '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6'
+      data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
+    - latest
+    - '0xdAC17F958D2ee523a2206206994597C13D831ec7':
+        stateDiff:
+          '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+      '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6':
+        stateDiff:
+          '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+      '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1':
+        nonce: '0x1'
+        balance: '0x2386f26fc10000'
   - id: test_28
     params:
     - from: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e'
       to: '0x0000000000000000000000000000000000000003'
       data: 0x
-    - '0x419CE0'
+    - latest
     - '0x0000000000000000000000000000000000000003':
         movePrecompileToAddress: '0x0000000000000000000000000000000000000002'
+  eth_feeHistory:
+  - id: test_01
+    params:
+    - '0x1'
+    - latest
+    - - 25
+      - 75
+  - id: test_02
+    params:
+    - '0x2'
+    - latest
+    - - 10
+      - 50
+      - 90
+  - id: test_03
+    params:
+    - '0x5'
+    - latest
+    - - 25
+      - 50
+      - 75
+  - id: test_04
+    params:
+    - '0x2'
+    - latest
+    - - 0
+      - 50
+      - 100
+  - id: test_05
+    params:
+    - '0x2'
+    - latest
+    - - 100
+  - id: test_06
+    params:
+    - '0x2'
+    - latest
+    - - 5
+      - 95
+  - id: test_07
+    params:
+    - '0x2'
+    - latest
+    - - 1
+      - 5
+      - 95
+      - 100
+  - id: test_08
+    params:
+    - '0xa'
+    - latest
+    - - 50
+  - id: test_09
+    params:
+    - '0x2'
+    - latest
+    - []
+  - id: test_10
+    params:
+    - '0x1'
+    - latest
+    - []
+  - id: test_11
+    params:
+    - '0xa'
+    - latest
+    - - 10
+  - id: test_12
+    params:
+    - '0xa'
+    - latest
+    - - 3
+  - id: test_13
+    params:
+    - '0x3'
+    - latest
+    - - 3
+      - 100
+  - id: test_14
+    params:
+    - '0x3'
+    - latest
+    - []
+  - id: test_15
+    params:
+    - '0x5'
+    - latest
+    - - 0
+  - id: test_16
+    params:
+    - '0x7'
+    - latest
+    - - 0
+  - id: test_17
+    params:
+    - '0x8'
+    - latest
+    - - 0
+  - id: test_21
+    params:
+    - '0x1'
+    - latest
+    - - 0
+      - 50
+      - 100
+  - id: test_22
+    params:
+    - '0x1'
+    - latest
   eth_getBalance:
   - id: test_01
     params:
     - '0xcf1dc766fc2c62bef0b67a8de666c8e67acf35f6'
-    - '0x1036640'
+    - latest
   - id: test_02
     params:
     - '0x0000000000000000000000000000000000000000'
-    - '0x1036649'
-  - id: test_04
-    params:
-    - '0x0000000000000000000000000000000000000000'
-    - earliest
+    - latest
   - id: test_05
     params:
     - '0xffffffffff2c62bef0b67a8de666c8e67acf35f6'
-    - '0xFFFFFFFFF'
+    - latest
   - id: test_06
     params:
     - '0x525816fB59585B2DD4Adc27108C0dBFff4b9f06f'
-    - '0x6029B0'
-  - id: test_07
-    params:
-    - '0x525816fB59585B2DD4Adc27108C0dBFff4b9f06f'
-    - '0xE4E226'
+    - latest
   - id: test_08
     params:
     - '0x56a79f84Fe85D8e04062DC29E0A088BdbCFC3d18'
-    - '0x1879A0'
+    - latest
   - id: test_09
     params:
     - '0x7623642d4D57C8B75214657fb4faA1F329E43Ea0'
-    - '0x1879A3'
+    - latest
   - id: test_10
     params:
     - '0xE2562Ba8F7a8068C96D4c14E683dEa0b1A44680D'
-    - '0x1879A3'
+    - latest
   - id: test_11
     params:
     - '0xC40f73c0630bE875970053B9980BD53AF59eB3E6'
-    - '0x2DC6C7'
+    - latest
   - id: test_12
     params:
     - '0x829BD824B016326A401d083B33D092293333A830'
-    - '0x6138FA'
+    - latest
   - id: test_13
     params:
     - '0xd36B2a8E19DaEff5D4849fEF0f5eA2F076C318D4'
-    - '0x5C4AF5'
+    - latest
   - id: test_14
     params:
     - '0x28C6c06298d514Db089934071355E5743bf21d60'
-    - '0xE4E1CA'
+    - latest
   - id: test_15
     params:
     - '0x09Fdf07dD48062CCfBfF5F3A4f4E1cAf0A29386E'
-    - '0xE4E22B'
+    - latest
   - id: test_16
     params:
     - '0xb64B76f9E9d788f49fA34726C89FBEaF982a7cd1'
-    - '0x1875B8'
+    - latest
   - id: test_17
     params:
     - '0xC59Ab36ABbc303Fd91Fd283FF8b58f93Ab002E6F'
-    - '0x64D8B8'
+    - latest
   - id: test_18
     params:
     - '0x1e5D2FEeE346afe729C803839c222A3f4414bc9f'
-    - '0x4366AD'
+    - latest
   - id: test_19
     params:
     - '0x61C9CE78CC6FbC67E252a53dF62E78801d120DD4'
-    - '0x4366AF'
+    - latest
   - id: test_20
     params:
     - '0xE93381fB4c4F14bDa253907b18faD305D799241a'
-    - '0x52A0B3'
+    - latest
   - id: test_21
     params:
     - '0x52bc44d5378309EE2abF1539BF71dE1b7d7bE3b5'
-    - '0xFA0A5'
+    - latest
   - id: test_22
     params:
     - '0x580992B51e3925e23280EfB93d3047C82f17E038'
-    - '0xE1A05'
+    - latest
   - id: test_23
     params:
     - '0x4F67b765FccBB1e8C9629F04eF1256f9ECf4c409'
-    - '0xE6055'
+    - latest
   - id: test_24
     params:
     - '0x9c5d444B83bd93e07f362DB099733483e89B63d2'
-    - '0xF0466'
+    - latest
   - id: test_25
     params:
     - '0x2a65Aca4D5fC5B5C859090a6c34d164135398226'
-    - '0xD7DC6'
-  - id: test_28
+    - latest
+  - id: test_26
     params:
-    - '0x0000000000000000000000000000000000000000'
-    - '0x99999999999999'
+    - '0xa9Ac1233699BDae25abeBae4f9Fb54DbB1b44700'
+    - latest
+  - id: test_27
+    params:
+    - '0xEF04bc7821433f080461BBAE815182E3d7bBb61A'
+    - latest
   - id: test_29
     params:
     - '0x0000000000000000000000000000000000000000'
+  eth_getBlockByHash:
+  - id: test_01
+    params:
+    - '0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3'
+    - true
+  - id: test_02
+    params:
+    - '0x127c6b9794874d7011770b3aa2a0a640e1db201c2d677d01b2b3b19e7ad427c7'
+    - false
+  - id: test_03
+    params:
+    - '0xfffc6b9794874d7011767777a2a0a640e1db201c2d677d01b2b3b19e7ad427c7'
+    - false
+  - id: test_05
+    params:
+    - '0xc2beedf91127b83563d2b1a44b9f8a5510febb028440599b3f16cf436637930e'
+    - true
+  - id: test_06
+    params:
+    - '0x5091c926f7a92b5fefbbf29446e2ed792a6880298974e733ad49a9e5e8347b97'
+    - true
+  - id: test_07
+    params:
+    - '0x885dbb7ca37d235e2a211e04668cd382f54872292e2adf50d61d65785fa2b713'
+    - false
+  - id: test_09
+    params:
+    - '0x746f3774ca35da17a8942103daf825eb4ebaa8b675888fd869e1e98c8ce69a12'
+    - true
+  - id: test_10
+    params:
+    - '0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3'
+    - false
+  eth_getBlockByNumber:
+  - id: test_01
+    params:
+    - latest
+    - false
+  - id: test_02
+    params:
+    - latest
+    - true
+  eth_getBlockReceipts:
+  - id: test_01
+    params:
+    - latest
+  eth_getBlockTransactionCountByHash:
+  - id: test_01
+    params:
+    - '0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3'
+  - id: test_02
+    params:
+    - '0xFFFFFFF6913a3879217169c6ba461114fa032d9510a56a409d3aab19f668e299'
+  - id: test_03
+    params:
+    - '0x96cfa0fb5e50b0a3f6cc76f3299cfbf48f17e8b41798d1394474e67ec8a97e9f'
+  - id: test_04
+    params:
+    - '0x736048fc56ee5570d18fce0fbad513f8a3cc1de2b18bfecfc8b3663e0bee1570'
+  - id: test_05
+    params:
+    - '0x4d5e647b2d8d3a3c8c1561ebb88734bc5fc3c2941016f810cf218738c0ecd99e'
+  eth_getBlockTransactionCountByNumber:
+  - id: test_01
+    params:
+    - latest
   eth_getCode:
   - id: test_01
     params:
     - '0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413'
-    - '0x15CD15'
-  - id: test_02
-    params:
-    - '0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413'
-    - '0x15CD13'
+    - latest
   - id: test_03
     params:
     - '0xfB9bc244D798123fDe783fCc1C72d3Bb8C189413'
-    - '0x15CD13'
-  - id: test_04
+    - latest
+  - id: test_06
     params:
-    - '0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413'
-    - '0x15CD16'
+    - '0xbD9a7da852ff7D99F2093c73E6bcF9d4cdb2086a'
+    - latest
+  - id: test_07
+    params:
+    - '0xfffbc244D798123fDe783fCc1C72d3Bb8C189413'
+    - latest
   - id: test_08
     params:
     - '0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413'
+  eth_getLogs:
+  - id: test_01
+    params:
+    - address:
+      - '0x00000000219ab540356cbb839cbe05303d7705fa'
+      fromBlock: latest
+      toBlock: latest
+      topics: []
+  - id: test_03
+    params:
+    - address:
+      - '0xFd7f243f315B3C5b6E45F8383cBB20d71C9661d4'
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925'
+  - id: test_05
+    params:
+    - address:
+      - '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+      - '0x7f268357A8c2552623316e2562D90e642bB538E5'
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c'
+      - - '0x5152abf959f6564662358c2e52b702259b78bac5ee7842a0f01937e670efcc7d'
+  - id: test_08
+    params:
+    - address:
+      - '0x2a0c0DBEcC7E4D658f48E01e3fA353F44050c208'
+      fromBlock: latest
+      toBlock: latest
+      topics: []
+  - id: test_09
+    params:
+    - address:
+      - '0x2a0c0DBEcC7E4D658f48E01e3fA353F44050c208'
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xdcbc1c05240f31ff3ad067ef1ee35ce4997762752e3a095284754544f4c709d7'
+  - id: test_10
+    params:
+    - address: []
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xdcbc1c05240f31ff3ad067ef1ee35ce4997762752e3a095284754544f4c709d7'
+  - id: test_11
+    params:
+    - address: []
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4d00000000'
+  - id: test_13
+    params:
+    - address:
+      - '0xA62142888ABa8370742bE823c1782D17A0389Da1'
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+        - '0x8f36579a548bc439baa172a6521207464154da77f411e2da3db2f53affe6cc3a'
+  - id: test_15
+    params:
+    - address:
+      - '0xA62142888ABa8370742bE823c1782D17A0389Da1'
+      - '0x0777F76D195795268388789343068e4fCd286919'
+      - '0xB3775fB83F7D12A36E0475aBdD1FCA35c091efBe'
+      fromBlock: latest
+      toBlock: latest
+      topics: []
+  - id: test_17
+    params:
+    - address:
+      - '0x6090A6e47849629b7245Dfa1Ca21D94cd15878Ef'
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xb556ff269c1b6714f432c36431e2041d28436a73b6c3f19c021827bbdc6bfc29'
+  - id: test_18
+    params:
+    - address:
+      - '0x6090A6e47849629b7245Dfa1Ca21D94cd15878Ef'
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xb556ff269c1b6714f432c36431e2041d28436a73b6c3f19c021827bbdc6bfc29'
+        - '0xb686a8841b2c3e9211548a0dea7fc8dcb44661de69f4c517e2abef04d996d8e8'
+  - id: test_20
+    params:
+    - address:
+      - '0xBbB1BD2D741F05E144E6C4517676a15554fD4B8D'
+      - '0x8d12A197cB00D4747a1fe03395095ce2A5CC6819'
+      fromBlock: latest
+      toBlock: latest
+      topics:
+      - - '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+        - '0xf341246adaac6f497bc2a656f546ab9e182111d630394f0c57c710a59a2cb567'
+  - id: test_21
+    params:
+    - fromBlock: latest
+      toBlock: latest
   eth_getProof:
+  - id: test_01
+    params:
+    - '0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a'
+    - []
+    - latest
+  - id: test_02
+    params:
+    - '0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+      - '0xe1c3525287a2def1e779a7848143015975a5c9a2c34033d59e3975a898748371'
+    - latest
+  - id: test_03
+    params:
+    - '0x000000000001a36777f9930aaeff623771b13e70'
+    - - '0x0a8147dedbd185977bcab16f8b64501b8ec0ea75e31d73b656cb8b3b4da54950'
+      - '0x1b3995281c91f027a7eee4f4fde48a7eb0f8b73d4b36beb850c2af7e27477931'
+      - '0x4525a583ac3461f4495d6472a312c7b55e8b1b6f0cb426ae4b7df8cc09bfb3f0'
+    - latest
+  - id: test_04
+    params:
+    - '0x000000000000df8c944e775bde7af50300999283'
+    - - '0x000000000000000000000000000000000000000000000000000000001540aa89'
+    - latest
+  - id: test_05
+    params:
+    - '0x00000000001018d31a8dafc886363cfb0bf78768'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+      - '0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563'
+      - '0x4071f02e9dfb6444626b0ea4b66a9e6594bf6a38177e6bc168fa269c3b3a7d4e'
+    - latest
+  - id: test_06
+    params:
+    - '0x0644eb324073d6f83cb0879ff88d820a984e916a'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+      - '0x0000000000000000000000000000000000000000000000000000000000000001'
+    - latest
+  - id: test_07
+    params:
+    - '0x0644eaa32d7961aabdf053aa7a252f2a4b43db27'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+      - '0x0000000000000000000000000000000000000000000000000000000000000002'
+    - latest
+  - id: test_08
+    params:
+    - '0x0644d2bbb1234139fd22c06433afe3d7987ea375'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+    - latest
+  - id: test_09
+    params:
+    - '0x0644c4a7e73a7923e1620df43cb032dbdeddb24e'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+    - latest
+  - id: test_10
+    params:
+    - '0x0644bd6a984ace53679d542e94d15cbc5b0c9340'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000003'
+      - '0x0000000000000000000000000000000000000000000000000000000000000002'
+      - '0x0000000000000000000000000000000000000000000000000000000000000001'
+      - '0x0000000000000000000000000000000000000000000000000000000000000000'
+    - latest
+  - id: test_11
+    params:
+    - '0x9A65814571e728eA8C86C10972b220Bf96615bF7'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+    - latest
+  - id: test_12
+    params:
+    - '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+    - - '0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563'
+      - '0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace'
+      - '0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6'
+      - '0xcf0fc17adf91aba0d79c36b0cf3154d305f93efc93e78de954364fbe02c81fc4'
+    - latest
+  - id: test_13
+    params:
+    - '0x34d471583d739B8A7f12e1b106263B2d53c89E23'
+    - []
+    - latest
+  - id: test_14
+    params:
+    - '0x0000000000000000000000000000000000000000'
+    - []
+    - latest
+  - id: test_15
+    params:
+    - '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+    - - '0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563'
+      - '0xa66cc928b5edb82af9bd49922954155ab7b0942694bea4ce44661d9a8736c688'
+      - '0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6'
+      - '0xf3f7a9fe364faab93b216da50a3214154f22a0a2b415b23a84c8169e8b636ee3'
+    - latest
+  - id: test_16
+    params:
+    - '0x6B175474E89094C44Da98b954EedeAC495271d0F'
+    - - '0x036b6384b5eca791c62761152d0c79bb0604c104a5fb6f4eb0703f3154bb3db0'
+      - '0x2c039c658cf71ff700b82abf7f8f6f48980653d4ee593486536821297393dff3'
+      - '0x42ca3cf7dcabf37805cf6c8cde2049a719cbd3e3d46de46775666c5ea5477712'
+      - '0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6'
+    - latest
+  - id: test_17
+    params:
+    - '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+    - - '0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563'
+      - '0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace'
+      - '0x8a35acfbc15ff81a39ae7d344fd709f28e8600b4aa8c65c6b64bfe7fe36bd19b'
+      - '0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6'
+    - latest
+  - id: test_18
+    params:
+    - '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+    - latest
+  - id: test_19
+    params:
+    - '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+    - - '0xfd57608f6c382103f56a5d469736e927c4ff1659779275753063f70425cc02c8'
+    - latest
+  - id: test_20
+    params:
+    - '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+    - - '0x0000000000000000000000000000000000000000000000000000000000000000'
+      - '0x0000000000000000000000000000000000000000000000000000000000000001'
+      - '0x0000000000000000000000000000000000000000000000000000000000000002'
+      - '0x0000000000000000000000000000000000000000000000000000000000000003'
+      - '0xfd57608f6c382103f56a5d469736e927c4ff1659779275753063f70425cc02c8'
+    - latest
   - id: test_21
     params:
     - '0x1c89fbf5750ea4a2cdd8615de1e173836fe937b8'
     - []
-    - '0x186b3'
+    - latest
   - id: test_22
     params:
     - '0x9D39A5DE30e57443BfF2A8307A4256c8797A3497'
     - []
-    - '0x1674F77'
+    - latest
   - id: test_23
     params:
     - '0x9D39A5DE30e57443BfF2A8307A4256c8797A3497'
     - - '0x5c112e25c8ca97e0ac5683e85b3a24d8fba09abed7a3ac95561d1e3222ed5324'
-    - '0x1674F77'
+    - latest
   - id: test_24
     params:
     - '0x54792FF69040FCbb4723B4C7439984336f559234'
     - - '0x5c112e25c8ca97e0ac5683e85b3a24d8fba09abed7a3ac95561d1e3222ed5324'
-    - '0x167dcbc'
+    - latest
   - id: test_25
     params:
     - '0x54792FF69040FCbb4723B4C7439984336f559234'
     - []
-    - '0x168be48'
+    - latest
   - id: test_26
     params:
     - '0x9A65814571e728eA8C86C10972b220Bf96615bF7'
     - []
-    - '0x16a2de6'
+    - latest
   - id: test_27
     params:
     - '0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a'
     - []
+  eth_getRawTransactionByBlockHashAndIndex:
+  - id: test_01
+    params:
+    - '0x3c9c46a46b17361cd1ac3ed3401c9a268095c1810bf991c470c139f8441e1d0b'
+    - '0x0'
+  - id: test_02
+    params:
+    - '0x9a71a95be3fe957457b11817587e5af4c7e24836d5b383c430ff25b9286a457f'
+    - '0x12'
+  - id: test_03
+    params:
+    - '0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3'
+    - '0x14'
+  - id: test_04
+    params:
+    - '0xfffffffbaf010a7dbaff92722aeac25c4c862d0b48d010b8bc1600af69c1c10a'
+    - '0x0'
+  - id: test_05
+    params:
+    - '0x96cfa0fb5e50b0a3f6cc76f3299cfbf48f17e8b41798d1394474e67ec8a97e9f'
+    - '0x999999'
+  - id: test_06
+    params:
+    - '0xf9078bd95539f49065a0fd10cb9260e1f6748af46f60b657439ebecb5d7153c0'
+    - '0x12'
+  - id: test_07
+    params:
+    - '0x8e38b4dbf6b11fcc3b9dee84fb7986e29ca0a02cecd8977c161ff7333329681e'
+    - '0x1'
+  - id: test_08
+    params:
+    - '0x3c9c46a46b17361cd1ac3ed3401c9a268095c1810bf991c470c139f8441e1d0b'
+    - '0x18'
+  - id: test_09
+    params:
+    - '0xc8a55bd53f11d30e8e634f39cb2fdf9000c54a009681a5617d3d8831db64cf02'
+    - '0x9'
+  - id: test_10
+    params:
+    - '0x3dc4ef568ae2635db1419c5fec55c4a9322c05302ae527cd40bff380c1d465dd'
+    - '0x2a'
+  eth_getRawTransactionByBlockNumberAndIndex:
+  - id: test_01
+    params:
+    - latest
+    - '0x0'
+  - id: test_03
+    params:
+    - latest
+    - '0x10'
+  - id: test_04
+    params:
+    - latest
+    - '0x4'
+  - id: test_05
+    params:
+    - latest
+    - '0x123335'
+  - id: test_06
+    params:
+    - latest
+    - '0x3'
+  - id: test_07
+    params:
+    - latest
+    - '0x1'
+  - id: test_08
+    params:
+    - latest
+    - '0x2'
+  - id: test_09
+    params:
+    - latest
+    - '0x32'
+  - id: test_10
+    params:
+    - latest
+    - '0x50'
+  - id: test_13
+    params:
+    - latest
+    - '0x5000'
+  eth_getRawTransactionByHash:
+  - id: test_01
+    params:
+    - '0xaf077c0d331e542f43f69ba4e7bf1114fa810d8fb0538d8e5d52af6d72fbf568'
+  - id: test_02
+    params:
+    - '0x273b0e021f5ec28407e0e9c6e7383737ae700f2f37a62977d63fd50f84df76c1'
+  - id: test_03
+    params:
+    - '0x5823f35b19a7d2770a78fc0ea5dd1f3423bf3645c7f54000323c9909fc3904b5'
+  - id: test_04
+    params:
+    - '0x11d21a1940149314655da30434097a76338ffddd2e0c63134d77582a56d160ac'
+  - id: test_05
+    params:
+    - '0xf9b4ba2d36a08f631a3ad9481102f7e8c2f36d2347f7903f0278a98ee6d5ce9c'
+  - id: test_06
+    params:
+    - '0x1d48dc197c3cf27218142f595c37262f752df982cfc108e758975c1c30f066f3'
+  - id: test_07
+    params:
+    - '0x496eabfa43bb9fe6bacaad5818880b987d35ae19d4a2dff33fd5360c68860790'
+  - id: test_08
+    params:
+    - '0xaac4bf6458a0c5b7997abcfebe9d4a63e610d552aa9e5b3ddbeb20b7e26461c3'
+  - id: test_09
+    params:
+    - '0x1b8aa428fd5df34c482e44c64d932d52308eeded99f1da672711c5956a0072d0'
+  - id: test_10
+    params:
+    - '0xc34dc5ec52c48c124c662f542ac3ac8d39a842c06a4439c92a3a63e9b0c4fb9c'
+  - id: test_11
+    params:
+    - '0x0c4066eea7240af3b4c9d7989e1a01b4c75eae0b51c95e1d716de67d489a5251'
+  - id: test_12
+    params:
+    - '0xeadc68fc533081412e63fb3ebf7184d5e6f8d68edb274e8cad0e3c7a7dc99b83'
+  - id: test_13
+    params:
+    - '0xa8534411791645fa4a604b240ef0c4108e2604458769e2e48f665fd9b779ccd1'
+  - id: test_14
+    params:
+    - '0x8087e06c5b8667b35fd289b193e6350441e7da4af38e244042baa336478ef8f7'
+  - id: test_15
+    params:
+    - '0x41f31d4a28d568ee189b62ee558a28e1e78018337699a31429c8d30a16b46f4d'
+  - id: test_16
+    params:
+    - '0x689f1782584a2e910c874ba8eced0c1c6171f89df4367d426f547272da83d258'
   eth_getStorageAt:
   - id: test_01
     params:
     - '0x6C8f2A135f6ed072DE4503Bd7C4999a1a17F824B'
     - '0x1'
-    - '0x112A87f'
+    - latest
   - id: test_02
     params:
     - '0x8D92A6812b3dA2346883F0631910c96Cb9c5a5f9'
     - '0x0'
-    - '0x104A3FA'
-  - id: test_03
-    params:
-    - '0x8D92A6812b3dA2346883F0631910c96Cb9c5a5f9'
-    - '0x0'
-    - '0x104A3F9'
-  - id: test_05
+    - latest
+  - id: test_04
     params:
     - '0x8cED5ad0d8dA4Ec211C17355Ed3DBFEC4Cf0E5b9'
     - '0x0'
-    - earliest
+    - latest
   - id: test_06
     params:
     - '0x8cED5ad0d8dA4Ec211C17355Ed3DBFEC4Cf0E5b9'
     - '0x1'
-    - earliest
+    - latest
+  - id: test_07
+    params:
+    - '0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413'
+    - '0x3'
+    - latest
+  - id: test_08
+    params:
+    - '0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413'
+    - '0x2'
+    - latest
+  - id: test_09
+    params:
+    - '0x8cED5ad0d8dA4Ec211C17355Ed3DBFEC4Cf0E5b9'
+    - 0xasdf
+    - latest
+  - id: test_10
+    params:
+    - '0xc1cadaffffffffffffffffffffffffffffffffff'
+    - '0x0100000000000000000000000000000000000000000000000000000000000000'
+    - latest
   - id: test_11
     params:
     - '0xc1cadaffffffffffffffffffffffffffffffffff'
@@ -3074,22 +3148,164 @@ calls:
     params:
     - '0x6C8f2A135f6ed072DE4503Bd7C4999a1a17F824B':
       - '0x0000000000000000000000000000000000000000000000000000000000000001'
+  eth_getTransactionByBlockHashAndIndex:
+  - id: test_01
+    params:
+    - '0x4d5e647b2d8d3a3c8c1561ebb88734bc5fc3c2941016f810cf218738c0ecd99e'
+    - '0x0'
+  - id: test_02
+    params:
+    - '0x4d5e647b2d8d3a3c8c1561ebb88734bc5fc3c2941016f810cf218738c0ecd99e'
+    - '0x53'
+  - id: test_03
+    params:
+    - '0x4d5e647b2d8d3a3c8c1561ebb88734bc5fc3c2941016f810cf218738c0ecd99e'
+    - '0x70'
+  - id: test_04
+    params:
+    - '0x4d5e647b2d8d3a3c8c1561ebb88734bc5fc3c2941016f810cf218738c0ecd99e'
+    - '0x99'
+  - id: test_05
+    params:
+    - '0x96cfa0fb5e50b0a3f6cc76f3299cfbf48f17e8b41798d1394474e67ec8a97e9f'
+    - '0x12'
+  - id: test_06
+    params:
+    - '0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3'
+    - '0x24'
+  eth_getTransactionByBlockNumberAndIndex:
+  - id: test_01
+    params:
+    - latest
+    - '0x0'
+  - id: test_04
+    params:
+    - latest
+    - '0x30'
+  - id: test_07
+    params:
+    - latest
+    - '0x99'
+  - id: test_08
+    params:
+    - latest
+    - '0x20'
+  - id: test_09
+    params:
+    - latest
+    - '0x500'
+  eth_getTransactionByHash:
+  - id: test_01
+    params:
+    - '0x45102190bcfd53cc6a15761c9d2da43a628d0ca713bfad5a1e311b531c294b77'
+  - id: test_02
+    params:
+    - '0xfffffffffffd53cc6a15761c9d2da43a628d0ca713bfad5a1e311b531c294b77'
+  - id: test_03
+    params:
+    - '0x570f05aa967fa55a8927379ee6be5137e6368d4504ad334d4c5f6af772ec83e1'
+  - id: test_04
+    params:
+    - '0x4a1e3e3a2aa4aa79a777d0ae3e2c3a6de158226134123f6c14334964c6ec70cf'
+  - id: test_05
+    params:
+    - '0x7c03009d52ec50069adb4311d5225fe2249ce5afb3a9951af258f0f680efb19a'
+  - id: test_06
+    params:
+    - '0xf868adfafd9c6220ccdfd9fb64cfebf38e7ed3022b04b8012b44d4b131bb4187'
+  - id: test_07
+    params:
+    - '0x89fd14f57848c96e9a47a84f3330dbf070d001e269d3c61e1e8e6a3ed6782176'
   eth_getTransactionCount:
   - id: test_01
     params:
     - '0x9E61cCD162172Ae8f209549E13660b1d6d9786fc'
-    - '0x112A880'
-  - id: test_03
-    params:
-    - '0x9E61cCD162172Ae8f209549E13660b1d6d9786fc'
-    - earliest
+    - latest
   - id: test_06
     params:
     - '0x650c1E71fD009DBD8344BB63a8727b538397B5D3'
-    - '0x1036640'
+    - latest
+  - id: test_07
+    params:
+    - '0x8457CA5040ad67fdebbCC8EdCE889A335Bc0fbFB'
+    - latest
+  - id: test_08
+    params:
+    - '0x2Fc617E933a52713247CE25730f6695920B3befe'
+    - latest
   - id: test_09
     params:
     - '0x2Fc617E933a52713247CE25730f6695920B3befe'
+  eth_getTransactionReceipt:
+  - id: test_01
+    params:
+    - '0x45102190bcfd53cc6a15761c9d2da43a628d0ca713bfad5a1e311b531c294b77'
+  - id: test_02
+    params:
+    - '0xffffffffffff53cc6a15761c9d2da43a628d0ca713bfad5a1e311b531c294b77'
+  - id: test_03
+    params:
+    - '0x4b17cb89d104f8b6d9a0ec3d5bdb306b5a5be0f9c894bd87a03f7a1dc44932a8'
+  - id: test_04
+    params:
+    - '0x56e790ad97b44db95e00342338fa48d58efe66b5b382e57d2516d52c6230cf8a'
+  - id: test_05
+    params:
+    - '0x6b2fe3575bc0e2b9220daf457d7bde7a118d8674b920a0c888bbf547d683d0b7'
+  - id: test_06
+    params:
+    - '0xc9ab90a1796613b0fbccb33827de583901d4c0775e89c0f25d604b7c3a71771e'
+  - id: test_07
+    params:
+    - '0x5e8969e7aca00054bcc9c46ac6c692282ddd60839bfddb134b66a23adea62f76'
+  - id: test_08
+    params:
+    - '0xa2267f11b454bfbc5a5471646282ab4bd561400a19a278e8ff0c8a83ee818690'
+  - id: test_09
+    params:
+    - '0xffff7f11b454bfbc5a5471646282ab4bd561400a19a278e8ff0c8a83ee818690'
+  - id: test_10
+    params:
+    - '0x48966c818022e9226b001d87df58d75d8f3fc1a67a44b6dabc45a5ffa4d69af7'
+  eth_getUncleByBlockHashAndIndex:
+  - id: test_01
+    params:
+    - '0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3'
+    - '0x0'
+  - id: test_02
+    params:
+    - '0xffff98e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3'
+    - '0x0'
+  - id: test_03
+    params:
+    - '0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3'
+    - '0x200'
+  eth_getUncleByBlockNumberAndIndex:
+  - id: test_01
+    params:
+    - latest
+    - '0x0'
+  - id: test_05
+    params:
+    - latest
+    - '0x200'
+  eth_getUncleCountByBlockHash:
+  - id: test_01
+    params:
+    - '0x827d30e914a3adeefabb9d53f70da87e6e0ed3d02a72e7d9ae9bfd1bf123c7a3'
+  - id: test_02
+    params:
+    - '0x96cfa0fb5e50b0a3f6cc76f3299cfbf48f17e8b41798d1394474e67ec8a97e9f'
+  - id: test_03
+    params:
+    - '0xffffffffff50b0a3f6cc76f3299cfbf48f17e8b41798d1394474e67ec8a97e9f'
+  eth_getUncleCountByBlockNumber:
+  - id: test_01
+    params:
+    - latest
+  eth_protocolVersion:
+  - id: test_1
+    params: []
   eth_simulateV1:
   - id: test_01
     params:
@@ -3101,7 +3317,7 @@ calls:
           gasPrice: '0x2CB417800'
           value: '0x229322'
       traceTransfers: true
-    - '0x89543F'
+    - latest
   - id: test_02
     params:
     - blockStateCalls:
@@ -3111,7 +3327,7 @@ calls:
           data: '0xf497df75e26b997716bc2fe71aa3286e0665c7d2301190e3e5e3d676f179aa7ab81eeb8400000000000000000000000050fc97526ba0878eb9aa87812b2074f4e600f9e9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062d0a8458ed7719fdaf978fe5929c6d342b0bfce000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000006678ec0dbc575c20000000000000000000000000000000000000000000000000000035058159c62ca9e24a80000000000000000000000000000000006767d82a00000000000000000000b3e76cb88f37002141d6a54af40ee6aa2ae915f0edec20b5939534cc94cdc19ecdcff026298a528223ceeb6852423f237024bba7284fc34e2db9918a4eae84c80000000000000000000000000000000000000000000028f5d1f68737b4fca91a8000010f0003740000000000000000000000000000000000154c4676b3e329ca00000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000483000000ef0000005e0000005e0000005e0000005e0000002f0000000000000000fb2809a5314473e1165f6b58018e20ed8f07b840000c92000014df6767d76a0000b400d0ed00bccf0090000c920024fb2809a5314473e1165f6b58018e20ed8f07b840000c92000014df6767d76a0000b400d0ed00bccf0090000c920024fb2809a5314473e1165f6b58018e20ed8f07b8406767d752b09498030ae3416b66dc0000b8394f2220fac7e6ade60000339fb574bdc56763f9950000d18bd45f0b94f54a968f0000d61b892b2ad6249011850000ade19567bb538035ed360000617556ed277ab3223378000095770895ad27ad6b0d9500006a637b6b08ebe78b9da500006de5e0e428ac771d77b500005000000688768803bbd44095770895ad27ad6b0d9500000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000002644dcebcba000000000000000000000000000000000000000000000000000000006767d7e000000000000000000000000000000688768803bbd44095770895ad27ad6b0d95000000000000000000000000807cf9a772d5a3f9cefbc1192e939d62f0d9bd38000000000000000000000000000000000000000000000000181374bb9c0866f400000000000000000000000062d0a8458ed7719fdaf978fe5929c6d342b0bfce000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000028f5d1f68737b4fca91a00000000000000000000000000000000000000000000000015526314823acae400000000000000000000000000000688768803bbd44095770895ad27ad6b0d950000000000000000000000000000000000000000000000000000000000000000fb9be256d0bc2a1aa87c773fd95a4df00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000004198c6fc4439fb19b8beb90d01c6fc967301fb5617821c8e080bfb34e0a6cfa5bf6af36783ad7d0ce3f177e35199f459b654587be5b528463ba75270af1990b32f1c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
           maxFeePerGas: '0x1cf04482e'
       traceTransfers: true
-    - '0x147689E'
+    - latest
   - id: test_03
     params:
     - blockStateCalls:
@@ -3123,7 +3339,79 @@ calls:
           data: '0xf497df75e26b997716bc2fe71aa3286e0665c7d2301190e3e5e3d676f179aa7ab81eeb8400000000000000000000000050fc97526ba0878eb9aa87812b2074f4e600f9e9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062d0a8458ed7719fdaf978fe5929c6d342b0bfce000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000006678ec0dbc575c20000000000000000000000000000000000000000000000000000035058159c62ca9e24a80000000000000000000000000000000006767d82a00000000000000000000b3e76cb88f37002141d6a54af40ee6aa2ae915f0edec20b5939534cc94cdc19ecdcff026298a528223ceeb6852423f237024bba7284fc34e2db9918a4eae84c80000000000000000000000000000000000000000000028f5d1f68737b4fca91a8000010f0003740000000000000000000000000000000000154c4676b3e329ca00000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000483000000ef0000005e0000005e0000005e0000005e0000002f0000000000000000fb2809a5314473e1165f6b58018e20ed8f07b840000c92000014df6767d76a0000b400d0ed00bccf0090000c920024fb2809a5314473e1165f6b58018e20ed8f07b840000c92000014df6767d76a0000b400d0ed00bccf0090000c920024fb2809a5314473e1165f6b58018e20ed8f07b8406767d752b09498030ae3416b66dc0000b8394f2220fac7e6ade60000339fb574bdc56763f9950000d18bd45f0b94f54a968f0000d61b892b2ad6249011850000ade19567bb538035ed360000617556ed277ab3223378000095770895ad27ad6b0d9500006a637b6b08ebe78b9da500006de5e0e428ac771d77b500005000000688768803bbd44095770895ad27ad6b0d9500000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000002644dcebcba000000000000000000000000000000000000000000000000000000006767d7e000000000000000000000000000000688768803bbd44095770895ad27ad6b0d95000000000000000000000000807cf9a772d5a3f9cefbc1192e939d62f0d9bd38000000000000000000000000000000000000000000000000181374bb9c0866f400000000000000000000000062d0a8458ed7719fdaf978fe5929c6d342b0bfce000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000028f5d1f68737b4fca91a00000000000000000000000000000000000000000000000015526314823acae400000000000000000000000000000688768803bbd44095770895ad27ad6b0d950000000000000000000000000000000000000000000000000000000000000000fb9be256d0bc2a1aa87c773fd95a4df00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000004198c6fc4439fb19b8beb90d01c6fc967301fb5617821c8e080bfb34e0a6cfa5bf6af36783ad7d0ce3f177e35199f459b654587be5b528463ba75270af1990b32f1c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
           maxFeePerGas: '0x1cf04482e'
       traceTransfers: true
-    - '0x147689E'
+    - latest
+  - id: test_04
+    params:
+    - blockStateCalls:
+      - blockOverrides:
+          baseFeePerGas: '0x2e90a'
+        stateOverrides:
+          '0x8e826078f1498e98b71d64380963390fe5768565':
+            balance: '0x6f05b59d3b20000'
+          '0xc3d688B66703497DAA19211EEdff47f25384cdc3':
+            balance: '0x56bc75e2d63100000'
+        calls:
+        - from: '0x8e826078f1498e98b71d64380963390fe5768565'
+          to: '0xc3d688B66703497DAA19211EEdff47f25384cdc3'
+          data: '0xfc1543b50000000000000000000000008e826078f1498e98b71d64380963390fe57685650000000000000000000000000000000000000000000000000de0b6b3a7640000'
+          value: '0x3635c9adc5dea00000'
+          gas: '0x1d4c0'
+        - from: '0x8e826078f1498e98b71d64380963390fe5768565'
+          to: '0xc3d688B66703497DAA19211EEdff47f25384cdc3'
+          data: '0x1d36808b0000000000000000000000008e826078f1498e98b71d64380963390fe5768565000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000005f5e100'
+          gas: '0x1d4c0'
+      validation: true
+      traceTransfers: true
+    - latest
+  - id: test_05
+    params:
+    - blockStateCalls:
+      - blockOverrides:
+          baseFeePerGas: '0x2e9'
+        stateOverrides:
+          '0x8e826078f1498e98b71d64380963390fe5768565':
+            balance: '0x6f05b59d3b20000'
+          '0xc3d688B66703497DAA19211EEdff47f25384cdc3':
+            balance: '0x56bc75e2d63100000'
+        calls:
+        - from: '0x8e826078f1498e98b71d64380963390fe5768565'
+          to: '0xc3d688B66703497DAA19211EEdff47f25384cdc3'
+          data: '0xfc1543b50000000000000000000000008e826078f1498e98b71d64380963390fe57685650000000000000000000000000000000000000000000000000de0b6b3a7640000'
+          value: '0x3635c9adc5dea00000'
+          gas: '0x1d4c0'
+          maxFeePerGas: '0x2ea'
+        - from: '0x8e826078f1498e98b71d64380963390fe5768565'
+          to: '0xc3d688B66703497DAA19211EEdff47f25384cdc3'
+          data: '0x1d36808b0000000000000000000000008e826078f1498e98b71d64380963390fe5768565000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000005f5e100'
+          gas: '0x1d4c0'
+          maxFeePerGas: '0x2ea'
+      validation: true
+      traceTransfers: true
+    - latest
+  - id: test_06
+    params:
+    - blockStateCalls:
+      - stateOverrides:
+          '0x1111111111111111111111111111111111111111':
+            balance: '0x3635C9ADC5DEA00000'
+        calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: '0x2222222222222222222222222222222222222222'
+          value: '0xde0b6b3a7640000'
+          gas: '0x5208'
+          maxFeePerGas: '0x77359400'
+          maxPriorityFeePerGas: '0x3b9aca00'
+    - latest
+  - id: test_07
+    params:
+    - blockStateCalls:
+      - stateOverrides:
+          '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2':
+            code: '0x602a60005260206000f3'
+        calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+    - latest
   - id: test_08
     params:
     - blockStateCalls:
@@ -3138,7 +3426,7 @@ calls:
       traceTransfers: false
       validation: false
       returnFullTransactions: true
-    - '0x15c8b93'
+    - latest
   - id: test_09
     params:
     - blockStateCalls:
@@ -3148,7 +3436,7 @@ calls:
         stateOverrides:
           '0x4444444444444444444444444444444444444444':
             code: '0x60006000fd'
-    - '0x15c8b93'
+    - latest
   - id: test_10
     params:
     - blockStateCalls:
@@ -3162,21 +3450,8 @@ calls:
         stateOverrides:
           '0x1111111111111111111111111111111111111111':
             balance: '0x8ac7230489e80000'
-    - '0x15c8b93'
-  - id: test_11
-    params:
-    - blockStateCalls:
-      - calls:
-        - from: '0x1111111111111111111111111111111111111111'
-          to: '0x2222222222222222222222222222222222222222'
-          nonce: '0x65'
-          value: '0xde0b6b3a7640000'
-        stateOverrides:
-          '0x1111111111111111111111111111111111111111':
-            balance: '0x8ac7230489e80000'
-            nonce: '0x64'
-    - '0x15c8b93'
-  - id: test_120
+    - latest
+  - id: test_100
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3194,8 +3469,8 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
       traceTransfers: true
-    - '0x1406f40'
-  - id: test_121
+    - latest
+  - id: test_101
     params:
     - blockStateCalls:
       - blockOverrides:
@@ -3205,8 +3480,8 @@ calls:
           feeRecipient: '0xc200000000000000000000000000000000000000'
           prevRandao: '0xc300000000000000000000000000000000000000000000000000000000000000'
           baseFeePerGas: '0x3ef'
-    - '0x1406f40'
-  - id: test_122
+    - latest
+  - id: test_102
     params:
     - blockStateCalls:
       - blockOverrides:
@@ -3219,8 +3494,8 @@ calls:
         calls:
         - from: '0xc100000000000000000000000000000000000000'
           input: '0x4360005260206000f3'
-    - '0x1406f40'
-  - id: test_123
+    - latest
+  - id: test_103
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3248,8 +3523,8 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0x0000000000000000000000000000000000000001'
           input: '0x4554480000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007b45544800000000000000000000000000000000000000000000000000000000004554490000000000000000000000000000000000000000000000000000000000'
-    - '0x1406f40'
-  - id: test_124
+    - latest
+  - id: test_104
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3294,8 +3569,8 @@ calls:
           input: '0x0ff4c9160000000000000000000000000000000000000000000000000000000000000001'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x1406f40'
-  - id: test_125
+    - latest
+  - id: test_105
     params:
     - blockStateCalls:
       - calls:
@@ -3309,8 +3584,8 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0x0000000000000000000000000000000000031ec7'
           input: '0xa9059cbb0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000a'
-    - '0x1406f40'
-  - id: test_126
+    - latest
+  - id: test_106
     params:
     - blockStateCalls:
       - blockOverrides:
@@ -3338,8 +3613,8 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           input: '0x815b8ab400000000000000000000000000000000000000000000000000000000000f4240'
-    - '0x1406f40'
-  - id: test_127
+    - latest
+  - id: test_107
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3352,8 +3627,8 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           input: '0x2e64cec1'
-    - '0x1406f40'
-  - id: test_128
+    - latest
+  - id: test_108
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3366,8 +3641,8 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           value: '0x3e8'
-    - '0x1406f40'
-  - id: test_129
+    - latest
+  - id: test_109
     params:
     - blockStateCalls:
       - blockOverrides:
@@ -3387,8 +3662,21 @@ calls:
           input: 0x
       validation: true
       returnFullTransactions: true
-    - '0x1406f40'
-  - id: test_130
+    - latest
+  - id: test_11
+    params:
+    - blockStateCalls:
+      - calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: '0x2222222222222222222222222222222222222222'
+          nonce: '0x65'
+          value: '0xde0b6b3a7640000'
+        stateOverrides:
+          '0x1111111111111111111111111111111111111111':
+            balance: '0x8ac7230489e80000'
+            nonce: '0x64'
+    - latest
+  - id: test_110
     params:
     - blockStateCalls:
       - calls:
@@ -3398,8 +3686,8 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           value: '0x3e8'
-    - '0x1406f40'
-  - id: test_131
+    - latest
+  - id: test_111
     params:
     - blockStateCalls:
       - calls:
@@ -3412,8 +3700,8 @@ calls:
           value: '0x3e8'
           nonce: '0x1'
       validation: true
-    - '0x1406f40'
-  - id: test_132
+    - latest
+  - id: test_112
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3425,8 +3713,8 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
       traceTransfers: true
-    - '0x1406f40'
-  - id: test_133
+    - latest
+  - id: test_113
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3454,8 +3742,8 @@ calls:
           input: '0x0ff4c9160000000000000000000000000000000000000000000000000000000000000001'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x1406f40'
-  - id: test_134
+    - latest
+  - id: test_114
     params:
     - blockStateCalls:
       - blockOverrides:
@@ -3474,8 +3762,8 @@ calls:
           value: '0x3e8'
       validation: true
       returnFullTransactions: true
-    - '0x1406f40'
-  - id: test_136
+    - latest
+  - id: test_116
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3498,8 +3786,8 @@ calls:
         - from: '0xc300000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           value: '0x3e8'
-    - '0x1406f40'
-  - id: test_137
+    - latest
+  - id: test_117
     params:
     - blockStateCalls:
       - stateOverrides:
@@ -3516,8 +3804,8 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           nonce: '0x5'
       validation: true
-    - '0x1406f40'
-  - id: test_138
+    - latest
+  - id: test_118
     params:
     - blockStateCalls:
       - blockOverrides:
@@ -3655,8 +3943,8 @@ calls:
           value: '0x6a'
           nonce: '0x1'
           input: 0x
-    - '0x1406f40'
-  - id: test_139
+    - latest
+  - id: test_119
     params:
     - blockStateCalls:
       - blockOverrides:
@@ -3915,7 +4203,40 @@ calls:
           input: '0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8000000000000000000000000000000000000000000000000000000000000001cb7cf302145348387b9e69fde82d8e634a0f8761e78da3bfa059efced97cbed0d2a66b69167cafe0ccfc726aec6ee393fea3cf0e4f3f9c394705e0f56d9bfe1c9'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
+  - id: test_12
+    params:
+    - blockStateCalls:
+      - calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: null
+          data: '0x60016000f3'
+        stateOverrides:
+          '0x1111111111111111111111111111111111111111':
+            balance: '0x8ac7230489e80000'
+    - latest
+  - id: test_13
+    params:
+    - blockStateCalls:
+      - calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: '0x2222222222222222222222222222222222222222'
+          value: '0x52B7D2DCC80CD2E40000'
+      validation: false
+    - latest
+  - id: test_14
+    params:
+    - blockStateCalls:
+      - calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: '0x2222222222222222222222222222222222222222'
+          gas: '0x5207'
+          maxFeePerGas: '0x77359400'
+          value: '0x1'
+        stateOverrides:
+          '0x1111111111111111111111111111111111111111':
+            balance: '0x8ac7230489e80000'
+    - latest
   - id: test_140
     params:
     - blockStateCalls:
@@ -3923,7 +4244,7 @@ calls:
           time: '0x1ce'
       - blockOverrides:
           time: '0x1cd'
-    - '0x1406f40'
+    - latest
   - id: test_141
     params:
     - blockStateCalls:
@@ -3942,7 +4263,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           input: '0x815b8ab400000000000000000000000000000000000000000000000000000000000f4240'
-    - '0x1406f40'
+    - latest
   - id: test_142
     params:
     - blockStateCalls:
@@ -3955,7 +4276,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           nonce: '0x0'
       validation: true
-    - '0x1406f40'
+    - latest
   - id: test_143
     params:
     - blockStateCalls:
@@ -3970,7 +4291,7 @@ calls:
           maxFeePerGas: '0x0'
           maxPriorityFeePerGas: '0x0'
       validation: true
-    - '0x1406f40'
+    - latest
   - id: test_144
     params:
     - blockStateCalls:
@@ -3981,7 +4302,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
-    - '0x1406f40'
+    - latest
   - id: test_145
     params:
     - blockStateCalls:
@@ -3996,7 +4317,7 @@ calls:
           value: '0x3e8'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_146
     params:
     - blockStateCalls:
@@ -4009,7 +4330,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           value: '0x1'
-    - '0x1406f40'
+    - latest
   - id: test_147
     params:
     - blockStateCalls:
@@ -4018,7 +4339,7 @@ calls:
             MovePrecompileToAddress: '0xc200000000000000000000000000000000000000'
           '0x0000000000000000000000000000000000000002':
             MovePrecompileToAddress: '0xc200000000000000000000000000000000000000'
-    - '0x1406f40'
+    - latest
   - id: test_148
     params:
     - blockStateCalls:
@@ -4048,7 +4369,7 @@ calls:
           - '0x010657f37554c781402a22917dee2f75def7ab966d7b770905398eba3c444014'
       validation: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_149
     params:
     - blockStateCalls:
@@ -4061,7 +4382,20 @@ calls:
           to: '0xc200000000000000000000000000000000000000'
           input: '0x83197ef0'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
+  - id: test_15
+    params:
+    - blockStateCalls:
+      - calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: '0x2222222222222222222222222222222222222222'
+          maxFeePerGas: '0x1'
+          value: '0x1'
+        stateOverrides:
+          '0x1111111111111111111111111111111111111111':
+            balance: '0x8ac7230489e80000'
+      validation: true
+    - latest
   - id: test_150
     params:
     - blockStateCalls:
@@ -4078,7 +4412,7 @@ calls:
           value: '0x3e8'
           input: '0x5c19a95c000000000000000000000000c200000000000000000000000000000000000000'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_151
     params:
     - blockStateCalls:
@@ -4094,7 +4428,7 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0x0000000000000000000000000000000000000001'
           input: '0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8000000000000000000000000000000000000000000000000000000000000001cb7cf302145348387b9e69fde82d8e634a0f8761e78da3bfa059efced97cbed0d2a66b69167cafe0ccfc726aec6ee393fea3cf0e4f3f9c394705e0f56d9bfe1c9'
-    - '0x1406f40'
+    - latest
   - id: test_152
     params:
     - blockStateCalls:
@@ -4106,7 +4440,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_153
     params:
     - blockStateCalls:
@@ -4120,7 +4454,7 @@ calls:
         calls:
         - from: '0xc000000000000000000000000000000000000000'
           input: '0x4360005260206000f3'
-    - '0x1406f40'
+    - latest
   - id: test_154
     params:
     - blockStateCalls:
@@ -4134,7 +4468,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           maxFeePerGas: '0x0'
           maxPriorityFeePerGas: '0x0'
-    - '0x1406f40'
+    - latest
   - id: test_155
     params:
     - blockStateCalls:
@@ -4142,7 +4476,7 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           nonce: '0x64'
-    - '0x1406f40'
+    - latest
   - id: test_156
     params:
     - blockStateCalls:
@@ -4157,7 +4491,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0x0000000000000000000000000000000000000002'
           input: '0x1234'
-    - '0x1406f40'
+    - latest
   - id: test_157
     params:
     - blockStateCalls:
@@ -4172,7 +4506,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0x0000000000000000000000000000000000000004'
           input: '0x1234'
-    - '0x1406f40'
+    - latest
   - id: test_158
     params:
     - blockStateCalls:
@@ -4192,7 +4526,7 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0x0000000000000000000000000000000000000001'
           input: '0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8000000000000000000000000000000000000000000000000000000000000001cb7cf302145348387b9e69fde82d8e634a0f8761e78da3bfa059efced97cbed0d2a66b69167cafe0ccfc726aec6ee393fea3cf0e4f3f9c394705e0f56d9bfe1c9'
-    - '0x1406f40'
+    - latest
   - id: test_159
     params:
     - blockStateCalls:
@@ -4207,7 +4541,20 @@ calls:
           value: '0x3e8'
           input: 0x
       traceTransfers: true
-    - '0x1406f40'
+    - latest
+  - id: test_16
+    params:
+    - blockStateCalls:
+      - calls:
+        - from: '0x1111111111111111111111111111111111111111'
+          to: '0x2222222222222222222222222222222222222222'
+          maxFeePerGas: '0x1'
+          value: '0x1'
+        stateOverrides:
+          '0x1111111111111111111111111111111111111111':
+            balance: '0x8ac7230489e80000'
+      validation: false
+    - latest
   - id: test_160
     params:
     - blockStateCalls:
@@ -4224,7 +4571,7 @@ calls:
           value: '0x3e8'
           input: 0x
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_161
     params:
     - blockStateCalls:
@@ -4239,7 +4586,7 @@ calls:
           value: '0x3e8'
           input: '0x4b64e4920000000000000000000000000000000000000000000000000000000000000100'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_162
     params:
     - blockStateCalls:
@@ -4256,7 +4603,7 @@ calls:
           value: '0x3e8'
           input: '0x4b64e492c200000000000000000000000000000000000000000000000000000000000000'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_163
     params:
     - blockStateCalls:
@@ -4267,7 +4614,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc000000000000000000000000000000000000000'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_164
     params:
     - blockStateCalls:
@@ -4278,7 +4625,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           input: '0xee82ac5e0000000000000000000000000000000000000000000000000000000000000001'
-    - '0x1406f40'
+    - latest
   - id: test_165
     params:
     - blockStateCalls:
@@ -4299,7 +4646,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           input: '0xee82ac5e000000000000000000000000000000000000000000000000000000000000001d'
-    - '0x1406f40'
+    - latest
   - id: test_166
     params:
     - blockStateCalls:
@@ -4320,7 +4667,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           input: '0xb9724d63000000000000000000000000c200000000000000000000000000000000000000'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_167
     params:
     - blockStateCalls:
@@ -4339,7 +4686,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           input: '0xb9724d630000000000000000000000000000000000000000000000000000000000000001'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_168
     params:
     - blockStateCalls:
@@ -4358,7 +4705,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           input: '0xb9724d630000000000000000000000000000000000000000000000000000000000031ec7'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_169
     params:
     - blockStateCalls:
@@ -4378,7 +4725,7 @@ calls:
           to: '0xc000000000000000000000000000000000000000'
           nonce: '0x0'
       validation: true
-    - '0x1406f40'
+    - latest
   - id: test_17
     params:
     - blockStateCalls:
@@ -4390,7 +4737,7 @@ calls:
             code: '0x4160005260206000f3'
         blockOverrides:
           feeRecipient: '0xcccccccccccccccccccccccccccccccccccccccc'
-    - '0x15c8b93'
+    - latest
   - id: test_170
     params:
     - blockStateCalls:
@@ -4403,7 +4750,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
       validation: true
-    - '0x1406f40'
+    - latest
   - id: test_171
     params:
     - blockStateCalls:
@@ -4415,7 +4762,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
-    - '0x1406f40'
+    - latest
   - id: test_172
     params:
     - blockStateCalls:
@@ -4443,7 +4790,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc300000000000000000000000000000000000000'
           input: '0xdce4a447000000000000000000000000c200000000000000000000000000000000000000'
-    - '0x1406f40'
+    - latest
   - id: test_173
     params:
     - blockStateCalls:
@@ -4451,7 +4798,7 @@ calls:
         - from: '0x0000000000000000000000000000000000000004'
           to: '0x0000000000000000000000000000000000000002'
           input: '0x1234'
-    - '0x1406f40'
+    - latest
   - id: test_174
     params:
     - blockStateCalls:
@@ -4463,7 +4810,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_175
     params:
     - blockStateCalls:
@@ -4478,7 +4825,7 @@ calls:
       traceTransfers: true
       validation: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_176
     params:
     - blockStateCalls:
@@ -4511,7 +4858,7 @@ calls:
           to: '0xc200000000000000000000000000000000000000'
           input: '0xf8b2cb4f000000000000000000000000c100000000000000000000000000000000000000'
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_177
     params:
     - blockStateCalls:
@@ -4531,7 +4878,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           input: '0xee82ac5e0000000000000000000000000000000000000000000000000000000000000013'
-    - '0x1406f40'
+    - latest
   - id: test_178
     params:
     - blockStateCalls:
@@ -4564,7 +4911,7 @@ calls:
       traceTransfers: true
       validation: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_179
     params:
     - blockStateCalls:
@@ -4577,7 +4924,7 @@ calls:
           to: '0xc200000000000000000000000000000000000000'
           value: '0x3e8'
       validation: true
-    - '0x1406f40'
+    - latest
   - id: test_18
     params:
     - blockStateCalls:
@@ -4589,7 +4936,7 @@ calls:
             code: '0x4160005260206000f3'
         blockOverrides:
           difficulty: '0xCAFE0000'
-    - '0x15c8b93'
+    - latest
   - id: test_180
     params:
     - blockStateCalls:
@@ -4612,7 +4959,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           input: 0x
-    - '0x1406f40'
+    - latest
   - id: test_181
     params:
     - blockStateCalls:
@@ -4639,7 +4986,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           input: 0x
-    - '0x1406f40'
+    - latest
   - id: test_182
     params:
     - blockStateCalls:
@@ -4648,7 +4995,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           maxFeePerGas: '0x0'
           maxPriorityFeePerGas: '0x0'
-    - '0x1406f40'
+    - latest
   - id: test_183
     params:
     - blockStateCalls:
@@ -4952,7 +5299,7 @@ calls:
       - {}
       - {}
       - {}
-    - '0x1406f40'
+    - latest
   - id: test_184
     params:
     - blockStateCalls:
@@ -4971,7 +5318,7 @@ calls:
       - {}
       traceTransfers: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_185
     params:
     - blockStateCalls:
@@ -5011,7 +5358,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           input: 0x
-    - '0x1406f40'
+    - latest
   - id: test_186
     params:
     - blockStateCalls:
@@ -5024,7 +5371,7 @@ calls:
       - blockOverrides:
           number: '0x41'
           time: '0x1e0'
-    - '0x1406f40'
+    - latest
   - id: test_187
     params:
     - blockStateCalls:
@@ -5034,7 +5381,7 @@ calls:
       - blockOverrides:
           time: '0x1ce'
       - blockOverrides: {}
-    - '0x1406f40'
+    - latest
   - id: test_188
     params:
     - blockStateCalls:
@@ -5042,7 +5389,7 @@ calls:
           time: '0x1ce'
       - blockOverrides:
           time: '0x1ce'
-    - '0x1406f40'
+    - latest
   - id: test_189
     params:
     - blockStateCalls:
@@ -5050,7 +5397,7 @@ calls:
           time: '0x1cd'
       - blockOverrides:
           time: '0x1ce'
-    - '0x1406f40'
+    - latest
   - id: test_19
     params:
     - blockStateCalls:
@@ -5075,7 +5422,7 @@ calls:
           coinbase: '0xdddddddddddddddddddddddddddddddddddddddd'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x15c8b93'
+    - latest
   - id: test_190
     params:
     - blockStateCalls:
@@ -5104,7 +5451,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
-    - '0x1406f40'
+    - latest
   - id: test_191
     params:
     - blockStateCalls:
@@ -5127,7 +5474,7 @@ calls:
           maxFeePerGas: '0xf'
           nonce: '0x2'
       validation: true
-    - '0x1406f40'
+    - latest
   - id: test_192
     params:
     - blockStateCalls:
@@ -5138,20 +5485,20 @@ calls:
         calls:
         - {}
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_193
     params:
     - blockStateCalls:
       - {}
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_194
     params:
     - blockStateCalls:
       - {}
       validation: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_195
     params:
     - blockStateCalls:
@@ -5159,7 +5506,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
-    - '0x1406f40'
+    - latest
   - id: test_196
     params:
     - blockStateCalls:
@@ -5168,7 +5515,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
       validation: true
-    - '0x1406f40'
+    - latest
   - id: test_197
     params:
     - blockStateCalls:
@@ -5179,7 +5526,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           input: 0x
-    - '0x1406f40'
+    - latest
   - id: test_198
     params:
     - blockStateCalls:
@@ -5187,7 +5534,7 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
           gas: '0x0'
-    - '0x1406f40'
+    - latest
   - id: test_199
     params:
     - blockStateCalls:
@@ -5198,7 +5545,7 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc200000000000000000000000000000000000000'
           input: '0x6057361d0000000000000000000000000000000000000000000000000000000000000005'
-    - '0x1406f40'
+    - latest
   - id: test_20
     params:
     - blockStateCalls:
@@ -5221,7 +5568,7 @@ calls:
           timestamp: '0x68D3B73C'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x15c8b93'
+    - latest
   - id: test_200
     params:
     - blockStateCalls:
@@ -5261,7 +5608,7 @@ calls:
         - from: '0xc100000000000000000000000000000000000000'
           to: '0x0000000000000000000000000000000000123457'
           input: '0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8000000000000000000000000000000000000000000000000000000000000001cb7cf302145348387b9e69fde82d8e634a0f8761e78da3bfa059efced97cbed0d2a66b69167cafe0ccfc726aec6ee393fea3cf0e4f3f9c394705e0f56d9bfe1c9'
-    - '0x1406f40'
+    - latest
   - id: test_201
     params:
     - blockStateCalls:
@@ -5270,7 +5617,7 @@ calls:
             MovePrecompileToAddress: '0xc200000000000000000000000000000000000000'
           '0x0200000000000000000000000000000000000000':
             MovePrecompileToAddress: '0xc200000000000000000000000000000000000000'
-    - '0x1406f40'
+    - latest
   - id: test_202
     params:
     - blockStateCalls:
@@ -5278,7 +5625,7 @@ calls:
         - {}
       traceTransfers: true
       returnFullTransactions: true
-    - '0x1406f40'
+    - latest
   - id: test_203
     params:
     - blockStateCalls:
@@ -5286,14 +5633,14 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc100000000000000000000000000000000000000'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_204
     params:
     - blockStateCalls:
       - calls:
         - from: '0xc000000000000000000000000000000000000000'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_205
     params:
     - blockStateCalls:
@@ -5305,7 +5652,7 @@ calls:
           to: '0xc100000000000000000000000000000000000000'
           value: '0x3e8'
       traceTransfers: true
-    - '0x1406f40'
+    - latest
   - id: test_21
     params:
     - blockStateCalls:
@@ -5328,7 +5675,7 @@ calls:
           timestamp: '0x68D3B73C'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x15c8b93'
+    - latest
   - id: test_22
     params:
     - blockStateCalls:
@@ -5351,7 +5698,7 @@ calls:
           timestamp: '0x68D3B73C'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x15c8b93'
+    - latest
   - id: test_23
     params:
     - blockStateCalls:
@@ -5372,7 +5719,7 @@ calls:
           timestamp: '0x68D3B73C'
       traceTransfers: true
       returnFullTransactions: true
-    - '0x15DE4B0'
+    - latest
   - id: test_24
     params:
     - blockStateCalls:
@@ -5392,7 +5739,7 @@ calls:
           value: '0x1'
       validation: true
       traceTransfers: true
-    - '0x13d2746'
+    - latest
   - id: test_26
     params:
     - blockStateCalls:
@@ -5414,7 +5761,29 @@ calls:
           data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
       validation: false
       traceTransfers: false
-    - '0x16540f0'
+    - latest
+  - id: test_27
+    params:
+    - blockStateCalls:
+      - stateOverrides:
+          '0xdAC17F958D2ee523a2206206994597C13D831ec7':
+            stateDiff:
+              '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+              '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6':
+            stateDiff:
+              '0xe8668fbdcb49eea01f71c55f2c539b0953b137a92283519b2e33d48a03e1e3e7': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+              '0xa2d1bb9934928c34b005700965f54467eef400cea7fd9fbfc0d1d1eb2184eee8': '0x000000000000000000000000000000000000000000000000000000000098a0a8'
+          '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1':
+            nonce: '0x1'
+            balance: '0x2386f26fc10000'
+        calls:
+        - from: '0xF21079d225F4f3e7FDd3E258042a55cED651b2a1'
+          to: '0xa9D53f7B4836a595db7E11A7f92F9EF3810E04B6'
+          data: '0x46c474a60000000000000000000000000000000000000000000000000000000000bc614e00000000000000000000000000000000000000000000000000000000000f455a000000000000000000000000125f4b6650e205a987ba92972a87c833dcf5a84700000000000000000000000000000000000000000000000000000000000f455a'
+      validation: false
+      traceTransfers: true
+    - latest
   - id: test_28
     params:
     - blockStateCalls:
@@ -5441,7 +5810,7 @@ calls:
         blockOverrides:
           number: '0x15c8b95'
           timestamp: '0x68D3B73C'
-    - '0x15c8b93'
+    - latest
   - id: test_65
     params:
     - blockStateCalls:
@@ -5449,24 +5818,16 @@ calls:
         - from: '0xc000000000000000000000000000000000000000'
           to: '0xc000000000000000000000000000000000000000'
       validation: true
-    - '0x2000000'
+    - latest
   - id: test_85
     params:
     - blockStateCalls:
       - {}
-    - '0x15c8b93'
-  - id: test_86
+    - latest
+  net_version:
+  - id: test_1
+    params: []
+  web3_sha3:
+  - id: test_1
     params:
-    - blockStateCalls:
-      - {}
-    - '0x1'
-  - id: test_87
-    params:
-    - blockStateCalls:
-      - {}
-    - '0x15c8b92'
-  - id: test_88
-    params:
-    - blockStateCalls:
-      - {}
-    - '0x2000000'
+    - '0x00'

@@ -1,5 +1,5 @@
 name: erigon-mainnet-divergent
-description: "Ported from erigontech/rpc-tests (source rpc-tests 214c13799371e832a90d92781f83b0fe2d143d68); bucket 'divergent'. Runs on: informational \u2014 will not compare cleanly across clients; curate before use. Differential (client-vs-client) \u2014 pair with erigon-mainnet-rules.yaml."
+description: "Ported from erigontech/rpc-tests (source rpc-tests 214c13799371e832a90d92781f83b0fe2d143d68). non-standard namespaces / node-local / oracle methods; informational (noisy cross-client). Every test retargeted to block 'latest' \u2014 runnable on any synced node. Differential; pair with erigon-mainnet-rules.yaml."
 calls:
   admin_nodeInfo:
   - id: test_01
@@ -306,28 +306,7 @@ calls:
   erigon_getHeaderByNumber:
   - id: test_01
     params:
-    - '0x41b57c'
-  - id: test_02
-    params:
-    - '0x989680'
-  - id: test_03
-    params:
-    - '0xC65D40'
-  - id: test_04
-    params:
-    - '0xE4E1C0'
-  - id: test_05
-    params:
-    - '0xF42400'
-  - id: test_06
-    params:
-    - '0x1036640'
-  - id: test_07
-    params:
-    - '0x112A880'
-  - id: test_08
-    params:
-    - '0x12C135B'
+    - latest
   erigon_getLatestLogs:
   - id: test_01
     params:
@@ -798,25 +777,7 @@ calls:
   ots_getBlockDetails:
   - id: test_01
     params:
-    - '0x299fca'
-  - id: test_02
-    params:
-    - '0xF42400'
-  - id: test_03
-    params:
-    - '0xEC82E0'
-  - id: test_04
-    params:
-    - '0xBEBC20'
-  - id: test_05
-    params:
-    - '0x12C135B'
-  - id: test_06
-    params:
-    - '0xFFFFFFFF'
-  - id: test_07
-    params:
-    - '0x12FA660'
+    - latest
   ots_getBlockDetailsByHash:
   - id: test_01
     params:
@@ -833,37 +794,27 @@ calls:
   ots_getBlockTransactions:
   - id: test_01
     params:
-    - '0x499fca'
+    - latest
     - 0
     - 2
   - id: test_02
     params:
-    - '0x79fca'
+    - latest
     - 1
     - 4
   - id: test_03
     params:
-    - '0x112A880'
+    - latest
     - 2
     - 5
   - id: test_04
     params:
-    - '0x112A980'
+    - latest
     - 1
     - 9
   - id: test_05
     params:
-    - '0x112AA80'
-    - 1
-    - 5
-  - id: test_06
-    params:
-    - '0xffffff0'
-    - 1
-    - 5
-  - id: test_07
-    params:
-    - '0x12FA660'
+    - latest
     - 1
     - 5
   ots_getContractCreator:
@@ -924,49 +875,6 @@ calls:
   - id: test_19
     params:
     - '0x5256AD78c2e8a98cD2d6A1aF8D90739A859B9a51'
-  ots_getInternalOperations:
-  - id: test_01
-    params:
-    - '0x32f435ccb05b1f39c79006178bb4575e99904899236b368378f1b4c321c6454e'
-  - id: test_02
-    params:
-    - '0x84569ab5540e290219f5fc8b4d143f7796a307435842d4d5e03e4f30df74f354'
-  - id: test_03
-    params:
-    - '0x850f401b4bb93a577e620c7d429677ef5c46770ae4307cfd19ea8b7ec9753087'
-  - id: test_04
-    params:
-    - '0x2f4de949cf3199962492c70b233c5111eed7ac7b7d9cd519bef102388c0482b4'
-  - id: test_05
-    params:
-    - '0x30831316f384b9cb5dbb65fdeb0bb6c17049a5160b6454109bdb318b7262b631'
-  - id: test_06
-    params:
-    - '0x1238722fac9c19c94f6b87bb7cb9e0230d6047046ad3632173a7ffd9cbaff74c'
-  - id: test_08
-    params:
-    - '0x7e39092974678d474386b3e0084574e87846c75dbd1a81e0c2a15763e3595762'
-  - id: test_09
-    params:
-    - '0xbd5bdee301f3013fc151be3c3b93fcdb88069e31889fd1eed87fa6009888f917'
-  - id: test_10
-    params:
-    - '0x601641f807742d71590baec64507cba6229f60b74285e21115a149d87d1c373b'
-  - id: test_11
-    params:
-    - '0xfffffff807742d71590baec64507cba6229f60b74285e21115a149d87d1c373b'
-  - id: test_12
-    params:
-    - '0xb79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267'
-  - id: test_13
-    params:
-    - '0xdff838df7e0dccd9d9864a6651dd10abb705b36a1e46f0d0500d6c6d17235b3f'
-  - id: test_14
-    params:
-    - '0x3bf6997d43ee3b5a78ecd3dd2ea659eddbbf376b360cf5cf27590df30cc7dd72'
-  - id: test_15
-    params:
-    - '0x541a536cd7ce7e9990876b7a49041f21590cd92251e699d9d924c0abbb2e98ba'
   ots_getTransactionBySenderAndNonce:
   - id: test_01
     params:
@@ -1020,49 +928,6 @@ calls:
     params:
     - '0x3f5ACD0413E557501289Aa8f59616a5905C2636a'
     - 1
-  ots_getTransactionError:
-  - id: test_01
-    params:
-    - '0xec080b91deea33830c3e626201662243c66c1f3d10da01f32c4cb0ebf395012a'
-  - id: test_02
-    params:
-    - '0x55ae18a7de23db2aa60622dfac6ba5895c809e2d28adc4a1281dddc22359096f'
-  - id: test_03
-    params:
-    - '0x6ba9ed0a8c5a55abb299ae666322717008dd216cabe66d2311bc6cd92ee963d2'
-  - id: test_04
-    params:
-    - '0xa68c025e9ffa7a53b6aa1776e1df8c434ca942b5257f4231e93577a0a37a6c7b'
-  - id: test_05
-    params:
-    - '0x56e790ad97b44db95e00342338fa48d58efe66b5b382e57d2516d52c6230cf8a'
-  - id: test_07
-    params:
-    - '0x6949e79051705ea96e5b4d489a16ae3aef0b48a8a95d7a7efbee622cc19279f8'
-  - id: test_08
-    params:
-    - '0x763a6deb6734b2fcf6a68a627f7473dac6e8e1393a7bbd9b325bec63f10c99e5'
-  - id: test_09
-    params:
-    - '0xc1b35fdaddd6f58855633eada81cf983a228bb50c07d766dfdece8d5d674f557'
-  - id: test_10
-    params:
-    - '0xcfe6d609a4298923567605de9d3861a8ba6e47bc3be0a8f5740a9d40abe09801'
-  - id: test_11
-    params:
-    - '0xfffffff9a4298923567605de9d3861a8ba6e47bc3be0a8f5740a9d40abe09801'
-  - id: test_12
-    params:
-    - '0x6025f782e7395022b0825f5199eaa73afa0f29e9c83e0220c0cd494207a8326f'
-  - id: test_13
-    params:
-    - '0xd01864d201116b99ed013e16d67f9e697a27501a607daa573a9e86e27edfa1c7'
-  - id: test_14
-    params:
-    - '0x45c82a4a64f55df639da2e098e07094e22ad6ae34bfe24d5ae89b9aa01592e9e'
-  - id: test_15
-    params:
-    - '0xc123d5346a8af063f6302f2259583b234d3800ae0ce6a78dd5af80276046fdae'
   ots_hasCode:
   - id: test_01
     params:
@@ -1276,73 +1141,6 @@ calls:
     - '0xFFfFFFFF2F8aF59Fd1D7Fa65D1C12f89f12F9394'
     - 1305822
     - 25
-  ots_traceTransaction:
-  - id: test_01
-    params:
-    - '0x0433cca2c713d66e13b2b71fd66589785428b6bdbc60bdb1642d44493b2a9c6f'
-  - id: test_02
-    params:
-    - '0xd193debd1572b6f28b8367cbc022664f8e8148def963a0ea44f38bc5b7348759'
-  - id: test_03
-    params:
-    - '0x10662fb0e9efc42d9fc0599aa1aee1a14d028cb6a27bc46bb57d1eacb9bb6c14'
-  - id: test_04
-    params:
-    - '0x9c4a07b0328989a456b7e2a1dec7954475e79953f985375758e0d60fbd6474c1'
-  - id: test_05
-    params:
-    - '0x7942a04b91aaa8e9b256b50877e269018a2b6b7682f1e5eb8a904317b9d5c0eb'
-  - id: test_06
-    params:
-    - '0x893f5fec4ff16d22a6e4ee54828419b2abc46c57756a0eeb5f45ff9ef1535717'
-  - id: test_07
-    params:
-    - '0x939d7513f2d869101f53694fab0e874ceebe53fb0acbf5c663a95d99c44fdc80'
-  - id: test_08
-    params:
-    - '0x67b7da808974bffe636e6c969cbdcb600f1196cdf06e2faba981414fc2511da2'
-  - id: test_09
-    params:
-    - '0x0a2bb1d6a3d825a0f73050bc593b5c736eb3fdb8bfddc8f9bae2c8bc9b54d692'
-  - id: test_10
-    params:
-    - '0x4b1dc28dfb960117bf8808c3d870a34211b48addf665b33fab83a5476bb01876'
-  - id: test_11
-    params:
-    - '0x84569ab5540e290219f5fc8b4d143f7796a307435842d4d5e03e4f30df74f354'
-  - id: test_12
-    params:
-    - '0x2f4de949cf3199962492c70b233c5111eed7ac7b7d9cd519bef102388c0482b4'
-  - id: test_13
-    params:
-    - '0x30831316f384b9cb5dbb65fdeb0bb6c17049a5160b6454109bdb318b7262b631'
-  - id: test_14
-    params:
-    - '0xffffff16f384b9cb5dbb65fdeb0bb6c17049a5160b6454109bdb318b7262b631'
-  - id: test_15
-    params:
-    - '0x05f5fb8165bb99d425ed85e3cdcc3eef8a3fbc3459441537d7e886a93a473646'
-  - id: test_16
-    params:
-    - '0x2c4bce201742be6dbfd2ad37178b404f857d8224f1a61a5434fb5e81506753fb'
-  - id: test_17
-    params:
-    - '0x0ec09f455e58a2670ce5d3c27011ae324354bf5d0e0791e1c15c5ff7abe4ad1a'
-  - id: test_18
-    params:
-    - '0xbb4b3fc2b746877dce70862850602f1d19bd890ab4db47e6b7ee1da1fe578a0d'
-  - id: test_19
-    params:
-    - '0x541a536cd7ce7e9990876b7a49041f21590cd92251e699d9d924c0abbb2e98ba'
-  - id: test_20
-    params:
-    - '0x273962e00767d8989b4def781a4f89d0eb44f8d3a9bb95582aa4c51275571fbe'
-  - id: test_21
-    params:
-    - '0x7aff1755fb92839df5da3798bd011a36f9f50cdfbb20881d9d74ad328acadc53'
-  - id: test_22
-    params:
-    - '0xb79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267'
   parity_listStorageKeys:
   - id: test_01
     params:
@@ -1479,60 +1277,10 @@ calls:
   trace_block:
   - id: test_01
     params:
-    - '0x4366ac'
-  - id: test_03
-    params:
-    - '0x52a0b3'
-  - id: test_08
-    params:
-    - '0xf4244'
-  - id: test_09
-    params:
-    - '0x1e848a'
-  - id: test_10
-    params:
-    - '0x1e84ac'
-  - id: test_11
-    params:
-    - '0x1e84ae'
-  - id: test_12
-    params:
-    - '0x1e8548'
-  - id: test_13
-    params:
-    - '0x1e85ca'
-  - id: test_14
-    params:
-    - '0xfa0a5'
-  - id: test_21
-    params:
-    - '0xed0af6'
-  - id: test_22
-    params:
-    - '0xed14f1'
-  - id: test_23
-    params:
-    - '0xed14f2'
-  - id: test_24
-    params:
-    - '0xed175b'
-  - id: test_25
-    params:
     - latest
-  - id: test_26
-    params:
-    - '0x1048427'
-  - id: test_27
-    params:
-    - '0x1048428'
   - id: test_28
     params:
-    - '0x1048427'
-    - null
-    - IncludeWithdrawals: true
-  - id: test_29
-    params:
-    - '0x1048428'
+    - latest
     - null
     - IncludeWithdrawals: true
   trace_call:
@@ -1546,7 +1294,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x4366AC'
+    - latest
   - id: test_02
     params:
     - data: 0x
@@ -1555,7 +1303,7 @@ calls:
       gasPrice: '0x4A817C800'
       value: '0x46E4DEB133863000'
     - - trace
-    - '0x4366AC'
+    - latest
   - id: test_03
     params:
     - data: '0x00'
@@ -1565,7 +1313,7 @@ calls:
       to: '0x6Fc82a5fe25A5cDb58bc74600A40A69C065263f8'
       value: '0x6EEAFD0CC46C860'
     - - trace
-    - '0x4366AC'
+    - latest
   - id: test_05
     params:
     - data: '0xe4849b320000000000000000000000000000000000000000000000000000000000000000'
@@ -1576,7 +1324,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x52a0b3'
+    - latest
   - id: test_06
     params:
     - data: '0xa9059cbb000000000000000000000000fc9dd1f314dbb6b95c6b5386e00f662ee8e123780000000000000000000000000000000000000000000000004563918244f40000'
@@ -1587,7 +1335,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x5279A7'
+    - latest
   - id: test_07
     params:
     - data: '0x0a19b14a000000000000000000000000d4fa1460f537bb9085d22c7bccb5dd450ef28e3a0000000000000000000000000000000000000000000000000000000c3c11b1400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d2b5f3998317080000000000000000000000000000000000000000000000000000000000005279af000000000000000000000000000000000000000000000000000000021ac9e37b00000000000000000000000012a12562192bd96c0c9bda1f564681c256d71553000000000000000000000000000000000000000000000000000000000000001b1c8678b82a0cfb752734e66ddd0413f4df007f740faf855f0e3543beaacbda825f22b07885172fe452a5a1d0f000aa9295b8daa88ca9511310e3525d0c8d3ab40000000000000000000000000000000000000000000000000000000c3c11b140'
@@ -1598,7 +1346,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x5279A7'
+    - latest
   - id: test_09
     params:
     - data: 0x
@@ -1608,7 +1356,7 @@ calls:
       to: '0x9ea9b8a8c40d59DD55CD3AbB5Ebd7590bDCb9227'
       value: '0xF1539B63D3691'
     - - trace
-    - '0x5279A7'
+    - latest
   - id: test_10
     params:
     - data: 0x
@@ -1618,7 +1366,7 @@ calls:
       to: '0x434b6c1969067Eb48e53BaAA37dbBec6b17B83Da'
       value: '0xE0EC792E96800'
     - - trace
-    - '0x5279A7'
+    - latest
   - id: test_12
     params:
     - data: '0x071ccd0a00610023'
@@ -1629,7 +1377,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x5F7CF1'
+    - latest
   - id: test_13
     params:
     - data: '0x602a6000556101c960015560068060166000396000f3600035600055'
@@ -1638,7 +1386,7 @@ calls:
       gasPrice: '0x9502F9000'
       value: '0x8AC7230489E80000'
     - - trace
-    - '0x5279A7'
+    - latest
   - id: test_14
     params:
     - data: '0xdf8de3e7000000000000000000000000499d11e0b6eac7c0593d8fb292dcbbf815fb29ae'
@@ -1650,7 +1398,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x627331'
+    - latest
   - id: test_15
     params:
     - data: '0x04d6878f0000000000000000000000000000000000000000000000000000000000004f8f'
@@ -1661,7 +1409,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x5279A7'
+    - latest
   - id: test_18
     params:
     - data: '0x0d5f2659000000000000000000000000a06717bb4271d4f5df95d450ccbc677e4052050f000000000000000000000000000000000000000000000000000003f09f523800000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000413d3b237f36c68f59cbbd1ee147c3e7c2da18d545c14fcc0af7e18043cef9a21a6ea1a79e8ac13a4168fbfb36cca716b4567191159f5d0c7d89b40a0006e440a21c00000000000000000000000000000000000000000000000000000000000000'
@@ -1672,7 +1420,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x4366AC'
+    - latest
   - id: test_20
     params:
     - data: '0xd0e30db0'
@@ -1684,19 +1432,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x4366AD'
-  - id: test_21
-    params:
-    - data: '0xd0e30db0'
-      from: '0x1e5D2FEeE346afe729C803839c222A3f4414bc9f'
-      gas: '0x3D090'
-      gasPrice: '0x2CB417800'
-      to: '0x8d12A197cB00D4747a1fe03395095ce2A5CC6819'
-      value: '0x16345785D8A0000'
-    - - vmTrace
-      - trace
-      - stateDiff
-    - '0x1312D00'
+    - latest
   - id: test_22
     params:
     - data: '0xd0e30db0'
@@ -1708,43 +1444,7 @@ calls:
     - - vmTrace
       - trace
       - stateDiff
-    - '0x1312D00'
-  - id: test_23
-    params:
-    - data: '0xd0e30db0'
-      from: '0x1e5D2FEeE346afe729C803839c222A3f4414bc9f'
-      gas: '0x3D090'
-      gasPrice: '0x2CB417800'
-      to: '0x8d12A197cB00D4747a1fe03395095ce2A5CC6819'
-      value: '0x16345785D8A0000'
-    - - vmTrace
-      - trace
-      - stateDiff
-    - '0x1312D01'
-  - id: test_24
-    params:
-    - data: '0xd0e30db0'
-      from: '0x1e5D2FEeE346afe729C803839c222A3f4414bc9f'
-      gas: '0x3D090'
-      gasPrice: '0x2CB417800'
-      to: '0x8d12A197cB00D4747a1fe03395095ce2A5CC6819'
-      value: '0x16345785D8A0000'
-    - - vmTrace
-      - trace
-      - stateDiff
-    - '0x1312D02'
-  - id: test_25
-    params:
-    - data: '0xd0e30db0'
-      from: '0x1e5D2FEeE346afe729C803839c222A3f4414bc9f'
-      gas: '0x3D090'
-      gasPrice: '0x2CB417800'
-      to: '0x8d12A197cB00D4747a1fe03395095ce2A5CC6819'
-      value: '0x16345785D8A0000'
-    - - vmTrace
-      - trace
-      - stateDiff
-    - '0x1312D03'
+    - latest
   - id: test_26
     params:
     - data: '0x41c0e1b505684bf5'
@@ -2356,361 +2056,22 @@ calls:
   trace_replayBlockTransactions:
   - id: test_06
     params:
-    - '0xF4244'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_07
-    params:
-    - '0x1E848A'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_09
-    params:
-    - '0x1E84AE'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_10
-    params:
-    - '0x1E8548'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_11
-    params:
-    - '0x1E85CA'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_12
-    params:
-    - '0xFA0A5'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_27
-    params:
-    - '0x3d0901'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_36
-    params:
     - latest
     - - vmTrace
       - trace
       - stateDiff
   - id: test_37
     params:
-    - '0x1048427'
-    - - trace
-      - stateDiff
-  - id: test_38
-    params:
-    - '0x1048428'
+    - latest
     - - trace
       - stateDiff
   - id: test_39
     params:
-    - '0x1048427'
+    - latest
     - - trace
       - stateDiff
     - null
     - IncludeWithdrawals: true
-  - id: test_40
-    params:
-    - '0x1048428'
-    - - trace
-      - stateDiff
-    - null
-    - IncludeWithdrawals: true
-  trace_replayTransaction:
-  - id: test_01
-    params:
-    - '0xaf077c0d331e542f43f69ba4e7bf1114fa810d8fb0538d8e5d52af6d72fbf568'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_08
-    params:
-    - '0xd94d8fc4e1e37cd3094390e25b85856ddde5df4e1474c3910945ffa87e46f7d4'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_09
-    params:
-    - '0x667909407803fd910af1a25622c3a5db35df86b479d88b62acc3e4d43afd3b27'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_12
-    params:
-    - '0x2ef0dd3ec03b108ae84e9355a783d5399a7b7f7dde9c1c519f8693b15aaad5da'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_13
-    params:
-    - '0xc4cbf9ecc049722a1f6b71bf0e815ed544997c08fad33b1694d3ef1b5af9ded3'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_15
-    params:
-    - '0x86aecfb1190b37af3048cef8989e15433e5a868c81911221ba725ec6dd251e75'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_17
-    params:
-    - '0x0a15bb732c8222f5e720ac657f88f2de7952cea40deb1c8eb13b436cf635cf74'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_19
-    params:
-    - '0xc3db25b9007999894604a1e7bb28363ff6ce65fefa3ef521718420305e5334f6'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_20
-    params:
-    - '0x4e18f897398a84cf1ee13713cc8c0d53b43c86ec9c7c3f8a7521bd6245ea0780'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_21
-    params:
-    - '0xb8dd4cafda5c7aa2a8dd95c06288156fb9787fc39751a8e2cee56676fd5faa0d'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_24
-    params:
-    - '0xff8fdcd975d1c4f7ded80777727480c7f499e72a9ac9c51aca2dc66e0f77dad4'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_25
-    params:
-    - '0x473b30375595dbb8d1afe4bb283ef70d8b42b92ce3c1fc9ce7df0816be249978'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_26
-    params:
-    - '0xeaff6b82f85cf6fc07738213087d3dc11d725b711998d9a351f52f5e61b071b0'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_27
-    params:
-    - '0xc2d018922e1d372a8e5cc6c9e11d66ad06dc97e2618061cd33d6ef100d1eca9f'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_28
-    params:
-    - '0x2db60e02bf8339a0c8f66a67ccb74fed1562938e8732e9ea7231ced1a2ed3cd6'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_30
-    params:
-    - '0x4a1e3e3a2aa4aa79a777d0ae3e2c3a6de158226134123f6c14334964c6ec70cf'
-    - - vmTrace
-      - trace
-      - stateDiff
-  - id: test_31
-    params:
-    - '0x66cfb9b3a5b54702b3a18594a03540c22e43dfb309fbd7ee771fa8e8cfd4f745'
-    - - stateDiff
-  - id: test_32
-    params:
-    - '0xc6ce2d9e6c6d20a2354bbc08f0da6421798600c2d927efb65f720003b8b295ad'
-    - - stateDiff
-  - id: test_33
-    params:
-    - '0x84569ab5540e290219f5fc8b4d143f7796a307435842d4d5e03e4f30df74f354'
-    - - stateDiff
-  - id: test_34
-    params:
-    - '0x596b576db04f117bc760cd69cf57f8303f044eb92298a6f332011f176f54c3ad'
-    - - stateDiff
-  - id: test_35
-    params:
-    - '0x0f34c7cf6035d0748831d6b5969288a6648f72d227238bf009566d9d8f5a3854'
-    - - stateDiff
-  - id: test_36
-    params:
-    - '0xbb4b3fc2b746877dce70862850602f1d19bd890ab4db47e6b7ee1da1fe578a0d'
-    - - stateDiff
-  - id: test_37
-    params:
-    - '0x541a536cd7ce7e9990876b7a49041f21590cd92251e699d9d924c0abbb2e98ba'
-    - - stateDiff
-  - id: test_38
-    params:
-    - '0x273962e00767d8989b4def781a4f89d0eb44f8d3a9bb95582aa4c51275571fbe'
-    - - stateDiff
-  - id: test_39
-    params:
-    - '0xff178f8e9eede32ca37214446c889abc64c943a087bc630dfb88ad2695e262a8'
-    - - stateDiff
-  - id: test_40
-    params:
-    - '0xb79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267'
-    - - stateDiff
-  - id: test_49
-    params:
-    - '0x9da5e2c5da5e44fbe867d4784f2a935139028efe58b1d31b7884d55551478ec8'
-    - - trace
-  - id: test_50
-    params:
-    - '0x6f2609eb724d839119b9753ea456c37ef3e21d27553243b069c694c1d7ed3ed8'
-    - - trace
-  - id: test_51
-    params:
-    - '0xd4c21871b02ff047088ed399e8d1e6f4d73c9d575c4868c01634e87a896325d7'
-    - - trace
-  trace_transaction:
-  - id: test_01
-    params:
-    - '0xaf077c0d331e542f43f69ba4e7bf1114fa810d8fb0538d8e5d52af6d72fbf568'
-  - id: test_02
-    params:
-    - '0xd05c4230d3e0ee919efe8173e5759cc989ffb847e54245f94828e4000fbc6b8e'
-  - id: test_03
-    params:
-    - '0x6897d7991a8fca8d2c0654cfeaeeefed87f80308407f32f8da3d6aba9c2cede2'
-  - id: test_04
-    params:
-    - '0x63952eb7c146c2143db56238b339486cd541aa23e677d71479633cb3685822e0'
-  - id: test_05
-    params:
-    - '0x9ae92188666722c8dea3e15c6ba3acde99af9a5dbaab12a1215a50d44688b897'
-  - id: test_06
-    params:
-    - '0xd9a2d37e9355c9eff663cfbc60897897bdebb9795edf6bc01b69eff540b078d7'
-  - id: test_07
-    params:
-    - '0x2c492b15d9107ec38c8cf97437e70c4456db6081b85844221fd4be7a5ba44c21'
-  - id: test_08
-    params:
-    - '0xd94d8fc4e1e37cd3094390e25b85856ddde5df4e1474c3910945ffa87e46f7d4'
-  - id: test_09
-    params:
-    - '0x667909407803fd910af1a25622c3a5db35df86b479d88b62acc3e4d43afd3b27'
-  - id: test_10
-    params:
-    - '0xd2f67bd5748168a125f0a7e4fd1dfa3fe4d1bf151fec50d54e40fe7327ab83a7'
-  - id: test_11
-    params:
-    - '0x57d906e40122030109d384382443ef4a5914f7757838f96576fdc7fc21e5bf96'
-  - id: test_12
-    params:
-    - '0x2ef0dd3ec03b108ae84e9355a783d5399a7b7f7dde9c1c519f8693b15aaad5da'
-  - id: test_13
-    params:
-    - '0xc4cbf9ecc049722a1f6b71bf0e815ed544997c08fad33b1694d3ef1b5af9ded3'
-  - id: test_14
-    params:
-    - '0x53497a175e9ed1f457af6386e0ca88f99bcba4e6fa7d7fc6d9a418c83bb3315f'
-  - id: test_15
-    params:
-    - '0x86aecfb1190b37af3048cef8989e15433e5a868c81911221ba725ec6dd251e75'
-  - id: test_16
-    params:
-    - '0xf72a61bf9f175300f4a35d52951c24eb6149b68aec35786e446f981ecf143925'
-  - id: test_17
-    params:
-    - '0x0a15bb732c8222f5e720ac657f88f2de7952cea40deb1c8eb13b436cf635cf74'
-  - id: test_18
-    params:
-    - '0xd7645f9b4e1468e42a2410e0c8e00cc786fa729188172257b3fdbb850459c3bb'
-  - id: test_19
-    params:
-    - '0xc3db25b9007999894604a1e7bb28363ff6ce65fefa3ef521718420305e5334f6'
-  - id: test_20
-    params:
-    - '0x4e18f897398a84cf1ee13713cc8c0d53b43c86ec9c7c3f8a7521bd6245ea0780'
-  - id: test_21
-    params:
-    - '0xb8dd4cafda5c7aa2a8dd95c06288156fb9787fc39751a8e2cee56676fd5faa0d'
-  - id: test_24
-    params:
-    - '0xff8fdcd975d1c4f7ded80777727480c7f499e72a9ac9c51aca2dc66e0f77dad4'
-  - id: test_25
-    params:
-    - '0x473b30375595dbb8d1afe4bb283ef70d8b42b92ce3c1fc9ce7df0816be249978'
-  - id: test_26
-    params:
-    - '0xeaff6b82f85cf6fc07738213087d3dc11d725b711998d9a351f52f5e61b071b0'
-  - id: test_27
-    params:
-    - '0x0b668669fe26cb6924b49165d7daf4639dd90d84c22c304c9ddc9ba2c4b92cb5'
-  - id: test_28
-    params:
-    - '0xe0b928ef40062a4524f093b53795865a796328e75d4f0b76832c59c23776d9da'
-  - id: test_29
-    params:
-    - '0xf7a73f9e75853b2ad2be3e5a87c84165bdfcd06ab9e57793f7f034940049363f'
-  - id: test_30
-    params:
-    - '0xcf5f31d1cac1cd0d1148f501760acecdbdbc3bf6a70d1a4a261adca3ea6b34d1'
-  - id: test_31
-    params:
-    - '0xbb4b3fc2b746877dce70862850602f1d19bd890ab4db47e6b7ee1da1fe578a0d'
-  - id: test_32
-    params:
-    - '0x541a536cd7ce7e9990876b7a49041f21590cd92251e699d9d924c0abbb2e98ba'
-  - id: test_33
-    params:
-    - '0x273962e00767d8989b4def781a4f89d0eb44f8d3a9bb95582aa4c51275571fbe'
-  - id: test_34
-    params:
-    - '0x7aff1755fb92839df5da3798bd011a36f9f50cdfbb20881d9d74ad328acadc53'
-  - id: test_35
-    params:
-    - '0xb79b64182236284ad6753e1b5f506e7e6989912c25887575f82d64f23f6bf267'
-  - id: test_36
-    params:
-    - '0x1ae5f96a8b446ddd51e96019472f7a31fcad3d2e774373ecfbb2ba94ff72fc04'
-  - id: test_37
-    params:
-    - '0x4045a10890f6474bb51a4d522ad3cca5f01b9bf3745443bb255d55aaa745c239'
-  - id: test_38
-    params:
-    - '0x84d70c813df02825f606c294909daec7ffce6bb609ff9ca963d14bf69ea65455'
-  - id: test_39
-    params:
-    - '0x1bc9c7e75b2447f0233c062a6507875d7882847f524e30a22a16ce0d9c346667'
-  - id: test_40
-    params:
-    - '0x769b6e7f4ffd8d9b962ae9ff4f279eba100664979ff8bd04fd210cb3b4fab2b3'
-  - id: test_41
-    params:
-    - '0x1d9a60a9fa34a668f35584aef4b33cbe8546fd418996e490d291e3d37638792a'
-  - id: test_42
-    params:
-    - '0x3b00d67c8786c9d24116fa19668976c911c7de3d6f418683aaea630088ae6046'
-  - id: test_43
-    params:
-    - '0x584b5f631d99793934af985b3fd9ba76b5e434591f71230f0161b4391a24c765'
-  - id: test_44
-    params:
-    - '0x5122a589669c0b0e45d1f30ffc64b87e3f03f8133d01788946592c80a6c0225a'
-  - id: test_45
-    params:
-    - '0x278bdbb6b03c308fb2cdee56b89450fb73440a7bae7e4cd3cf6bd56fb8b4bf36'
-  - id: test_46
-    params:
-    - '0x020dd9b9d2d4c5c8833b5c197656751c31092ced32c8b49e05333eff8618cbfd'
-  - id: test_47
-    params:
-    - '0x3e97ba34dde0c68e196820d3bb8864f8b67904050b5c682db56549b3386ea375'
   txpool_content:
   - id: test_01
     params: []

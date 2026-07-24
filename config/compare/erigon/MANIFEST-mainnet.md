@@ -2,22 +2,34 @@
 
 Source: erigontech/rpc-tests (source rpc-tests 214c13799371e832a90d92781f83b0fe2d143d68)
 
-| bucket | calls | runs on |
+Every test is retargeted to block `latest`, so the whole suite runs on any synced node (no archive dependency).
+
+| config | calls | notes |
 |---|---:|---|
-| `erigon-mainnet-stateless.yaml` | 8 | any node |
-| `erigon-mainnet-head.yaml` | 181 | any synced node (full or archive) |
-| `erigon-mainnet-historical-immutable.yaml` | 195 | full node (has block/tx/receipt/log history) or archive |
-| `erigon-mainnet-historical-state.yaml` | 510 | ARCHIVE node only (full/head nodes prune historical state) |
-| `erigon-mainnet-divergent.yaml` | 505 | informational — will not compare cleanly across clients; curate before use |
+| `erigon-mainnet.yaml` | 577 | standard methods, compares cleanly across clients |
+| `erigon-mainnet-divergent.yaml` | 337 | informational (noisy cross-client) |
 
-Total requests: 1399
+Total runnable: 914
 
-Run against the 25490000 backups (full/head) with the safe buckets:
+## Dropped (not adaptable to an arbitrary block)
+
+Replay/state addressed only by a fixed hash — no block argument to retarget, and replaying the referenced point needs archive state:
+
+- `debug_getModifiedAccountsByHash` (11)
+- `debug_traceBlockByHash` (10)
+- `debug_traceTransaction` (81)
+- `ots_getInternalOperations` (15)
+- `ots_getTransactionError` (15)
+- `ots_traceTransaction` (22)
+- `trace_replayTransaction` (30)
+- `trace_transaction` (47)
+
+## Run
 
 ```bash
-runner compare --config config/compare/erigon/erigon-mainnet-<bucket>.yaml \
+go run ./runner compare --config config/compare/erigon/erigon-mainnet.yaml \
   --clients config/clients/clients.yaml --client-refs nethermind,geth,reth \
   --rules config/compare/erigon/erigon-mainnet-rules.yaml
 ```
 
-`stateless` + `head` + `historical-immutable` are safe on full/head nodes; `historical-state` needs an archive node; `divergent` is informational.
+For a moving-head node set `--target-block` to a fixed recent number when regenerating (default `latest` is deterministic across nodes parked at the same head).
