@@ -1,0 +1,9 @@
+comparison:
+  rules:
+  - method: eth_getBlockByNumber
+    path: totalDifficulty
+    kind: ignore
+  - method: eth_getBlockByHash
+    path: totalDifficulty
+    kind: ignore
+  - kind: error_code_only
