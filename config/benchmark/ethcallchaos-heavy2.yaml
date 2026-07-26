@@ -1,0 +1,12 @@
+test_name: "EthCallChaos v2 HEAVY (multi-second)"
+description: "Adversarial eth_call mix evolved by EthCallChaos (v2 heavy 150ms-4.4s multicall), replayed at a target rps to compare how each client handles load. clients/rps/vus are set by the runner."
+clients:
+  - nethermind
+duration: "30s"
+rps: 100
+vus: 100
+calls:
+  - name: "ethcallchaos-heavy2"
+    file: "./rpc-calls/ethcallchaos-heavy2.jsonl"
+    file_type: "jsonl"
+    weight: 1
