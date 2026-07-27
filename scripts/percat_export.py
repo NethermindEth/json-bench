@@ -52,16 +52,47 @@ def encode_aggregate3(subcalls):
     return "0x" + AGG3_SELECTOR + head + "".join(heads) + "".join(tails)
 
 
-def category(row):
+def _subcalls(row):
+    try:
+        return len(json.loads(row["multicall_targets_json"] or "[]"))
+    except Exception:
+        return 0
+
+
+def _calldata_bytes(row):
+    return len(strip0x(row["calldata"] or "")) // 2
+
+
+def _has_value(row):
+    v = row["value"] or "0x0"
+    try:
+        return v.lower().startswith("0x") and int(v, 16) > 0
+    except Exception:
+        return False
+
+
+def categories(row):
+    # Behavioural / shape axes (multi-label): a call is the "worst" in every dimension it
+    # belongs to. Coverage of the axes the mutators actually move, NOT protocol family.
+    cats = ["overall/worst"]
+    gas = row["gas_limit"] or 0
     if row["use_multicall"]:
-        try:
-            n = len(json.loads(row["multicall_targets_json"] or "[]"))
-        except Exception:
-            n = 0
-        bucket = "small" if n <= 5 else "med" if n <= 15 else "large"
-        return f"multicall/{bucket}"
-    fam = FAMILY.get((row["to_address"] or "").lower())
-    return f"single:{fam}" if fam else "single:other"
+        n = _subcalls(row)
+        cats.append("multicall/worst")
+        cats.append("multicall/" + ("small" if n <= 5 else "med" if n <= 15 else "large" if n <= 39 else "huge"))
+        if gas > 200_000_000:
+            cats.append("multicall/high-gas")
+    else:
+        cats.append("single/worst")
+        if gas > 200_000_000:
+            cats.append("single/high-gas")
+        if gas <= 30_000_000:
+            cats.append("single/low-gas")
+        if _calldata_bytes(row) > 256:
+            cats.append("single/large-calldata")
+        if _has_value(row):
+            cats.append("single/value-bearing")
+    return cats
 
 
 def request(row):
@@ -90,7 +121,8 @@ def main():
                      "use_multicall, multicall_targets_json, fitness FROM test_cases").fetchall()
     by_cat = {}
     for r in rows:
-        by_cat.setdefault(category(r), []).append(r)
+        for cat in categories(r):
+            by_cat.setdefault(cat, []).append(r)
 
     scenarios = []
     for cat in sorted(by_cat):
