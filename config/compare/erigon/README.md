@@ -52,9 +52,15 @@ go run ./runner compare \
 ## Regenerating / updating
 
 ```bash
-scripts/import_erigon_tests.sh mainnet        # clones rpc-tests at the pinned ref, rewrites the configs
-RPC_TESTS_REF=<sha> scripts/import_erigon_tests.sh mainnet   # pull a newer corpus
+# fetch the corpus (gitignored) then rewrite the configs
+bash rpc-calls/scripts/generate-erigon-compare/init.sh mainnet
+go run ./rpc-calls/scripts/generate-erigon-compare \
+  --source-ref "$(cat rpc-calls/sources/erigon-rpc-tests/SOURCE_REF)"
+
+# pull a newer corpus
+RPC_TESTS_REF=<sha> bash rpc-calls/scripts/generate-erigon-compare/init.sh mainnet
 ```
 
-Requires `python3` + `pyyaml` (dev-time only). The generated files here are
-checked in so they're usable without regenerating.
+See [`rpc-calls/scripts/generate-erigon-compare/`](../../../rpc-calls/scripts/generate-erigon-compare)
+for the generator and its flags. The generated files here are checked in so
+they're usable without regenerating.

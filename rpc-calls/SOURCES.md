@@ -8,8 +8,13 @@ and the generated `*.jsonl` files are checked in.
 
 - Repo: <https://github.com/erigontech/rpc-tests>
 - License: Apache-2.0
-- Generator: `scripts/generate-from-erigon-rpc-tests/`
-- Extraction: data only (the `integration/mainnet/<method>/test_*.json`
+- Generators:
+  - `scripts/generate-from-erigon-rpc-tests/` — `*.jsonl` load-test fixtures
+    for a curated subset of methods.
+  - `scripts/generate-erigon-compare/` — differential `compare` configs under
+    `config/compare/erigon/` covering the whole corpus, retargeted to a
+    runnable block.
+- Extraction: data only (the `integration/<network>/<method>/test_*.json`
   fixtures); no upstream code is vendored or executed.
 
 ## Curated mainnet contracts
