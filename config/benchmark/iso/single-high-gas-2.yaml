@@ -1,0 +1,18 @@
+test_name: "single/high-gas#2 isolated"
+clients:
+  - nethermind
+duration: "60s"
+rps: 150
+vus: 512
+calls:
+  - name: "single/high-gas#2"
+    method: "eth_call"
+    params:
+      - to: "0x1f2f10d1c40777ae1da742455c65828ff36df387"
+        data: "0xe82a49dcedc48dcd784791d861e62abeabb5ff9a53193697090b947862739af7c9720578"
+        gas: "0x1dcd6500"
+        value: "0x0"
+        from: "0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503"
+      - "latest"
+    weight: 1
+    thresholds: ["p(99)<600000"]
