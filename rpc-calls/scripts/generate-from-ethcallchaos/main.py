@@ -139,7 +139,7 @@ def main():
 
     import os
     os.makedirs(OUT_DIR, exist_ok=True)
-    with open(os.path.join(OUT_DIR, "scenarios.jsonl"), "w") as f:
+    with open(os.path.join(OUT_DIR, "ethcallchaos-percategory-scenarios.jsonl"), "w") as f:
         for s in scenarios:
             f.write(json.dumps(s) + "\n")
 

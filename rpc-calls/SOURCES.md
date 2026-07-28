@@ -24,3 +24,20 @@ and the generated `*.jsonl` files are checked in.
 - Generator: `scripts/generate-from-contracts/`
 - Extraction: ABI JSON only (cached under `rpc-calls/sources/contract-abis/`,
   gitignored); no contract source code is vendored.
+
+## EthCallChaos fuzzing corpus
+
+- Source: EthCallChaos — an out-of-tree, coverage-guided `eth_call` fuzzer that
+  evolves worst-case `eth_call` / Multicall3 payloads and records each candidate
+  (with its measured fitness) in a SQLite corpus DB.
+- License: payloads are synthetic fuzzer output, not third-party content.
+- Generator: `scripts/generate-from-ethcallchaos/`
+- Corpus: the SQLite DB is produced out-of-tree and is not vendored; drop it
+  under `rpc-calls/sources/ethcallchaos/` (gitignored). The generator reads the
+  `test_cases` table read-only.
+- Checked-in outputs:
+  - `ethcallchaos-percategory-scenarios.jsonl` — top-N slowest cases per
+    behavioural/shape category, selected by the generator.
+  - `ethcallchaos-corpus.jsonl`, `ethcallchaos-heavy.jsonl`,
+    `ethcallchaos-heavy2.jsonl` — direct exports of corpus slices from the same
+    fuzzer (data only; not reproduced by the in-tree generator).
