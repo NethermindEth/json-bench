@@ -1,0 +1,18 @@
+test_name: "single/large-calldata#1 isolated"
+clients:
+  - nethermind
+duration: "60s"
+rps: 150
+vus: 512
+calls:
+  - name: "single/large-calldata#1"
+    method: "eth_call"
+    params:
+      - to: "0x5f1b8dbd3135c444f9b016f9fa19738e6b98a9b5"
+        data: "0xec81c2b8006812e911007db300006e0000be0000050056eb945f12b63378ca348deb2cc7312254b1f1b115667dbad572df9d9da94e7792b516d1ba5a0000be0000050004bcd0764b1ad62e2755ac1ba66d9a55bca6764b64d6012755acc9a6999a5564e1b03bda96b6fa512c3f32f90a43fc34e31827cd9a010d5336648cbab93475f8d70d6f80c87200000000000000000000000000000000000000000000000000000000000000c9a6999a5580c872000096a4e988cad0d8ea64e1f9cfd6b64926c2abd6e5c2abd6e57ebaa5755f7ebaa5755f143d1a1fb8655ef80d6f80c872000096a4e988cad0d8eaca9800cd27bc29c0852e1c79bd4e2826d334d881014208ecae0000000000000000000000000000000000000000000000000000000000000000d1305a9c6f9cef48b8e796e8a29cbe3a402a5c5701202f731cfd56e78430fa825ad0cee10beb255dfbeb945f12b63378ca348deb2cc7312254b1f1b115667dbaffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff85700a3ff687df98182f1c31b6225d"
+        gas: "0x5f5e100"
+        value: "0x0"
+        from: "0xae2Fc483527B8EF99EB5D9B44875F005ba1FaE13"
+      - "latest"
+    weight: 1
+    thresholds: ["p(99)<600000"]
