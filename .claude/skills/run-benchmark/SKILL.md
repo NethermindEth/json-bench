@@ -39,9 +39,11 @@ Rules that bite if missed:
 - Only `weight` drives call frequency; some older committed profiles use `frequency: 10%`, which the loader ignores (that call would get zero traffic). Convert to `weight` when deriving from them.
 - Generated configs for a specific run belong next to the run's outputs (or a scratch path), not committed into `config/` — that directory is for reusable profiles.
 
-**Same requests everywhere.** The runner builds the request set by weighted random sampling, so two runs of the same config send *different* requests — which makes their results incomparable. Before running any benchmark command, pre-generate the request set once and reuse it in every run:
+**Same requests everywhere.** The runner builds the request set by weighted random sampling, so two runs of the same config send *different* requests — which makes their results incomparable. Before running any benchmark command, build the runner once, then pre-generate the request set and reuse it in every run:
 
 ```bash
+go build -o benchmark ./runner
+
 ./benchmark --output outputs/<benchmark-name>/ generate-requests \
   --config <benchmark-config>.yaml --out outputs/<benchmark-name>/requests.csv
 ```
@@ -52,11 +54,9 @@ then point every run's benchmark config at it with `calls_file: <path>/requests.
 
 ## Step 4: Execute
 
-Build once, then run per the plan:
+The runner is already built (step 3). Run per the plan:
 
 ```bash
-go build -o benchmark ./runner
-
 ./benchmark --output outputs/<benchmark-name>/ benchmark \
   --config <benchmark-config>.yaml \
   --clients <clients-registry>.yaml \
