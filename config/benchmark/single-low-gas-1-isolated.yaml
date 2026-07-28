@@ -3,7 +3,7 @@ clients:
   - nethermind
 duration: "60s"
 rps: 150
-vus: 100
+vus: 512
 calls:
   - name: "single/low-gas#1"
     method: "eth_call"
