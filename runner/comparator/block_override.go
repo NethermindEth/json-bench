@@ -92,13 +92,19 @@ func pinnedBlock(method string, params []interface{}) (uint64, bool) {
 	return hexBlock(params[idx])
 }
 
+// maxQuantityHexLen is the length of "0x" plus the 16 hex digits of a uint64.
+// Methods such as eth_getBlockReceipts accept either a block number or a
+// 32-byte block hash in the same argument position, so anything longer is a
+// hash and must not be read as a height.
+const maxQuantityHexLen = 18
+
 func hexBlock(v interface{}) (uint64, bool) {
 	s, ok := v.(string)
-	if !ok || !strings.HasPrefix(s, "0x") {
+	if !ok || !strings.HasPrefix(s, "0x") || len(s) > maxQuantityHexLen {
 		return 0, false
 	}
 	b, ok := parseHexBig(s)
-	if !ok {
+	if !ok || !b.IsUint64() {
 		return 0, false
 	}
 	return b.Uint64(), true

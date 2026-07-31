@@ -89,6 +89,16 @@ func TestPinnedBlock(t *testing.T) {
 		{"eth_call", []interface{}{map[string]interface{}{}, "0xff"}, 255, true},
 		{"eth_getLogs", []interface{}{map[string]interface{}{"toBlock": "0x20"}}, 32, true},
 		{"eth_getBlockByHash", []interface{}{"0xhash", true}, 0, false},
+
+		// eth_getBlockReceipts takes a block number or a block hash in the same
+		// position. Truncating a hash to 64 bits yields a height above any real
+		// head, which made --skip-above-head silently drop every by-hash call.
+		{"eth_getBlockReceipts", []interface{}{"0x112a880"}, 18000000, true},
+		{"eth_getBlockReceipts", []interface{}{"0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae01587674482ba4baf3"}, 0, false},
+		// A hash whose low 64 bits are small would still be a plausible height.
+		{"eth_getBlockReceipts", []interface{}{"0x95b198e154acbfc64109dfd22d8224fe927fd8dfdedfae0158767448200000ff"}, 0, false},
+		// Oversized but shorter than a hash: not representable, so not pinned.
+		{"eth_getBlockByNumber", []interface{}{"0x1ffffffffffffffff", true}, 0, false},
 	}
 	for _, tc := range tests {
 		got, ok := pinnedBlock(tc.method, tc.params)
