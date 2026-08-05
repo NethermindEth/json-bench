@@ -1,0 +1,161 @@
+name: "eth_call fee-environment probes"
+description: >
+  Synthetic probes isolating eth_call transaction-environment semantics that
+  differ between clients: visibility of the upfront gas charge (gas_limit x
+  gasPrice) in SELFBALANCE/BALANCE, the GASPRICE opcode value, below-basefee
+  acceptance, the EIP-1559 path, and gas accounting. Each call state-overrides
+  0x...c0ffee with a tiny contract returning one 32-byte environment value and
+  a balance of exactly 1 ETH, so every response is deterministic and any
+  cross-client diff pinpoints the diverging semantics. Motivated by real
+  mainnet searcher-bot corpus calls (from == to, explicit gas ~2e9, explicit
+  sub-gwei gasPrice) where reth diverged from nethermind and geth.
+  Probe codes: SELFBALANCE 0x47..., GASPRICE 0x3a..., BASEFEE 0x48...,
+  GASLEFT 0x5a..., CALLER;BALANCE 0x3331... each followed by
+  6000526020 6000f3 (MSTORE + RETURN 32 bytes).
+
+calls:
+  eth_call:
+    # 1. The real-world shape: self-call + explicit gas + explicit gasPrice.
+    #    Does the upfront charge show in SELFBALANCE? (1 ETH vs 1 ETH - limit*price)
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 2. Control: same but no gasPrice — every client must return exactly 1 ETH.
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 3. No explicit gas — the charge derives from the client's default/cap gas limit.
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 4. GASPRICE opcode with explicit gasPrice — raw vs effective price in the EVM.
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x3a60005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 5. GASPRICE opcode with no gasPrice given (0 vs basefee).
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x3a60005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 6. BASEFEE opcode — block-env control, must match everywhere.
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4860005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 7. GAS opcode at first instruction — gas accounting control.
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x5a60005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 8. External caller pays — the contract's SELFBALANCE must stay 1 ETH everywhere.
+    - params:
+        - from: "0x0000000000000000000000000000000000ca11e4"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xde0b6b3a7640000"
+          "0x0000000000000000000000000000000000ca11e4":
+            balance: "0xde0b6b3a7640000"
+
+    # 9. Sender balance as seen in-call (CALLER;BALANCE) after the upfront charge.
+    - params:
+        - from: "0x0000000000000000000000000000000000ca11e4"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x333160005260206000f3"
+            balance: "0xde0b6b3a7640000"
+          "0x0000000000000000000000000000000000ca11e4":
+            balance: "0xde0b6b3a7640000"
+
+    # 10. EIP-1559 variant of probe 1 (maxFeePerGas instead of gasPrice).
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          maxFeePerGas: "0xa3ba3a8"
+          maxPriorityFeePerGas: "0x0"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 11. gasPrice = 1 wei, certainly below basefee — accepted or rejected?
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0x1"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xde0b6b3a7640000"
+
+    # 12. gasPrice = 1 gwei variant of probe 1.
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0x3b9aca00"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xde0b6b3a7640000"
