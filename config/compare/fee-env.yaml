@@ -159,3 +159,43 @@ calls:
         - "0x0000000000000000000000000000000000c0ffee":
             code: "0x4760005260206000f3"
             balance: "0xde0b6b3a7640000"
+
+    # 13. UNDERFUNDED self-call — the real divergence shape: sender balance
+    #     (0.00425 ETH) is far below gas*gasPrice (0.343 ETH). What SELFBALANCE
+    #     does the EVM see when the prepay cannot be afforded?
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0xf19b56655e400"
+
+    # 14. Same with a zero-balance sender.
+    - params:
+        - from: "0x0000000000000000000000000000000000c0ffee"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x4760005260206000f3"
+            balance: "0x0"
+
+    # 15. Underfunded EXTERNAL caller, viewed via CALLER;BALANCE.
+    - params:
+        - from: "0x0000000000000000000000000000000000ca11e4"
+          to: "0x0000000000000000000000000000000000c0ffee"
+          gas: "0x77359400"
+          gasPrice: "0xa3ba3a8"
+          data: "0x"
+        - "latest"
+        - "0x0000000000000000000000000000000000c0ffee":
+            code: "0x333160005260206000f3"
+            balance: "0xde0b6b3a7640000"
+          "0x0000000000000000000000000000000000ca11e4":
+            balance: "0xf19b56655e400"
