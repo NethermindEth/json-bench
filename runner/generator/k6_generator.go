@@ -193,6 +193,8 @@ func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
 		totalWeight += call.Weight
 	}
 
+	rng := newRNG(cfg.Seed)
+
 	// Calculate the number of requests to generate based on the duration and RPS or iterations
 	var maxRequests int
 	if cfg.RPS > 0 {
@@ -201,14 +203,14 @@ func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
 		maxRequests = cfg.Iterations
 	}
 	for reqsCount <= maxRequests {
-		reqRand := rand.Float64() * float64(totalWeight)
+		reqRand := rng.Float64() * float64(totalWeight)
 		cumFreq := 0.0
 		for _, call := range cfg.Calls {
 			cumFreq += float64(call.Weight)
 			if reqRand < cumFreq {
 				id := reqsCount
 
-				rpcCall, err := call.Sample()
+				rpcCall, err := call.Sample(rng)
 				if err != nil {
 					return "", fmt.Errorf("failed to sample call %s: %w", call.Name, err)
 				}
@@ -235,6 +237,15 @@ func GenerateK6Requests(cfg *config.Config, outputDir string) (string, error) {
 	writer.Flush()
 
 	return requestsPath, nil
+}
+
+// newRNG returns the generator behind request sampling: fixed by `seed` when non-zero, so two runs
+// of one config issue byte-identical request sequences; otherwise seeded from the clock.
+func newRNG(seed int64) *rand.Rand {
+	if seed == 0 {
+		seed = time.Now().UnixNano()
+	}
+	return rand.New(rand.NewSource(seed))
 }
 
 // GenerateK6Cmd generates the k6 command and returns the command to run
