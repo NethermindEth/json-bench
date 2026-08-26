@@ -16,6 +16,7 @@ type Config struct {
 	RPS             int                   `yaml:"rps"`
 	Iterations      int                   `yaml:"iterations"`
 	VUs             int                   `yaml:"vus"`
+	Seed            int64                 `yaml:"seed"` // Optional: fixes the request sequence so repeated runs replay identical requests
 	Calls           []*Call               `yaml:"calls"`
 	CallsFile       string                `yaml:"calls_file"` // Optional: use file containing RPC calls instead of generating them
 	ResolvedClients []*types.ClientConfig `yaml:"-"`

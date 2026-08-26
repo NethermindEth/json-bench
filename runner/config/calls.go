@@ -38,10 +38,10 @@ func (c *Call) LoadFile() error {
 	return nil
 }
 
-// Sample returns a random call from the call collection or the single call if no collection is provided
-func (c *Call) Sample() (RPCCall, error) {
+// Sample returns a call drawn uniformly from the collection with rng, or the single call if no collection is provided
+func (c *Call) Sample(rng *rand.Rand) (RPCCall, error) {
 	if len(c.Calls) > 0 {
-		return c.Calls[rand.Intn(len(c.Calls))], nil // Uniformly sample a call
+		return c.Calls[rng.Intn(len(c.Calls))], nil
 	}
 
 	// Use the single call if no collection is provided
