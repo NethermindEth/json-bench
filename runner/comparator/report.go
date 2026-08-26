@@ -23,6 +23,8 @@ type MethodComparisonResult struct {
 	Differences        map[string]interface{} `json:"differences"`
 	DifferencesDisplay string                 `json:"differences_display"`
 	SchemaErrors       map[string][]string    `json:"schema_errors,omitempty"`
+	TransportErrors    map[string]string      `json:"transport_errors,omitempty"`
+	ErrorClass         map[string]string      `json:"error_class,omitempty"`
 	Responses          map[string]string      `json:"responses"`
 	Error              error                  `json:"error,omitempty"`
 }
@@ -87,14 +89,16 @@ func (c *Comparator) GenerateHTMLReport(outputPath string) error {
 
 		// Create ResponseDiff
 		responseDiffs[i] = types.ResponseDiff{
-			Method:       result.Method,
-			Params:       result.Params,
-			Clients:      clientNames,
-			ClientNames:  clientNames,
-			Responses:    result.Responses,
-			Differences:  result.Differences,
-			SchemaErrors: result.SchemaErrors,
-			HasDiff:      hasDiff,
+			Method:          result.Method,
+			Params:          result.Params,
+			Clients:         clientNames,
+			ClientNames:     clientNames,
+			Responses:       result.Responses,
+			Differences:     result.Differences,
+			SchemaErrors:    result.SchemaErrors,
+			TransportErrors: result.TransportErrors,
+			ErrorClass:      result.ErrorClass,
+			HasDiff:         hasDiff,
 		}
 	}
 
@@ -192,6 +196,8 @@ func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outpu
 			Differences:        diff.Differences,
 			DifferencesDisplay: diffDisplay,
 			SchemaErrors:       diff.SchemaErrors,
+			TransportErrors:    diff.TransportErrors,
+			ErrorClass:         diff.ErrorClass,
 			Responses:          formattedResponses,
 		}
 
@@ -212,6 +218,11 @@ func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outpu
 
 		// Check for schema errors
 		if len(methodResult.SchemaErrors) > 0 {
+			hasError = true
+		}
+
+		// A call that lost a client to a transport failure was never compared
+		if len(methodResult.TransportErrors) > 0 {
 			hasError = true
 		}
 
@@ -271,6 +282,13 @@ func reportData(result *types.BenchmarkResult, diffs []types.ResponseDiff, outpu
 	for _, diff := range diffs {
 		if len(diff.SchemaErrors) > 0 {
 			summary.SchemaErrors++
+		}
+
+		// A call that lost a client is neither matching nor differing: it was
+		// never compared.
+		if len(diff.TransportErrors) > 0 {
+			summary.CallErrors++
+			continue
 		}
 
 		if len(diff.Differences) > 0 {
@@ -601,6 +619,10 @@ const htmlReportTemplate = `<!DOCTYPE html>
             <h3>Schema Errors</h3>
             <div class="number">{{.Summary.SchemaErrors}}</div>
         </div>
+        <div class="summary-card">
+            <h3>Transport Errors</h3>
+            <div class="number">{{.Summary.CallErrors}}</div>
+        </div>
     </div>
 
     <div class="config">
@@ -667,6 +689,24 @@ const htmlReportTemplate = `<!DOCTYPE html>
                                     <pre class="code-content">{{range $errors}}{{.}}{{end}}</pre>
                                 </div>
                             </td>
+                        </tr>
+                        {{end}}
+                    </table>
+                </div>
+                {{end}}
+
+                {{if $result.TransportErrors}}
+                <div>
+                    <h4>Transport Errors (call not compared):</h4>
+                    <table class="diff-table">
+                        <tr>
+                            <th>Client</th>
+                            <th>Error</th>
+                        </tr>
+                        {{range $client, $err := $result.TransportErrors}}
+                        <tr>
+                            <td>{{$client}}</td>
+                            <td><pre class="code-content">{{$err}}</pre></td>
                         </tr>
                         {{end}}
                     </table>
@@ -896,6 +936,24 @@ const htmlReportTemplate = `<!DOCTYPE html>
                     </table>
                 </div>
                 {{end}}
+
+                {{if $result.TransportErrors}}
+                <div>
+                    <h4>Transport Errors (call not compared):</h4>
+                    <table class="diff-table">
+                        <tr>
+                            <th>Client</th>
+                            <th>Error</th>
+                        </tr>
+                        {{range $client, $err := $result.TransportErrors}}
+                        <tr>
+                            <td>{{$client}}</td>
+                            <td><pre class="code-content">{{$err}}</pre></td>
+                        </tr>
+                        {{end}}
+                    </table>
+                </div>
+                {{end}}
                 
                 {{if $result.Differences}}
                 <div>
@@ -984,6 +1042,24 @@ const htmlReportTemplate = `<!DOCTYPE html>
                                     <pre class="code-content">{{range $errors}}{{.}}{{end}}</pre>
                                 </div>
                             </td>
+                        </tr>
+                        {{end}}
+                    </table>
+                </div>
+                {{end}}
+
+                {{if $result.TransportErrors}}
+                <div>
+                    <h4>Transport Errors (call not compared):</h4>
+                    <table class="diff-table">
+                        <tr>
+                            <th>Client</th>
+                            <th>Error</th>
+                        </tr>
+                        {{range $client, $err := $result.TransportErrors}}
+                        <tr>
+                            <td>{{$client}}</td>
+                            <td><pre class="code-content">{{$err}}</pre></td>
                         </tr>
                         {{end}}
                     </table>

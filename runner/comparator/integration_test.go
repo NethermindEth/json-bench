@@ -124,10 +124,20 @@ func TestCompareIntegration_MatchAndMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read results: %v", err)
 	}
-	var results []ComparisonResult
-	if err := json.Unmarshal(data, &results); err != nil {
+	var doc ComparisonResultsDocument
+	if err := json.Unmarshal(data, &doc); err != nil {
 		t.Fatalf("unmarshal results: %v", err)
 	}
+	if doc.SchemaVersion != ComparisonResultsSchemaVersion {
+		t.Errorf("schema_version = %d, want %d", doc.SchemaVersion, ComparisonResultsSchemaVersion)
+	}
+	if doc.Summary.Total != 3 {
+		t.Errorf("summary.total = %d, want 3", doc.Summary.Total)
+	}
+	if len(doc.ClientRefs) != 2 {
+		t.Errorf("client_refs = %v, want 2 entries", doc.ClientRefs)
+	}
+	results := doc.Results
 	if len(results) != 3 {
 		t.Fatalf("results len = %d, want 3 (%v)", len(results), results)
 	}

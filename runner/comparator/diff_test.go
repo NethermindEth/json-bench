@@ -220,6 +220,20 @@ func TestClassifyError(t *testing.T) {
 		{-32602, "logs range too large", "range_cap"},
 		{-32602, "invalid argument", ""},
 		{-32000, "execution reverted", ""},
+
+		// Pruned or unavailable state, reported under a reused -32000.
+		{-32000, "missing trie node 0x3a4f (path ) state 0x3a4f is not available", "no_state"},
+		{-32000, "Historical state for block 12345 is unavailable", "no_state"},
+		{-32000, "pruned history unavailable", "pruned_history"},
+		{4444, "Pruned history unavailable", "pruned_history"},
+		{-32005, "query returned more than 10000 results", "range_cap"},
+		{-32016, "eth_getLogs request was canceled due to enabled timeout", "internal_timeout"},
+
+		// Genuine execution errors under the same -32000 must stay real
+		// differences, or --fail-on-diff stops catching regressions.
+		{-32000, "err: max fee per gas less than block base fee", ""},
+		{-32000, "insufficient funds for transfer", ""},
+		{-32000, "nonce too low", ""},
 	}
 	for _, tc := range tests {
 		got := classifyError(errorResp(tc.code, tc.msg))

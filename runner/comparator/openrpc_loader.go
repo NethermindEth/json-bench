@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"os"
 	"time"
-
-	"github.com/jsonrpc-bench/runner/config"
 )
 
 // OpenRPCSpec represents the structure of an OpenRPC specification
@@ -159,14 +157,11 @@ func loadOpenRPCSpec(specPath string) (*OpenRPCSpec, error) {
 			return nil, fmt.Errorf("failed to read OpenRPC spec: %w", err)
 		}
 	} else {
-		safePath, err := config.SafeReadPath(specPath)
-		if err != nil {
-			return nil, err
-		}
-		data, err = os.ReadFile(safePath)
+		fileData, err := os.ReadFile(specPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read OpenRPC spec file: %w", err)
 		}
+		data = fileData
 	}
 
 	// Parse OpenRPC spec
@@ -180,8 +175,7 @@ func loadOpenRPCSpec(specPath string) (*OpenRPCSpec, error) {
 
 // parseRemoteURL returns the parsed URL and true when specPath looks like an
 // http(s) URL. Anything else (file:// schemes, gopher://, bare strings) is
-// treated as a local file path so the file-read branch can apply its own
-// path-traversal guard via config.SafeReadPath.
+// treated as a local file path and read from disk.
 func parseRemoteURL(specPath string) (*url.URL, bool) {
 	u, err := url.Parse(specPath)
 	if err != nil || u.Scheme == "" {

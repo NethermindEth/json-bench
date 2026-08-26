@@ -6,8 +6,6 @@ import (
 	"regexp"
 
 	"gopkg.in/yaml.v3"
-
-	"github.com/jsonrpc-bench/runner/config"
 )
 
 // compareCall is a single {method, id?, params} entry from a compare config.
@@ -57,11 +55,7 @@ func validateRuleKinds(rules []ComparisonRule, ctx string) error {
 // bare rules/block_override at the root) and returns the parsed rules and block
 // override for merging into a config in either --config or --from-jsonl mode.
 func LoadComparisonRules(path string) ([]ComparisonRule, string, error) {
-	safePath, err := config.SafeReadPath(path)
-	if err != nil {
-		return nil, "", err
-	}
-	data, err := os.ReadFile(safePath)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read rules file: %w", err)
 	}
@@ -110,11 +104,7 @@ var reservedIDPattern = regexp.MustCompile(`^variant\d+$`)
 // returned *ComparisonConfig is left zero for the caller to populate from
 // CLI flags.
 func LoadCompareConfig(path string) (*ComparisonConfig, error) {
-	safePath, err := config.SafeReadPath(path)
-	if err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(safePath)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read compare config: %w", err)
 	}

@@ -88,7 +88,11 @@ Two ways to feed calls; prefer the corpus for breadth.
   methods that can't be compared cross-node: `eth_getProof` (proofs may not be
   stored) and head-dependent zero-arg methods (`eth_gasPrice`, `eth_syncing`,
   `eth_blockNumber`, `eth_maxPriorityFeePerGas`). Start with `--sample 60–150`
-  per method to keep runtime and output sane; raise it for a thorough pass.
+  per method to keep runtime and output sane; raise it for a thorough pass. The
+  dir may be an absolute path, and files in the tree that aren't corpora
+  (generator inputs under `rpc-calls/scripts/`, scenario files) are skipped with
+  a warning — read the load line it prints and confirm the file count before
+  trusting the sample.
 - **Curated config:** a hand-written `config/compare/*.yaml` (`calls:` map) when
   the user wants a specific, small set. See `config/compare/example.yaml`.
 
@@ -142,13 +146,19 @@ go run ./runner --output "$OUT" compare \
   --skip-above-head \
   --diff-only \
   --concurrency 4 --timeout 60 \
-  --fail-on-diff
+  --rate-limit 2.4 \
+  --fail-on-diff --fail-on-transport-error
 ```
 
 Why these flags:
 - `--concurrency 4` (low): remote nodes commonly throttle connection bursts;
   high concurrency trips per-IP limits and causes flaky transport errors.
-  Retries with backoff are built in and absorb the occasional blip.
+  Retries with backoff (429 included, `Retry-After` honoured) are built in and
+  absorb the occasional blip.
+- `--rate-limit <rps>` (per client): the fix for a *sustained* limit, which
+  retries cannot absorb — the Infura free tier hard-429s above ~2.5 req/s. Drop
+  it when both endpoints are your own. A client can also carry its own
+  `rate_limit` in `clients.yaml`.
 - `--skip-above-head`: drops calls pinned to a numeric block above the lower
   head so a still-syncing node doesn't generate false "missing block" diffs.
   (Hash-addressed calls can't be checked this way — see gotchas.)
@@ -158,6 +168,8 @@ Why these flags:
   if you need the full payloads for a differing call.
 - `--fail-on-diff`: exit non-zero when *real* (non-environment) differences
   remain — useful as a CI gate. Add `--fail-on-env-diff` for strict mode.
+- `--fail-on-transport-error`: a run that lost calls to throttling compared
+  less than you asked for; without this it still exits 0.
 
 Outputs written to `$OUT/`: `comparison-results.json`, `comparison-report.html`,
 `comparison-provenance.json` (the effective config — rules, block override,
@@ -167,9 +179,16 @@ Full flag reference: `references/flags.md`.
 
 ### 6. Analyze and categorize
 
-The tool's summary line tallies `identical / differ / transport-error /
-schema-error / skipped` plus env/capability buckets. Don't stop at the count —
-open `comparison-results.json` and put every surviving difference into one of:
+The tool's summary line tallies `identical / differ (real) / differ
+(env/expected) / transport-error (of which rate-limited) / schema-error /
+skipped` plus env/capability buckets. Check the transport-error count first: a
+call that lost a client was never compared, so a large count means the run
+covered far less than the sample suggests — raise `--rate-limit` pacing (lower
+rps) and re-run rather than reading the diffs.
+
+Don't stop at the count — open `comparison-results.json` (differences live under
+`results`; the wrapper carries `schema_version`, `client_refs` and `summary`)
+and put every surviving difference into one of:
 
 1. **Benign version difference** — same data, different serialization
    (e.g. `totalDifficulty` present on one). Add an `ignore` rule and re-note.
@@ -214,9 +233,10 @@ each, and give every real defect its own section with a reproduction command.
 - **Report size.** The report embeds full responses; a block-heavy run without
   `--diff-only` is enormous. Keep `--diff-only` on; the JSON is the source of
   truth, the HTML is a convenience.
-- **Throttling nodes.** If you see transport errors, lower `--concurrency`, not
-  raise it. The old/baseline node in past runs refused bursts and recovered
-  after a cooldown.
+- **Throttling nodes.** If you see transport errors, reach for
+  `--rate-limit` first and lower `--concurrency` second — concurrency bounds
+  calls in flight, not the request rate, and it is shared across clients. The
+  old/baseline node in past runs refused bursts and recovered after a cooldown.
 - **`--skip-above-head` is numeric-only.** Hash-addressed calls
   (`eth_getBlockByHash`, `debug_traceTransaction`) referencing a block above the
   candidate's head can't be pre-filtered and will legitimately show as diffs

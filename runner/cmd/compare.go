@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,6 +30,8 @@ var (
 	compareRetryBaseDelay   time.Duration
 	compareFailOnDiff       bool
 	compareFailOnEnv        bool
+	compareFailOnTransport  bool
+	compareRateLimit        float64
 	compareSkipAboveHead    bool
 	compareBlockOverride    string
 	compareFromJSONL        string
@@ -59,6 +62,8 @@ func init() {
 	compareCmd.Flags().DurationVar(&compareRetryBaseDelay, "retry-base-delay", 0, "Base backoff between transport retries (0 = 200ms)")
 	compareCmd.Flags().BoolVar(&compareFailOnDiff, "fail-on-diff", false, "Exit non-zero when real (non-environment) differences remain")
 	compareCmd.Flags().BoolVar(&compareFailOnEnv, "fail-on-env-diff", false, "Also exit non-zero on environment/capability differences (compose with --fail-on-diff for strict mode)")
+	compareCmd.Flags().BoolVar(&compareFailOnTransport, "fail-on-transport-error", false, "Exit non-zero when any call lost a client to a transport error, so a decimated run cannot pass silently")
+	compareCmd.Flags().Float64Var(&compareRateLimit, "rate-limit", 0, "Cap requests per second per client, overriding rate_limit in clients.yaml (0 = no override; fractional values allowed, e.g. 2.4)")
 	compareCmd.Flags().BoolVar(&compareSkipAboveHead, "skip-above-head", false, "Skip calls pinned to a block above the lowest client head")
 	compareCmd.Flags().StringVar(&compareBlockOverride, "block-override", "", "Rewrite latest/pending block tags to this static block (overrides config and --rules)")
 	compareCmd.Flags().StringVar(&compareFromJSONL, "from-jsonl", "", "Build the config from a corpus directory (recurses; reads *.jsonl and *.json arrays) instead of --config")
@@ -116,7 +121,9 @@ func runCompare(cmd *cobra.Command, args []string) error {
 
 	var cfg *comparator.ComparisonConfig
 	if compareFromJSONL != "" {
-		cfg, err = comparator.LoadCorpusConfig(compareFromJSONL, compareSample, compareSampleSeed, effectiveBlockOverride)
+		var report *comparator.CorpusReport
+		cfg, report, err = comparator.LoadCorpusConfig(compareFromJSONL, compareSample, compareSampleSeed, effectiveBlockOverride)
+		logCorpusReport(compareFromJSONL, report)
 		if err != nil {
 			return fmt.Errorf("failed to build config from corpus: %w", err)
 		}
@@ -137,6 +144,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	cfg.MaxResponseBytes = compareMaxResponseBytes
 	cfg.MaxRetries = compareMaxRetries
 	cfg.RetryBaseDelayMs = int(compareRetryBaseDelay.Milliseconds())
+	cfg.RateLimitRPS = compareRateLimit
 	cfg.SkipAboveHead = compareSkipAboveHead
 
 	// Layer the --rules file on top of any rules from --config, then apply the
@@ -162,7 +170,20 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	}
 	logger.Infof("Completed comparison of %d calls", len(results))
 
-	return finishComparison(comp, compareFailOnDiff, compareFailOnEnv)
+	return finishComparison(comp, compareFailOnDiff, compareFailOnEnv, compareFailOnTransport)
+}
+
+// logCorpusReport names every corpus file that was skipped, loudly enough that a
+// genuinely malformed corpus is noticed, and states what was actually loaded.
+func logCorpusReport(dir string, report *comparator.CorpusReport) {
+	if report == nil {
+		return
+	}
+	for _, skip := range report.Skips {
+		logger.Warnf("corpus: skipped %s: %s", skip.Path, skip.Reason)
+	}
+	logger.Infof("corpus %s: loaded %d calls from %d files, %d files held only excluded methods, %d files skipped",
+		dir, report.Entries, report.Files, report.Excluded, len(report.Skips))
 }
 
 // applyDiffOnlyDefaults makes --diff-only the obvious "small report" switch: if
@@ -176,9 +197,9 @@ func applyDiffOnlyDefaults(cfg *comparator.ComparisonConfig, keepBodies bool) {
 }
 
 // finishComparison writes the results, provenance sidecar, and HTML report,
-// prints the outcome summary, and returns a non-zero (error) result when
-// failOnDiff is set and post-filter differences remain.
-func finishComparison(comp *comparator.Comparator, failOnDiff, failOnEnv bool) error {
+// prints the outcome summary, and returns a non-zero (error) result when one of
+// the fail-on gates trips.
+func finishComparison(comp *comparator.Comparator, failOnDiff, failOnEnv, failOnTransport bool) error {
 	jsonPath := filepath.Join(outputDir, "comparison-results.json")
 	if err := comp.SaveResults(jsonPath); err != nil {
 		return fmt.Errorf("failed to save comparison results: %w", err)
@@ -198,23 +219,29 @@ func finishComparison(comp *comparator.Comparator, failOnDiff, failOnEnv bool) e
 
 	printComparisonSummary(comp.Summarize())
 
-	realFail := failOnDiff && comp.HasRealDifferences()
-	envFail := failOnEnv && comp.HasEnvDifferences()
-	if realFail {
+	if failOnDiff && comp.HasRealDifferences() {
 		return fmt.Errorf("real differences found (--fail-on-diff)")
 	}
-	if envFail {
+	if failOnEnv && comp.HasEnvDifferences() {
 		return fmt.Errorf("environment/expected differences found (--fail-on-env-diff)")
+	}
+	if failOnTransport && comp.HasTransportErrors() {
+		return fmt.Errorf("calls lost a client to transport errors (--fail-on-transport-error)")
 	}
 	return nil
 }
 
 // printComparisonSummary logs a one-screen tally of the run's outcomes.
 func printComparisonSummary(s comparator.Summary) {
-	logger.Infof("Summary: %d calls — %d identical, %d differ (real), %d differ (env/expected), %d transport-error, %d schema-error, %d skipped",
-		s.Total, s.Identical, s.Differ, s.DifferEnv, s.TransportError, s.SchemaError, s.Skipped)
-	for class, n := range s.EnvError {
-		logger.Infof("  env/capability errors [%s]: %d", class, n)
+	logger.Infof("Summary: %d calls — %d identical, %d differ (real), %d differ (env/expected), %d transport-error (%d rate-limited), %d schema-error, %d skipped",
+		s.Total, s.Identical, s.Differ, s.DifferEnv, s.TransportError, s.RateLimited, s.SchemaError, s.Skipped)
+	classes := make([]string, 0, len(s.EnvError))
+	for class := range s.EnvError {
+		classes = append(classes, class)
+	}
+	sort.Strings(classes)
+	for _, class := range classes {
+		logger.Infof("  env/capability errors [%s]: %d", class, s.EnvError[class])
 	}
 }
 

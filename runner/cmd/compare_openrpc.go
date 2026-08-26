@@ -29,7 +29,9 @@ var (
 	openrpcRetryBaseDelay   time.Duration
 	openrpcFailOnDiff       bool
 	openrpcFailOnEnv        bool
+	openrpcFailOnTransport  bool
 	openrpcSkipAboveHead    bool
+	openrpcRateLimit        float64
 )
 
 var compareOpenRPCCmd = &cobra.Command{
@@ -57,6 +59,8 @@ func init() {
 	compareOpenRPCCmd.Flags().DurationVar(&openrpcRetryBaseDelay, "retry-base-delay", 0, "Base backoff between transport retries (0 = 200ms)")
 	compareOpenRPCCmd.Flags().BoolVar(&openrpcFailOnDiff, "fail-on-diff", false, "Exit non-zero when real (non-environment) differences remain")
 	compareOpenRPCCmd.Flags().BoolVar(&openrpcFailOnEnv, "fail-on-env-diff", false, "Also exit non-zero on environment/capability differences (compose with --fail-on-diff for strict mode)")
+	compareOpenRPCCmd.Flags().BoolVar(&openrpcFailOnTransport, "fail-on-transport-error", false, "Exit non-zero when any call lost a client to a transport error, so a decimated run cannot pass silently")
+	compareOpenRPCCmd.Flags().Float64Var(&openrpcRateLimit, "rate-limit", 0, "Cap requests per second per client, overriding rate_limit in clients.yaml (0 = no override; fractional values allowed, e.g. 2.4)")
 	compareOpenRPCCmd.Flags().BoolVar(&openrpcSkipAboveHead, "skip-above-head", false, "Skip calls pinned to a block above the lowest client head")
 
 	_ = compareOpenRPCCmd.MarkFlagRequired("spec")
@@ -107,6 +111,7 @@ func runCompareOpenRPC(cmd *cobra.Command, args []string) error {
 	cfg.MaxResponseBytes = openrpcMaxResponseBytes
 	cfg.MaxRetries = openrpcMaxRetries
 	cfg.RetryBaseDelayMs = int(openrpcRetryBaseDelay.Milliseconds())
+	cfg.RateLimitRPS = openrpcRateLimit
 	cfg.SkipAboveHead = openrpcSkipAboveHead
 	applyDiffOnlyDefaults(cfg, openrpcKeepBodies)
 
@@ -127,7 +132,7 @@ func runCompareOpenRPC(cmd *cobra.Command, args []string) error {
 	}
 	logger.Infof("Completed comparison of %d methods", len(results))
 
-	return finishComparison(comp, openrpcFailOnDiff, openrpcFailOnEnv)
+	return finishComparison(comp, openrpcFailOnDiff, openrpcFailOnEnv, openrpcFailOnTransport)
 }
 
 func applyMethodFilter(cfg *comparator.ComparisonConfig, methodsToInclude []string) {
