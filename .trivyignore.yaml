@@ -1,0 +1,61 @@
+# Findings in usr/bin/k6 — the load generator binary that grafana/k6 ships
+# prebuilt. Eight are Go stdlib issues fixed in Go 1.26.6, one is golang.org/x/text
+# fixed in 0.39.0; k6 2.1.0 is built with Go 1.26.4 and k6 2.2.0, the newest
+# release, with 1.26.5, so no available tag clears them and nothing in this repo
+# can rebuild that binary. They stay suppressed until Grafana publishes a k6
+# built on a patched toolchain.
+#
+# Scoped deliberately: each CVE is pinned to usr/bin/k6, so the same identifier
+# in our own binary or in the OS layer still fails the gate, and expired_at makes
+# the suppression lapse rather than rot — the scan goes red again in December and
+# forces a re-check instead of hiding a stale exception forever.
+#
+# Both of these targets report 0 findings, and that is what this file protects:
+#   app/jsonrpc-bench-runner (gobinary)  0
+#   local/runner (alpine 3.24.0)         0
+vulnerabilities:
+  - id: CVE-2026-33818
+    paths:
+      - usr/bin/k6
+    statement: "encoding/asn1 DoS in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
+  - id: CVE-2026-39821
+    paths:
+      - usr/bin/k6
+    statement: "golang.org/x/net/idna issue in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
+  - id: CVE-2026-46600
+    paths:
+      - usr/bin/k6
+    statement: "golang.org/x/net/dns/dnsmessage issue in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
+  - id: CVE-2026-56852
+    paths:
+      - usr/bin/k6
+    statement: "golang.org/x/text DoS vendored into the prebuilt k6 binary; needs x/text 0.39.0."
+    expired_at: 2026-12-01
+  - id: CVE-2026-56853
+    paths:
+      - usr/bin/k6
+    statement: "net/http unencrypted HTTP/2 issue in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
+  - id: CVE-2026-56858
+    paths:
+      - usr/bin/k6
+    statement: "html/template XSS in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
+  - id: CVE-2026-56859
+    paths:
+      - usr/bin/k6
+    statement: "encoding/xml DoS in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
+  - id: CVE-2026-56860
+    paths:
+      - usr/bin/k6
+    statement: "net/url DoS in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
+  - id: CVE-2026-56862
+    paths:
+      - usr/bin/k6
+    statement: "crypto/tls DoS in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.6."
+    expired_at: 2026-12-01
