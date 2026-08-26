@@ -224,3 +224,23 @@ func TestLoadCorpusConfigExcludedFileIsNotASkip(t *testing.T) {
 		t.Errorf("an excluded-methods file must not warn, got %+v", report.Skips)
 	}
 }
+
+// WalkDir does not follow a symlinked root, so a linked corpus directory used to
+// look empty. The root is resolved before walking.
+func TestLoadCorpusConfigSymlinkedDir(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{
+		"c.jsonl": `{"method":"eth_getBalance","params":["0x1","0x10"]}` + "\n",
+	})
+	link := filepath.Join(filepath.Dir(dir), "corpus-link")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	cfg, report, err := LoadCorpusConfig(link, 0, 42, "")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig through a symlink: %v", err)
+	}
+	if len(cfg.Methods) != 1 || report.Entries != 1 {
+		t.Errorf("expected one loaded call, got %v (%d entries)", cfg.Methods, report.Entries)
+	}
+}

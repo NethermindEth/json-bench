@@ -16,8 +16,10 @@ type k6MetricValue struct {
 	Count int64   `json:"count"`
 	Rate  float64 `json:"rate"`
 	// A k6 Rate metric (http_req_failed) reports observations, not a "rate"
-	// field: Passes counts the true ones, Fails the false ones, and Value is
-	// the resulting ratio.
+	// field: Passes counts the observations where the condition held, Fails the
+	// ones where it did not, and Value is Passes/(Passes+Fails). Since the
+	// condition on http_req_failed is "the request failed", Passes is the
+	// failure count — see failedRate.
 	Passes int64              `json:"passes"`
 	Fails  int64              `json:"fails"`
 	Value  float64            `json:"value"`
@@ -242,8 +244,22 @@ func extractMethodFromSummary(s *k6Summary, methodTag, clientName, methodName st
 // Rate metric, so the summary carries passes/fails and a "value" ratio — not the
 // "rate" field a Counter carries. Reading the wrong one silently reported every
 // run as 100% successful.
+//
+// Value is authoritative: k6 computes it as Passes/(Passes+Fails), and for this
+// metric a "pass" is an observation of the condition "the request failed", so
+// Value is already the failure ratio the `rate < 0.01` threshold is written
+// against. Two runs against a stub, for the same 400-odd requests:
+//
+//	all responses 200      -> {passes: 0,   fails: 402, value: 0}
+//	429 on every 4th       -> {passes: 100, fails: 301, value: 0.2494}
+//
+// so Passes counts failures, not successes. Passes/(Passes+Fails) is the
+// fallback for a summary that omits value.
 func failedRate(v k6MetricValue) float64 {
 	if total := v.Passes + v.Fails; total > 0 {
+		if v.Value > 0 {
+			return v.Value
+		}
 		return float64(v.Passes) / float64(total)
 	}
 	return pickFloat(v.Value, pickFloat(metricFloat(v, "value"), pickFloat(v.Rate, metricFloat(v, "rate"))))

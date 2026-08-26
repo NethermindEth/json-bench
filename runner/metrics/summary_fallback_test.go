@@ -236,11 +236,20 @@ func TestExtractMethodFromSummary_FailureRateForms(t *testing.T) {
 		wantErrors int64
 		wantRate   float64
 	}{
-		{"passes and fails", k6MetricValue{Passes: 25, Fails: 75}, 25, 25},
-		{"value ratio", k6MetricValue{Value: 0.5}, 50, 50},
+		// For http_req_failed a "pass" is an observation of the condition
+		// "the request failed", so passes counts failures. These two shapes are
+		// what k6 actually emitted for an all-200 run and for a run with a 429
+		// on every fourth request; reading fails/(passes+fails) instead would
+		// report the all-200 run as 100% failed.
+		{"passes counts failures", k6MetricValue{Passes: 25, Fails: 75, Value: 0.25}, 25, 25},
+		{"every request succeeded", k6MetricValue{Passes: 0, Fails: 100, Value: 0}, 0, 0},
+		{"every request failed", k6MetricValue{Passes: 100, Fails: 0, Value: 1}, 100, 100},
+		// value is authoritative when present, and passes/fails is the fallback
+		// for a summary that omits it.
+		{"passes and fails without value", k6MetricValue{Passes: 40, Fails: 60}, 40, 40},
+		{"value ratio only", k6MetricValue{Value: 0.5}, 50, 50},
 		{"rate field", k6MetricValue{Rate: 0.1}, 10, 10},
 		{"values map", k6MetricValue{Values: map[string]float64{"value": 0.2}}, 20, 20},
-		{"no failures", k6MetricValue{Passes: 0, Fails: 100}, 0, 0},
 	}
 	for _, tc := range tests {
 		summary := &k6Summary{Metrics: map[string]k6MetricValue{

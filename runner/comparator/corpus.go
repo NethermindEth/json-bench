@@ -67,8 +67,17 @@ type CorpusReport struct {
 // A file that does not parse as corpus entries is skipped and reported rather
 // than failing the load, which only happens when nothing usable was found.
 func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) (*ComparisonConfig, *CorpusReport, error) {
+	// Resolve the root through any symlink before walking: WalkDir does not
+	// follow a symlinked root, so a linked corpus directory would otherwise look
+	// empty. Reading files under the resolved root also keeps the containment
+	// check in readCorpusFile comparing like with like.
+	walkRoot := dir
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		walkRoot = resolved
+	}
+
 	var files []string
-	walkErr := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	walkErr := filepath.WalkDir(walkRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -94,7 +103,7 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 	byMethod := make(map[string][][]interface{})
 	order := make([]string, 0)
 	for _, file := range files {
-		entries, err := readCorpusFile(dir, file)
+		entries, err := readCorpusFile(walkRoot, file)
 		if err != nil {
 			report.Skips = append(report.Skips, CorpusSkip{Path: file, Reason: err.Error()})
 			continue
