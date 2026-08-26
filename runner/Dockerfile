@@ -1,5 +1,5 @@
 # Multi-stage build for Go runner
-FROM golang:1.25.12-alpine AS builder
+FROM golang:1.25.14-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -22,10 +22,17 @@ FROM grafana/k6:2.1.0
 # Use root user for dependencies installation
 USER root
 
-# Refresh base image packages so the pinned grafana/k6:2.1.0 picks up
-# patched libcrypto3/libssl3 from Alpine's update channel.
+# Refresh base image packages so the pinned grafana/k6:2.1.0 picks up patched
+# libcrypto3/libssl3 from Alpine's update channel. The explicit minimums are not
+# redundant: CI builds with `cache-from: type=gha`, and `--no-cache` only
+# disables apk's index cache, not Docker's layer cache — so a bare `apk upgrade`
+# layer is replayed from cache indefinitely and silently keeps shipping whatever
+# was current when it was first built. Naming the versions changes the layer, so
+# the upgrade re-runs, and fails the build if the patched package is gone rather
+# than publishing a vulnerable image.
 RUN apk --no-cache upgrade && \
-    apk --no-cache add ca-certificates tzdata curl postgresql-client
+    apk --no-cache add ca-certificates tzdata curl postgresql-client \
+        'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0'
 
 WORKDIR /app
 
