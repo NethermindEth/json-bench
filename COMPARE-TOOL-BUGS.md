@@ -87,8 +87,11 @@ walking the directory the operator named. Either:
 
 **Regression test:** `--from-jsonl /abs/path/to/corpus` loads successfully.
 
-**Fixed** (option 2). New `config.SafeReadPathUnder(root, p)` resolves both to
-absolute paths and asserts containment. The guard also came off the other
+**Fixed** (option 2). New `config.SafeReadPathUnder(root, p)` resolves both
+paths — through symlinks, since it is the target that gets read — and asserts
+containment. The corpus root is also resolved before the walk, because
+`filepath.WalkDir` does not follow a symlinked root and a linked corpus
+directory therefore looked empty. The guard also came off the other
 CLI-entry loaders — `--config`, `--rules`, `--spec`, `--variations` — which had
 the same trap; `config.SafeReadPath` stays for the one caller that reads a path
 *out of* a YAML file (`runner/config/file_loader.go`).
