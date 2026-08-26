@@ -18,10 +18,21 @@ import (
 	"github.com/prometheus/common/model"
 )
 
+// CollectClientsMetrics builds per-client, per-method metrics from Prometheus
+// when it is configured, and from k6's summary.json otherwise. A Prometheus
+// failure is not fatal: the run falls back to summary.json rather than
+// returning nothing, because empty exports read as a successful run with no
+// traffic. It never returns a nil map.
 func CollectClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
-	if cfg.Outputs != nil && cfg.Outputs.PrometheusRW != nil {
-		return collectPrometheusClientsMetrics(cfg, timestamp, summaryPath, logger)
+	if cfg.Outputs == nil || cfg.Outputs.PrometheusRW == nil {
+		return collectSummaryClientsMetrics(cfg, summaryPath, logger)
 	}
+
+	clientsMetrics, err := collectPrometheusClientsMetrics(cfg, timestamp, summaryPath, logger)
+	if err == nil {
+		return clientsMetrics, nil
+	}
+	logger.WithError(err).Warnf("Prometheus was configured but could not be queried; per-client metrics come from %s instead, and no time series will be available in Grafana", summaryPath)
 	return collectSummaryClientsMetrics(cfg, summaryPath, logger)
 }
 
@@ -30,7 +41,7 @@ func CollectClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath 
 func collectSummaryClientsMetrics(cfg *config.Config, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
 	clientsMetrics := newClientsMetricsSkeleton(cfg)
 	applySummaryFallback(clientsMetrics, cfg, summaryPath, logger)
-	finalizeClientMetrics(clientsMetrics)
+	finalizeClientMetrics(clientsMetrics, runElapsedSeconds(cfg, summaryPath, logger))
 	return clientsMetrics, nil
 }
 
@@ -54,13 +65,12 @@ func newClientsMetricsSkeleton(cfg *config.Config) map[string]*types.ClientMetri
 	return clientsMetrics
 }
 
-func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
-	clientsMetrics := newClientsMetricsSkeleton(cfg)
-
-	// Parse prometheus endpoint. The query API lives at the base URL; the
-	// remote-write target on cfg.Outputs.PrometheusRW.Endpoint already has
-	// the write path appended and would 404 when the Prometheus client
-	// composes <base>/api/v1/query on top of it.
+// newPrometheusAPI builds the query API client for the configured endpoint. The
+// query API lives at the base URL; the remote-write target on
+// cfg.Outputs.PrometheusRW.Endpoint already has the write path appended and
+// would 404 when the Prometheus client composes <base>/api/v1/query on top of
+// it.
+func newPrometheusAPI(cfg *config.Config) (v1.API, error) {
 	queryAddr := cfg.Outputs.PrometheusRW.QueryURL
 	if queryAddr == "" {
 		queryAddr = cfg.Outputs.PrometheusRW.Endpoint
@@ -74,14 +84,43 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		prometheusURL.User = url.UserPassword(cfg.Outputs.PrometheusRW.BasicAuth.Username, cfg.Outputs.PrometheusRW.BasicAuth.Password)
 	}
 
-	// Create prometheus http api client
 	client, err := prometheus.NewClient(prometheus.Config{
 		Address: prometheusURL.String(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create prometheus client: %w", err)
 	}
-	api := v1.NewAPI(client)
+	return v1.NewAPI(client), nil
+}
+
+// CheckPrometheus probes the configured Prometheus so an unusable endpoint is
+// reported before the benchmark runs rather than after it. It returns nil when
+// Prometheus is not configured.
+func CheckPrometheus(cfg *config.Config) error {
+	if cfg.Outputs == nil || cfg.Outputs.PrometheusRW == nil {
+		return nil
+	}
+	api, err := newPrometheusAPI(cfg)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, _, err := api.Query(ctx, "vector(1)", time.Now()); err != nil {
+		return fmt.Errorf("failed to query prometheus: %w", err)
+	}
+	return nil
+}
+
+func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, summaryPath string, logger *logrus.Logger) (map[string]*types.ClientMetrics, error) {
+	clientsMetrics := newClientsMetricsSkeleton(cfg)
+
+	api, err := newPrometheusAPI(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	methodTag, _ := cfg.MethodKeys()
 
 	// Get benchmark metrics
 	query, _, err := api.Query(context.Background(),
@@ -108,7 +147,9 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		if !ok {
 			continue
 		}
-		metricMethod, ok := sample.Metric["req_name"]
+		// Key on the same tag the k6 thresholds were registered under, so the
+		// Prometheus and summary.json paths produce the same method rows.
+		metricMethod, ok := sample.Metric[model.LabelName(methodTag)]
 		if !ok {
 			continue
 		}
@@ -129,7 +170,10 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 		// Parse duration(latency) http metrics
 		// Metrics named: k6_http_req_<type>_<indicator> will be parsed here
 		if strings.HasPrefix(string(metricName), "k6_http_req_") {
-			metricsParts := strings.Split(strings.TrimPrefix(string(metricName), "k6_http_req_"), "_")
+			// Split once only: an indicator can itself contain an underscore
+			// (k6 sanitizes p(99.9) to p99_9), and splitting on every "_" would
+			// truncate it to "p99" and overwrite the real p99.
+			metricsParts := strings.SplitN(strings.TrimPrefix(string(metricName), "k6_http_req_"), "_", 2)
 			if len(metricsParts) < 2 {
 				continue
 			}
@@ -149,12 +193,16 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 					method.P50 = milliseconds
 				case "max":
 					method.Max = milliseconds
+				case "p75":
+					method.P75 = milliseconds
 				case "p90":
 					method.P90 = milliseconds
 				case "p95":
 					method.P95 = milliseconds
 				case "p99":
 					method.P99 = milliseconds
+				case "p99_9", "p99.9":
+					method.P999 = milliseconds
 				default: // Skip unknown metrics indicators
 					continue
 				}
@@ -191,15 +239,16 @@ func collectPrometheusClientsMetrics(cfg *config.Config, timestamp time.Time, su
 
 	applySummaryFallback(clientsMetrics, cfg, summaryPath, logger)
 
-	finalizeClientMetrics(clientsMetrics)
+	finalizeClientMetrics(clientsMetrics, runElapsedSeconds(cfg, summaryPath, logger))
 
 	return clientsMetrics, nil
 }
 
 // finalizeClientMetrics recomputes per-client totals, aggregate latency and
 // throughput from the collected per-method data, regardless of whether that
-// data came from Prometheus or the summary.json fallback.
-func finalizeClientMetrics(clientsMetrics map[string]*types.ClientMetrics) {
+// data came from Prometheus or the summary.json fallback. elapsedSeconds is how
+// long the run actually took; throughput is left at zero when it is unknown.
+func finalizeClientMetrics(clientsMetrics map[string]*types.ClientMetrics, elapsedSeconds float64) {
 	for _, client := range clientsMetrics {
 		// Recalculate totals based on method data to ensure accuracy
 		var totalRequests int64
@@ -242,10 +291,11 @@ func finalizeClientMetrics(clientsMetrics map[string]*types.ClientMetrics) {
 				maxLatency = method.Max
 			}
 
-			// Calculate throughput for each method
-			if method.Avg > 0 {
-				// FIXME: Should throughput use directly cfg.RPS?
-				method.Throughput = 1000.0 / method.Avg // requests per second
+			// Throughput is requests over elapsed time. k6's own per-method
+			// rate is preferred (set by the summary fallback); this covers the
+			// Prometheus path, which carries counters but no rate.
+			if method.Throughput == 0 && method.Count > 0 && elapsedSeconds > 0 {
+				method.Throughput = float64(method.Count) / elapsedSeconds
 				client.Methods[methodName] = method
 			}
 		}
@@ -260,14 +310,15 @@ func finalizeClientMetrics(clientsMetrics map[string]*types.ClientMetrics) {
 				client.Latency.P95 = p95Sum / float64(methodCount)
 				client.Latency.P99 = p99Sum / float64(methodCount)
 			}
-			// Calculate overall throughput based on average latency
-			if client.Latency.Avg > 0 {
-				client.Latency.Throughput = 1000.0 / client.Latency.Avg // requests per second
+			if elapsedSeconds > 0 {
+				client.Latency.Throughput = float64(totalCount) / elapsedSeconds
 			}
 		}
 	}
 }
 
+// calculateStdDev is a crude range/4 stand-in: Prometheus stores k6's
+// aggregates, not the sample values a real standard deviation needs.
 func calculateStdDev(values types.MetricSummary) float64 {
 	return (values.Max - values.Min) / 4
 }

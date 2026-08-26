@@ -82,7 +82,8 @@ func getClientMetricsForRun(db *sql.DB, runID string) (map[string]*types.ClientM
 				MAX(CASE WHEN metric_name = 'latency_p95' THEN value ELSE 0 END) as p95,
 				MAX(CASE WHEN metric_name = 'latency_p99' THEN value ELSE 0 END) as p99,
 				MAX(CASE WHEN metric_name = 'error_rate' THEN value ELSE 0 END) as error_rate,
-				MAX(CASE WHEN metric_name = 'throughput' THEN value ELSE 0 END) as throughput
+				MAX(CASE WHEN metric_name = 'throughput' THEN value ELSE 0 END) as throughput,
+				MAX(CASE WHEN metric_name = 'total_requests' THEN value ELSE 0 END) as request_count
 			FROM benchmark_metrics
 			WHERE run_id = $1 AND client = $2 AND method != 'all'
 			GROUP BY method`
@@ -92,15 +93,16 @@ func getClientMetricsForRun(db *sql.DB, runID string) (map[string]*types.ClientM
 			defer methodRows.Close()
 			for methodRows.Next() {
 				var method string
+				var requestCount float64
 				var mm types.MetricSummary
 				err := methodRows.Scan(
 					&method,
 					&mm.Avg, &mm.Min, &mm.Max,
 					&mm.P50, &mm.P90, &mm.P95, &mm.P99,
-					&mm.ErrorRate, &mm.Throughput,
+					&mm.ErrorRate, &mm.Throughput, &requestCount,
 				)
 				if err == nil {
-					mm.Count = int64(mm.Throughput) // Approximate count from throughput
+					mm.Count = int64(requestCount)
 					cm.Methods[method] = mm
 				}
 			}

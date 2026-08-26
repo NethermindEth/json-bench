@@ -143,6 +143,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		RPS         int                  `yaml:"rps"`
 		VUs         int                  `yaml:"vus"`
 		Calls       []*Call              `yaml:"calls"`
+		CallsFile   string               `yaml:"calls_file"`
 	}
 
 	var oldConfig oldStyleConfig
@@ -158,6 +159,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		RPS:             oldConfig.RPS,
 		VUs:             oldConfig.VUs,
 		Calls:           oldConfig.Calls,
+		CallsFile:       oldConfig.CallsFile,
 		ClientRefs:      make([]string, 0, len(oldConfig.Clients)),
 		ResolvedClients: make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
 	}

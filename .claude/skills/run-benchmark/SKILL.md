@@ -48,7 +48,7 @@ go build -o benchmark ./runner
   --config <benchmark-config>.yaml --out outputs/<benchmark-name>/requests.csv
 ```
 
-then point every run's benchmark config at it with `calls_file: <path>/requests.csv`. This is mandatory whenever results will be compared — across targets, across hosts, or across repeat runs — and a good default even for a single target (it makes the run reproducible).
+then point every run's benchmark config at it with `calls_file: <path>/requests.csv`. This is mandatory whenever results will be compared — across targets, across hosts, or across repeat runs — and a good default even for a single target (it makes the run reproducible). The per-method breakdown keys on the CSV's `method` column (column 3), so its `name` column can be any label; see `references/configuration.md`.
 
 **Multiple targets.** Follow the user's instructions for how to handle them. The runner natively benchmarks several registry clients in one run (parallel k6 scenarios, which already share one request set), which works when benchmarking from a single vantage point. But for on-host SSH runs each target needs its own individual run on its own host — same workload config, same pre-generated `calls_file`, only the clients registry differs. Manage them one at a time and aggregate afterwards.
 
@@ -65,7 +65,7 @@ The runner is already built (step 3). Run per the plan:
 
 - **Output location**: everything goes under the git-ignored `outputs/` directory, in a subdirectory dedicated to this benchmark (e.g. `outputs/<date>-<short-name>/`). With multiple individual runs, give each target its own subdirectory inside it (`outputs/<benchmark-name>/<client>/`).
 - **Prometheus on**: start the local stack if needed (`docker compose up -d prometheus grafana`) and pass `--prometheus http://localhost:9090`. For on-host runs, metrics reach the local Prometheus through an SSH reverse tunnel (see `references/remote-runs.md`).
-- **Prometheus off**: beware the default — the runner always attempts remote-write to `--prometheus` (default `http://localhost:9090`), so if a local Prometheus happens to be running, metrics get exported silently even though nobody asked. When the user wants no export, point `--prometheus` at an unused port (e.g. `http://localhost:19999`) and note that the resulting remote-write error logs are expected noise, not benchmark failure.
+- **Prometheus off**: just omit `--prometheus`. It defaults to unset, and remote-write is disabled unless you pass an endpoint; metrics then come from k6's `summary.json`. Do **not** point it at an unused port to "turn it off" — that enables remote-write to a dead address and only produces noise.
 - Sanity-check the endpoint before a long run (e.g. an `eth_blockNumber` curl) so a dead target fails in seconds, not after the full duration.
 
 Verify each run produced its artifacts (`summary.json`, `exports/results.json`, `exports/client_comparison.csv`, `exports/method_metrics.csv`, `report.html` if requested) before moving on.

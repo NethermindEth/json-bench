@@ -59,7 +59,7 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 			Thresholds:        make(types.K6Thresholds, 0),
 			Scenarios:         scenarios,
 			SystemTags:        []string{"scenario", "status", "url", "group", "check", "error", "error_code"},
-			SummaryTrendStats: []string{"avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"},
+			SummaryTrendStats: []string{"avg", "min", "med", "max", "p(75)", "p(90)", "p(95)", "p(99)", "p(99.9)"},
 			Tags: map[string]string{
 				"testid": cfg.TestName,
 			},
@@ -89,16 +89,13 @@ func GenerateK6Config(cfg *config.Config, outputDir string) (string, error) {
 	// --summary-export emits a per-scenario (client) breakdown for each method:
 	// k6 only includes a tag-filtered submetric in summary.json when a threshold
 	// is defined on it. These conditions can never fail, so they never affect the
-	// k6 exit code. Keys are UNQUOTED and use {scenario:C,req_name:M} ordering
-	// because k6 stores the submetric name verbatim and metrics/summary_fallback.go
+	// k6 exit code. Keys are UNQUOTED and put scenario first because k6 stores
+	// the submetric name verbatim and metrics/summary_fallback.go
 	// (lookupSubmetric) matches that exact string. Grows as clients x methods x 3.
+	methodTag, methodIdentifiers := cfg.MethodKeys()
 	for _, client := range cfg.ResolvedClients {
-		for _, call := range cfg.Calls {
-			identifier := call.Name
-			if identifier == "" {
-				identifier = call.Method
-			}
-			selector := fmt.Sprintf("{scenario:%s,req_name:%s}", client.Name, identifier)
+		for _, identifier := range methodIdentifiers {
+			selector := fmt.Sprintf("{scenario:%s,%s:%s}", client.Name, methodTag, identifier)
 			config.Options.Thresholds["http_req_duration"+selector] = []string{"max>=0"}
 			config.Options.Thresholds["http_reqs"+selector] = []string{"count>=0"}
 			config.Options.Thresholds["http_req_failed"+selector] = []string{"rate>=0"}
@@ -289,7 +286,7 @@ func configureOutputs(cfg *config.Config, cmd *exec.Cmd) *exec.Cmd {
 		cmd.Args = append(cmd.Args, "--out", "experimental-prometheus-rw")
 		cmd.Env = append(cmd.Env,
 			fmt.Sprintf("K6_PROMETHEUS_RW_SERVER_URL=%s", cfg.Outputs.PrometheusRW.Endpoint),
-			"K6_PROMETHEUS_RW_TREND_STATS=min,max,avg,med,p(90),p(95),p(99)",
+			"K6_PROMETHEUS_RW_TREND_STATS=min,max,avg,med,p(75),p(90),p(95),p(99),p(99.9)",
 		)
 		if cfg.Outputs.PrometheusRW.BasicAuth.Username != "" {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("K6_PROMETHEUS_RW_USERNAME=%s", cfg.Outputs.PrometheusRW.BasicAuth.Username))
