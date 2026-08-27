@@ -8,8 +8,12 @@ type ResponseDiff struct {
 	Responses    map[string]interface{} `json:"responses"` // Map of client name to response
 	Differences  map[string]interface{} `json:"differences"`
 	SchemaErrors map[string][]string    `json:"schema_errors,omitempty"`
-	HasDiff      bool                   `json:"has_diff"`     // Whether there are differences
-	ClientNames  []string               `json:"client_names"` // Names of clients for easy access in templates
+	// TransportErrors and ErrorClass mirror the comparator's per-client maps so
+	// the report can show a call that was never compared.
+	TransportErrors map[string]string `json:"transport_errors,omitempty"`
+	ErrorClass      map[string]string `json:"error_class,omitempty"`
+	HasDiff         bool              `json:"has_diff"`     // Whether there are differences
+	ClientNames     []string          `json:"client_names"` // Names of clients for easy access in templates
 }
 
 // MetricSummary represents performance metrics for a specific measurement
@@ -83,8 +87,8 @@ type ClientMetrics struct {
 	ConnectionMetrics ConnectionMetrics            `json:"connection_metrics"`
 	TimeSeries        map[string][]TimeSeriesPoint `json:"time_series"`
 	SystemMetrics     []SystemMetrics              `json:"system_metrics"`
-	ErrorTypes  map[string]int64 `json:"error_types"`
-	StatusCodes map[int]int64    `json:"status_codes"`
+	ErrorTypes        map[string]int64             `json:"error_types"`
+	StatusCodes       map[int]int64                `json:"status_codes"`
 }
 
 // ConnectionMetrics represents connection-related metrics

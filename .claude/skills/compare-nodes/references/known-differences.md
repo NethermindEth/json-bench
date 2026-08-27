@@ -66,6 +66,24 @@ errors (they appear in the summary's env buckets, not as real diffs under
 - **No state for a block** (`-32002`, "No state available for block N") — the
   node doesn't retain state for that block (e.g. genesis after a state-sync).
   Class: `no_state`. Expected for non-archive / still-syncing nodes.
+- **Pruned state under a reused `-32000`** — Geth's "missing trie node 0x…" and
+  Nethermind's "Historical state for block N is unavailable" are the same
+  condition reported under a generic code. Both classify as `no_state`. Matching
+  is by phrase, because `-32000` also carries genuine execution errors
+  (`max fee per gas less than block base fee`, `insufficient funds`) which stay
+  real differences.
+- **Pruned log/receipt history** (`4444`, "Pruned history unavailable") — the
+  node dropped the history index the call needs. Class: `pruned_history`. Expect
+  it on a flat-history / windowed-retention node.
+- **Node-side RPC timeout** (`-32016`, "eth_getLogs request was canceled due to
+  enabled timeout") — the node aborted the request on its own internal deadline,
+  which is a capacity/config delta, not a wrong answer. Class:
+  `internal_timeout`. Narrow the range or raise the node's RPC timeout.
+- **HTTP 429 is not an error class.** A rate-limited provider never returns a
+  response, so it lands in `transport_errors` with
+  `transport_error_class: rate_limited` and the call is excluded from the
+  identical/differ tallies. Pace the run with `--rate-limit` instead of reading
+  those calls as findings.
 
 ## Expected — sync gap
 

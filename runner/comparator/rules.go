@@ -204,6 +204,39 @@ func errorCode(errVal interface{}) (int, bool) {
 	return int(code), true
 }
 
+// Environment/capability classes returned by classifyError.
+const (
+	// ClassNamespaceDisabled means the method is not exposed by the endpoint.
+	ClassNamespaceDisabled = "namespace_disabled"
+	// ClassNoState means the state the call needs has been pruned or was never
+	// stored.
+	ClassNoState = "no_state"
+	// ClassRangeCap means the endpoint refused the request as too large.
+	ClassRangeCap = "range_cap"
+	// ClassPrunedHistory means the log/receipt history index the call needs has
+	// been pruned.
+	ClassPrunedHistory = "pruned_history"
+	// ClassInternalTimeout means the node aborted the request on its own
+	// internal RPC timeout.
+	ClassInternalTimeout = "internal_timeout"
+)
+
+// classifiedPhrases maps a distinctive error-message substring (lower case) to
+// its class. Clients reuse a single code for several distinct conditions —
+// Nethermind returns -32000 for pruned state and for ordinary execution errors
+// alike — so these match the phrase, never the bare code.
+var classifiedPhrases = []struct {
+	phrase string
+	class  string
+}{
+	{"missing trie node", ClassNoState},
+	{"historical state for block", ClassNoState},
+	{"pruned history unavailable", ClassPrunedHistory},
+	{"query returned more than", ClassRangeCap},
+	{"canceled due to enabled timeout", ClassInternalTimeout},
+	{"cancelled due to enabled timeout", ClassInternalTimeout},
+}
+
 // classifyError buckets an error response into an environment/capability class
 // so it can be filtered as configuration rather than a correctness finding.
 // It returns "" for ordinary execution errors and non-error responses.
@@ -221,12 +254,18 @@ func classifyError(resp map[string]interface{}) string {
 
 	switch code {
 	case -32601, -32600:
-		return "namespace_disabled"
+		return ClassNamespaceDisabled
 	case -32002:
-		return "no_state"
+		return ClassNoState
 	case -32602:
 		if strings.Contains(lower, "range") || strings.Contains(lower, "logs") || strings.Contains(lower, "limit") {
-			return "range_cap"
+			return ClassRangeCap
+		}
+	}
+
+	for _, c := range classifiedPhrases {
+		if strings.Contains(lower, c.phrase) {
+			return c.class
 		}
 	}
 	return ""

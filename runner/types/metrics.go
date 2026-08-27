@@ -29,6 +29,7 @@ const (
 	MetricSuccessRate = "success_rate"
 	MetricErrorRate   = "error_rate"
 	MetricThroughput  = "throughput"
+	MetricTotalReqs   = "total_requests"
 	MetricCPUUsage    = "cpu_usage"
 	MetricMemoryUsage = "memory_usage"
 )

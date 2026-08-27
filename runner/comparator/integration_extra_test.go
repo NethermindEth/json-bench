@@ -207,11 +207,94 @@ func TestCompareIntegration_DiffOnly(t *testing.T) {
 		t.Fatalf("SaveResults: %v", err)
 	}
 	data, _ := os.ReadFile(jsonPath)
-	var results []ComparisonResult
-	if err := json.Unmarshal(data, &results); err != nil {
+	var doc ComparisonResultsDocument
+	if err := json.Unmarshal(data, &doc); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
+	results := doc.Results
 	if len(results) != 1 || results[0].Method != "eth_getBalance_variant1" {
 		t.Fatalf("--diff-only should keep only the differing call, got %d (%v)", len(results), results)
+	}
+}
+
+// TestCompareIntegration_ReferenceStaysPinned covers a subtler failure of the
+// old code: with the reference client dead, the diff silently re-based on
+// whichever client answered first, so unrelated clients were compared as if one
+// were the reference.
+func TestCompareIntegration_ReferenceStaysPinned(t *testing.T) {
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req := decodeRPC(t, r)
+		if req.Method == "eth_chainId" {
+			writeRPCResult(w, req.ID, "0x1")
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(dead.Close)
+
+	b := newRPCFake(t, "0x1", func(req rpcRequest) interface{} { return "0xaaa" })
+	c := newRPCFake(t, "0x1", func(req rpcRequest) interface{} { return "0xbbb" })
+
+	cfg := &ComparisonConfig{
+		Name:             "pinned",
+		Methods:          []string{"eth_blockNumber_variant1"},
+		MethodRPCNames:   map[string]string{"eth_blockNumber_variant1": "eth_blockNumber"},
+		CustomParameters: map[string][]interface{}{"eth_blockNumber_variant1": {}},
+		Clients: []*types.ClientConfig{
+			{Name: "reference", URL: dead.URL},
+			{Name: "b", URL: b.URL},
+			{Name: "c", URL: c.URL},
+		},
+		TimeoutSeconds:   5,
+		Concurrency:      1,
+		MaxRetries:       1,
+		RetryBaseDelayMs: 1,
+		OutputDir:        t.TempDir(),
+	}
+	comp, err := NewComparator(cfg)
+	if err != nil {
+		t.Fatalf("NewComparator: %v", err)
+	}
+	if _, err := comp.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	res := comp.GetResults()[0]
+	if len(res.TransportErrors) != 1 {
+		t.Fatalf("expected the reference client to fail, got %v", res.TransportErrors)
+	}
+	if len(res.Differences) != 0 {
+		t.Errorf("b and c must not be compared against each other, got %v", res.Differences)
+	}
+	if comp.HasRealDifferences() {
+		t.Error("an incomplete call must not trip --fail-on-diff")
+	}
+	if s := comp.Summarize(); s.TransportError != 1 || s.Differ != 0 {
+		t.Errorf("summary = %+v, want 1 transport-error and 0 real differences", s)
+	}
+}
+
+// TestReportSurfacesTransportErrors pins that the HTML report no longer drops
+// transport failures on the floor (CallErrors was dead before).
+func TestReportSurfacesTransportErrors(t *testing.T) {
+	diffs := []types.ResponseDiff{
+		{Method: "ok"},
+		{Method: "lost", TransportErrors: map[string]string{"nodeA": "HTTP request failed with status 429: {}"}},
+		{Method: "differs", Differences: map[string]interface{}{"nodeB": "x"}, HasDiff: true},
+	}
+	data := reportData(&types.BenchmarkResult{}, diffs, filepath.Join(t.TempDir(), "report.html"))
+
+	if data.Summary.CallErrors != 1 {
+		t.Errorf("Summary.CallErrors = %d, want 1", data.Summary.CallErrors)
+	}
+	if data.Summary.MatchingResponses != 1 {
+		t.Errorf("MatchingResponses = %d, want 1 (the lost call is not a match)", data.Summary.MatchingResponses)
+	}
+	if data.Summary.DifferentResponses != 1 {
+		t.Errorf("DifferentResponses = %d, want 1", data.Summary.DifferentResponses)
+	}
+	lost := data.MethodResults["lost"]
+	if len(lost) != 1 || len(lost[0].TransportErrors) != 1 {
+		t.Errorf("the report should carry the per-call transport error, got %+v", lost)
 	}
 }

@@ -40,15 +40,44 @@ type corpusEntry struct {
 	Params []interface{} `json:"params"`
 }
 
+// CorpusSkip records a corpus file that could not be used, so the caller can
+// report it. A corpus tree commonly holds files that are not corpora at all
+// (generator inputs, for instance), and one of those must not abort the run.
+type CorpusSkip struct {
+	Path   string
+	Reason string
+}
+
+// CorpusReport describes what a corpus load actually ingested. Excluded counts
+// files whose calls were all dropped by the method exclusions (see
+// corpusExcluded) — expected, unlike a skip.
+type CorpusReport struct {
+	Files    int
+	Entries  int
+	Excluded int
+	Skips    []CorpusSkip
+}
+
 // LoadCorpusConfig builds a ComparisonConfig by ingesting a corpus directory
 // recursively. It reads both line-delimited *.jsonl files and *.json files
 // holding a JSON array of {method, params} objects. When sample > 0 at most
 // that many calls per method are kept, chosen deterministically from seed.
 // Excluded methods (see corpusExcluded and the debug_ prefix) are dropped;
 // pinnable methods like eth_feeHistory are kept when blockOverride is set.
-func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) (*ComparisonConfig, error) {
+// A file that does not parse as corpus entries is skipped and reported rather
+// than failing the load, which only happens when nothing usable was found.
+func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) (*ComparisonConfig, *CorpusReport, error) {
+	// Resolve the root through any symlink before walking: WalkDir does not
+	// follow a symlinked root, so a linked corpus directory would otherwise look
+	// empty. Reading files under the resolved root also keeps the containment
+	// check in readCorpusFile comparing like with like.
+	walkRoot := dir
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		walkRoot = resolved
+	}
+
 	var files []string
-	walkErr := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	walkErr := filepath.WalkDir(walkRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -61,24 +90,31 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 		return nil
 	})
 	if walkErr != nil {
-		return nil, fmt.Errorf("failed to scan corpus dir: %w", walkErr)
+		return nil, nil, fmt.Errorf("failed to scan corpus dir: %w", walkErr)
 	}
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no .jsonl or .json files found under %s", dir)
+		return nil, nil, fmt.Errorf("no .jsonl or .json files found under %s", dir)
 	}
 	sort.Strings(files)
 
 	keepPinnable := blockOverride != ""
 
+	report := &CorpusReport{}
 	byMethod := make(map[string][][]interface{})
 	order := make([]string, 0)
 	for _, file := range files {
-		entries, err := readCorpusFile(file)
+		entries, err := readCorpusFile(walkRoot, file)
 		if err != nil {
-			return nil, err
+			report.Skips = append(report.Skips, CorpusSkip{Path: file, Reason: err.Error()})
+			continue
 		}
+		used, named := 0, 0
 		for _, entry := range entries {
-			if entry.Method == "" || isCorpusExcluded(entry.Method, keepPinnable) {
+			if entry.Method == "" {
+				continue
+			}
+			named++
+			if isCorpusExcluded(entry.Method, keepPinnable) {
 				continue
 			}
 			if entry.Params == nil {
@@ -88,11 +124,23 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 				order = append(order, entry.Method)
 			}
 			byMethod[entry.Method] = append(byMethod[entry.Method], entry.Params)
+			used++
 		}
+		if named == 0 {
+			// Parsed, but nothing in it names a method: not a corpus file.
+			report.Skips = append(report.Skips, CorpusSkip{Path: file, Reason: `no entries with a "method" field`})
+			continue
+		}
+		if used == 0 {
+			report.Excluded++
+			continue
+		}
+		report.Files++
+		report.Entries += used
 	}
 
 	if len(order) == 0 {
-		return nil, fmt.Errorf("corpus in %s contained no usable calls after exclusions", dir)
+		return nil, report, fmt.Errorf("corpus in %s contained no usable calls after exclusions (%d of %d files skipped)", dir, len(report.Skips), len(files))
 	}
 	sort.Strings(order)
 
@@ -115,13 +163,14 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 		}
 	}
 
-	return cfg, nil
+	return cfg, report, nil
 }
 
 // readCorpusFile parses one corpus file. A .json file is a JSON array of
-// entries; a .jsonl file is one entry per line.
-func readCorpusFile(path string) ([]corpusEntry, error) {
-	safePath, err := config.SafeReadPath(path)
+// entries; a .jsonl file is one entry per line. root is the operator-supplied
+// corpus directory the path was discovered under.
+func readCorpusFile(root, path string) ([]corpusEntry, error) {
+	safePath, err := config.SafeReadPathUnder(root, path)
 	if err != nil {
 		return nil, err
 	}

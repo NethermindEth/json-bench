@@ -7,21 +7,11 @@ import (
 	"testing"
 )
 
-// writeCorpus chdirs into a temp dir, writes the given files under a "corpus"
-// subdir, and returns the relative dir (SafeReadPath rejects absolute paths).
+// writeCorpus writes the given files under a "corpus" subdir of a temp dir and
+// returns its absolute path.
 func writeCorpus(t *testing.T, files map[string]string) string {
 	t.Helper()
-	dir := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(prev) })
-
-	corpusDir := "corpus"
+	corpusDir := filepath.Join(t.TempDir(), "corpus")
 	if err := os.Mkdir(corpusDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -45,7 +35,7 @@ func TestLoadCorpusConfig(t *testing.T) {
 `,
 	})
 
-	cfg, err := LoadCorpusConfig(dir, 0, 42, "")
+	cfg, _, err := LoadCorpusConfig(dir, 0, 42, "")
 	if err != nil {
 		t.Fatalf("LoadCorpusConfig: %v", err)
 	}
@@ -72,7 +62,7 @@ func TestLoadCorpusConfigRecursesAndReadsJSON(t *testing.T) {
 		t.Fatalf("write nested: %v", err)
 	}
 
-	cfg, err := LoadCorpusConfig(dir, 0, 42, "")
+	cfg, _, err := LoadCorpusConfig(dir, 0, 42, "")
 	if err != nil {
 		t.Fatalf("LoadCorpusConfig: %v", err)
 	}
@@ -98,12 +88,12 @@ func TestLoadCorpusConfigFeeHistoryPinning(t *testing.T) {
 
 	// Without a block override, eth_feeHistory is head-dependent and excluded,
 	// leaving an empty corpus.
-	if _, err := LoadCorpusConfig(dir, 0, 42, ""); err == nil {
+	if _, _, err := LoadCorpusConfig(dir, 0, 42, ""); err == nil {
 		t.Error("expected eth_feeHistory to be excluded without a block override")
 	}
 
 	// With a block override it is pinnable and kept.
-	cfg, err := LoadCorpusConfig(dir, 0, 42, "0x1406f40")
+	cfg, _, err := LoadCorpusConfig(dir, 0, 42, "0x1406f40")
 	if err != nil {
 		t.Fatalf("LoadCorpusConfig with block override: %v", err)
 	}
@@ -119,7 +109,7 @@ func TestLoadCorpusConfigSampling(t *testing.T) {
 	}
 	dir := writeCorpus(t, map[string]string{"eth_getBalance.jsonl": lines})
 
-	cfg, err := LoadCorpusConfig(dir, 3, 42, "")
+	cfg, _, err := LoadCorpusConfig(dir, 3, 42, "")
 	if err != nil {
 		t.Fatalf("LoadCorpusConfig: %v", err)
 	}
@@ -128,7 +118,7 @@ func TestLoadCorpusConfigSampling(t *testing.T) {
 	}
 
 	// Sampling is deterministic for a fixed seed.
-	cfg2, _ := LoadCorpusConfig(dir, 3, 42, "")
+	cfg2, _, _ := LoadCorpusConfig(dir, 3, 42, "")
 	for i, id := range cfg.Methods {
 		a := fmt.Sprintf("%v", cfg.CustomParameters[id])
 		b := fmt.Sprintf("%v", cfg2.CustomParameters[cfg2.Methods[i]])
@@ -140,7 +130,117 @@ func TestLoadCorpusConfigSampling(t *testing.T) {
 
 func TestLoadCorpusConfigAllExcluded(t *testing.T) {
 	dir := writeCorpus(t, map[string]string{"only.jsonl": `{"method":"eth_getProof","params":[]}` + "\n"})
-	if _, err := LoadCorpusConfig(dir, 0, 42, ""); err == nil {
+	if _, _, err := LoadCorpusConfig(dir, 0, 42, ""); err == nil {
 		t.Error("expected error when corpus is empty after exclusions")
+	}
+}
+
+// TestLoadCorpusConfigSkipsNonCorpusFiles pins the behaviour that makes
+// --from-jsonl usable against a real tree: generator inputs living beside the
+// corpus are skipped and reported, not fatal.
+func TestLoadCorpusConfigSkipsNonCorpusFiles(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{
+		"good.jsonl":          `{"method":"eth_call","params":[{"to":"0x1"},"0x10"]}` + "\n",
+		"filter-queries.json": `[[{"fromBlock":0,"toBlock":10,"address":["0x1"]}]]`,
+		"block-numbers.json":  `{"blockNumbers":[1,2,3]}`,
+		"no-method.json":      `[{"fromBlock":"0x1"}]`,
+	})
+
+	cfg, report, err := LoadCorpusConfig(dir, 0, 42, "")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig: %v", err)
+	}
+	if len(cfg.Methods) != 1 {
+		t.Fatalf("expected the one valid call to load, got %v", cfg.Methods)
+	}
+	if report.Files != 1 || report.Entries != 1 {
+		t.Errorf("report = %d files / %d entries, want 1/1", report.Files, report.Entries)
+	}
+	if report.Excluded != 0 {
+		t.Errorf("no file here is excluded-by-policy, got %d", report.Excluded)
+	}
+	if len(report.Skips) != 3 {
+		t.Fatalf("expected 3 skips, got %d: %+v", len(report.Skips), report.Skips)
+	}
+	for _, skip := range report.Skips {
+		if skip.Path == "" || skip.Reason == "" {
+			t.Errorf("skip is missing path or reason: %+v", skip)
+		}
+		if filepath.Base(skip.Path) == "good.jsonl" {
+			t.Error("the valid corpus file must not be skipped")
+		}
+	}
+}
+
+// TestLoadCorpusConfigAbsoluteDir covers the operator passing an absolute
+// --from-jsonl path, which the old path guard rejected outright.
+func TestLoadCorpusConfigAbsoluteDir(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{
+		"c.jsonl": `{"method":"eth_getBalance","params":["0x1","0x10"]}` + "\n",
+	})
+	if !filepath.IsAbs(dir) {
+		t.Fatalf("fixture dir should be absolute, got %q", dir)
+	}
+	cfg, report, err := LoadCorpusConfig(dir, 0, 42, "")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig with an absolute dir: %v", err)
+	}
+	if len(cfg.Methods) != 1 || report.Entries != 1 {
+		t.Errorf("expected one loaded call, got %v (%d entries)", cfg.Methods, report.Entries)
+	}
+}
+
+// TestLoadCorpusConfigAllSkippedReportsSkips keeps a wholly mis-shaped corpus a
+// hard error, and keeps the skips visible in the report.
+func TestLoadCorpusConfigAllSkippedReportsSkips(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{"bad.json": `[[{"fromBlock":0}]]`})
+	_, report, err := LoadCorpusConfig(dir, 0, 42, "")
+	if err == nil {
+		t.Fatal("expected an error when nothing usable loaded")
+	}
+	if report == nil || len(report.Skips) != 1 {
+		t.Fatalf("expected the report to carry the skip, got %+v", report)
+	}
+}
+
+// A file holding only excluded methods (debug_, eth_getProof, head-dependent
+// zero-arg calls) is expected, not a problem, so it is counted apart from skips.
+func TestLoadCorpusConfigExcludedFileIsNotASkip(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{
+		"good.jsonl":   `{"method":"eth_call","params":[{"to":"0x1"},"0x10"]}` + "\n",
+		"traces.jsonl": `{"method":"debug_traceTransaction","params":["0x1"]}` + "\n",
+	})
+	cfg, report, err := LoadCorpusConfig(dir, 0, 42, "")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig: %v", err)
+	}
+	if len(cfg.Methods) != 1 {
+		t.Fatalf("expected only the eth_call to load, got %v", cfg.Methods)
+	}
+	if report.Excluded != 1 {
+		t.Errorf("Excluded = %d, want 1", report.Excluded)
+	}
+	if len(report.Skips) != 0 {
+		t.Errorf("an excluded-methods file must not warn, got %+v", report.Skips)
+	}
+}
+
+// WalkDir does not follow a symlinked root, so a linked corpus directory used to
+// look empty. The root is resolved before walking.
+func TestLoadCorpusConfigSymlinkedDir(t *testing.T) {
+	dir := writeCorpus(t, map[string]string{
+		"c.jsonl": `{"method":"eth_getBalance","params":["0x1","0x10"]}` + "\n",
+	})
+	link := filepath.Join(filepath.Dir(dir), "corpus-link")
+	if err := os.Symlink(dir, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	cfg, report, err := LoadCorpusConfig(link, 0, 42, "")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig through a symlink: %v", err)
+	}
+	if len(cfg.Methods) != 1 || report.Entries != 1 {
+		t.Errorf("expected one loaded call, got %v (%d entries)", cfg.Methods, report.Entries)
 	}
 }

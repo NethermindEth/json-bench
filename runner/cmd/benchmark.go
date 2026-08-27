@@ -70,6 +70,10 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	if cfg.UsesCallsFile() {
+		logger.Infof("Using pre-generated requests from %s: %d distinct RPC methods, which is what the per-method breakdown is keyed on", cfg.CallsFile, len(cfg.CallsFileMethods))
+	}
+
 	cfg.Outputs = &config.Outputs{}
 	if benchmarkPrometheusURL != "" {
 		queryURL := strings.TrimRight(benchmarkPrometheusURL, "/")
@@ -105,6 +109,10 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	k6Cmd, summaryPath, err := generator.GenerateK6(cfg, outputDir)
 	if err != nil {
 		return fmt.Errorf("failed to generate k6 command: %w", err)
+	}
+
+	if err := metrics.CheckPrometheus(cfg); err != nil {
+		logger.WithError(err).Warnf("Prometheus at %s is not reachable; the benchmark will run and metrics will come from k6's summary.json, but no time series will be recorded", benchmarkPrometheusURL)
 	}
 
 	systemCollector, err := metrics.NewSystemCollector(1 * time.Second)

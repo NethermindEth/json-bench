@@ -6,23 +6,15 @@ import (
 	"testing"
 )
 
-// writeTempYAML chdirs into a fresh temp dir and writes a file there, returning
-// the relative name (SafeReadPath rejects absolute paths).
+// writeTempYAML writes a file into a fresh temp dir and returns its absolute
+// path.
 func writeTempYAML(t *testing.T, name, contents string) string {
 	t.Helper()
-	dir := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(prev) })
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	return name
+	return path
 }
 
 func TestLoadComparisonRules_ComparisonBlock(t *testing.T) {
@@ -97,7 +89,7 @@ func TestCorpusPlusRulesCompose(t *testing.T) {
 	dir := writeCorpus(t, map[string]string{
 		"c.jsonl": `{"method":"eth_getBlockByNumber","params":["0x10",false]}` + "\n",
 	})
-	cfg, err := LoadCorpusConfig(dir, 0, 42, "")
+	cfg, _, err := LoadCorpusConfig(dir, 0, 42, "")
 	if err != nil {
 		t.Fatalf("LoadCorpusConfig: %v", err)
 	}

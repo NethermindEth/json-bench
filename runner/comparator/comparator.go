@@ -28,8 +28,11 @@ type ComparisonResult struct {
 	Differences     map[string]interface{} `json:"differences"`
 	SchemaErrors    map[string][]string    `json:"schema_errors,omitempty"`
 	TransportErrors map[string]string      `json:"transport_errors,omitempty"`
-	ErrorClass      map[string]string      `json:"error_class,omitempty"`
-	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+	// TransportErrorClass buckets each transport failure (see the Transport*
+	// constants) so a run lost to rate limiting is legible.
+	TransportErrorClass map[string]string      `json:"transport_error_class,omitempty"`
+	ErrorClass          map[string]string      `json:"error_class,omitempty"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // hasDifferences reports whether the call has any post-filter differences.
@@ -83,6 +86,10 @@ type ComparisonConfig struct {
 	MaxRetries       int `json:"max_retries,omitempty"`
 	RetryBaseDelayMs int `json:"retry_base_delay_ms,omitempty"`
 
+	// RateLimitRPS caps requests per second per client. It overrides the
+	// per-client rate_limit block in clients.yaml; 0 means no override.
+	RateLimitRPS float64 `json:"rate_limit_rps,omitempty"`
+
 	// DiffOnly excludes identical calls from serialized output.
 	// OmitMatchingResponses drops full responses (diffs still carry the
 	// differing values). MaxResponseBytes truncates embedded response bodies.
@@ -97,13 +104,17 @@ type ComparisonConfig struct {
 
 // Comparator handles comparing responses between different Ethereum clients
 type Comparator struct {
-	config    *ComparisonConfig
-	validator *schema.SchemaValidator
-	outputDir string
-	mutex     sync.Mutex
-	results   []ComparisonResult
-	skipped   []skippedCall
-	verbose   bool
+	config     *ComparisonConfig
+	validator  *schema.SchemaValidator
+	outputDir  string
+	transports map[string]*rpcTransport
+	// transportMu guards lazy transport creation; the map is otherwise
+	// prepopulated by NewComparator and only read from the worker goroutines.
+	transportMu sync.Mutex
+	mutex       sync.Mutex
+	results     []ComparisonResult
+	skipped     []skippedCall
+	verbose     bool
 }
 
 // skippedCall records a call omitted because it pins to a block above the
@@ -141,13 +152,36 @@ func NewComparator(cfg *ComparisonConfig) (*Comparator, error) {
 		cfg.TimeoutSeconds = 10 // 10 seconds
 	}
 
-	return &Comparator{
-		config:    cfg,
-		validator: validator,
-		outputDir: cfg.OutputDir,
-		results:   make([]ComparisonResult, 0),
-		verbose:   cfg.Verbose,
-	}, nil
+	c := &Comparator{
+		config:     cfg,
+		validator:  validator,
+		outputDir:  cfg.OutputDir,
+		transports: make(map[string]*rpcTransport, len(cfg.Clients)),
+		results:    make([]ComparisonResult, 0),
+		verbose:    cfg.Verbose,
+	}
+	for _, client := range cfg.Clients {
+		maxAttempts, baseDelay := c.retryParams(client)
+		c.transports[client.Name] = newRPCTransport(cfg, client, maxAttempts, baseDelay)
+	}
+	return c, nil
+}
+
+// transport returns the send path for a client, building one on demand for
+// callers that assembled a Comparator without going through NewComparator.
+func (c *Comparator) transport(client *types.ClientConfig) *rpcTransport {
+	c.transportMu.Lock()
+	defer c.transportMu.Unlock()
+	if t, ok := c.transports[client.Name]; ok {
+		return t
+	}
+	if c.transports == nil {
+		c.transports = make(map[string]*rpcTransport, len(c.config.Clients))
+	}
+	maxAttempts, baseDelay := c.retryParams(client)
+	t := newRPCTransport(c.config, client, maxAttempts, baseDelay)
+	c.transports[client.Name] = t
+	return t
 }
 
 // CompareResponses compares responses from different clients for a specific method and parameters
@@ -155,6 +189,7 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 	responses := make(map[string]interface{})
 	schemaErrors := make(map[string][]string)
 	transportErrors := make(map[string]string)
+	transportErrorClass := make(map[string]string)
 	errorClass := make(map[string]string)
 
 	// Recover the real JSON-RPC method name from the identifier; loaders set
@@ -172,14 +207,14 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 	}
 
 	// Make JSON-RPC calls to all clients. A transport failure for one client is
-	// recorded and the run continues, so a single dead endpoint never discards
-	// an otherwise good comparison.
+	// recorded and the run continues, so one bad endpoint never aborts the run;
+	// this call is then reported as incomplete rather than compared.
 	answered := make([]*types.ClientConfig, 0, len(c.config.Clients))
 	for _, client := range c.config.Clients {
-		maxAttempts, baseDelay := c.retryParams(client)
-		response, err := makeJSONRPCCall(client.URL, rpcMethod, callParams, c.config.TimeoutSeconds, c.verbose, maxAttempts, baseDelay)
+		response, err := c.transport(client).call(rpcMethod, callParams)
 		if err != nil {
 			transportErrors[client.Name] = err.Error()
+			transportErrorClass[client.Name] = classifyTransportError(err)
 			continue
 		}
 
@@ -203,11 +238,13 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 		}
 	}
 
-	// Compare responses between the clients that answered. The reference is the
-	// first answered client (normally config.Clients[0]).
+	// Compare responses only when every client answered, so a response that was
+	// never received is never mistaken for a difference. The reference is
+	// config.Clients[0]; falling back to another client would silently change
+	// what the diff is relative to.
 	differences := make(map[string]interface{})
-	if len(answered) >= 2 {
-		refResponse := responses[answered[0].Name].(map[string]interface{})
+	if len(transportErrors) == 0 && len(answered) >= 2 {
+		refResponse := responses[c.config.Clients[0].Name].(map[string]interface{})
 		ctx := newDiffContext(rpcMethod, c.config.Rules)
 
 		for _, client := range answered[1:] {
@@ -225,14 +262,15 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 
 	// Create comparison result
 	result := &ComparisonResult{
-		Method:          method,
-		Params:          params,
-		Timestamp:       time.Now().Format(time.RFC3339),
-		Responses:       responses,
-		Differences:     differences,
-		SchemaErrors:    schemaErrors,
-		TransportErrors: transportErrors,
-		ErrorClass:      errorClass,
+		Method:              method,
+		Params:              params,
+		Timestamp:           time.Now().Format(time.RFC3339),
+		Responses:           responses,
+		Differences:         differences,
+		SchemaErrors:        schemaErrors,
+		TransportErrors:     transportErrors,
+		TransportErrorClass: transportErrorClass,
+		ErrorClass:          errorClass,
 		Metadata: map[string]interface{}{
 			"clients": c.config.Clients,
 		},
@@ -274,8 +312,7 @@ func (c *Comparator) VerifyNetworkConsistency() error {
 	// Get chainId from all clients
 	chainIDs := make(map[string]string)
 	for _, client := range c.config.Clients {
-		maxAttempts, baseDelay := c.retryParams(client)
-		response, err := makeJSONRPCCall(client.URL, "eth_chainId", []interface{}{}, c.config.TimeoutSeconds, c.verbose, maxAttempts, baseDelay)
+		response, err := c.transport(client).call("eth_chainId", []interface{}{})
 		if err != nil {
 			return fmt.Errorf("failed to get chainId from %s: %w", client.Name, err)
 		}
@@ -423,8 +460,7 @@ func (c *Comparator) lowestHead() (uint64, error) {
 	var lowest uint64
 	first := true
 	for _, client := range c.config.Clients {
-		maxAttempts, baseDelay := c.retryParams(client)
-		resp, err := makeJSONRPCCall(client.URL, "eth_blockNumber", []interface{}{}, c.config.TimeoutSeconds, c.verbose, maxAttempts, baseDelay)
+		resp, err := c.transport(client).call("eth_blockNumber", []interface{}{})
 		if err != nil {
 			return 0, fmt.Errorf("failed to get head from %s: %w", client.Name, err)
 		}
@@ -445,8 +481,43 @@ func (c *Comparator) lowestHead() (uint64, error) {
 	return lowest, nil
 }
 
+// ComparisonResultsSchemaVersion identifies the shape of the results document.
+// Version 1 was a bare top-level array of results.
+const ComparisonResultsSchemaVersion = 2
+
+// ComparisonResultsDocument is the on-disk shape of comparison-results.json: a
+// self-describing wrapper so downstream tooling gets the run's counts and
+// client refs without also reading the provenance sidecar.
+type ComparisonResultsDocument struct {
+	SchemaVersion int                `json:"schema_version"`
+	Name          string             `json:"name,omitempty"`
+	Description   string             `json:"description,omitempty"`
+	GeneratedAt   string             `json:"generated_at"`
+	ClientRefs    []string           `json:"client_refs"`
+	Summary       Summary            `json:"summary"`
+	Results       []ComparisonResult `json:"results"`
+}
+
+// resultsDocument assembles the results document for serialization.
+func (c *Comparator) resultsDocument() ComparisonResultsDocument {
+	clientRefs := make([]string, 0, len(c.config.Clients))
+	for _, client := range c.config.Clients {
+		clientRefs = append(clientRefs, client.Name)
+	}
+	return ComparisonResultsDocument{
+		SchemaVersion: ComparisonResultsSchemaVersion,
+		Name:          c.config.Name,
+		Description:   c.config.Description,
+		GeneratedAt:   time.Now().Format(time.RFC3339),
+		ClientRefs:    clientRefs,
+		Summary:       c.Summarize(),
+		Results:       c.resultsForOutput(),
+	}
+}
+
 // SaveResults saves comparison results to a JSON file, honoring the diff-only
-// and response-trimming output options.
+// and response-trimming output options. Note that Summary always describes the
+// whole run, even when --diff-only drops identical calls from Results.
 func (c *Comparator) SaveResults(filename string) error {
 	// Use the provided filename directly as it should already be a full path
 	outputPath := filename
@@ -458,7 +529,7 @@ func (c *Comparator) SaveResults(filename string) error {
 	}
 
 	// Marshal results to JSON
-	data, err := json.MarshalIndent(c.resultsForOutput(), "", "  ")
+	data, err := json.MarshalIndent(c.resultsDocument(), "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal results: %w", err)
 	}
@@ -500,10 +571,7 @@ func truncateResponses(responses map[string]interface{}, maxBytes int) map[strin
 	for name, resp := range responses {
 		encoded, err := json.Marshal(resp)
 		if err == nil && len(encoded) > maxBytes {
-			out[name] = map[string]interface{}{
-				"_truncated": true,
-				"_bytes":     len(encoded),
-			}
+			out[name] = truncationMarker(resp, len(encoded))
 			continue
 		}
 		out[name] = resp
@@ -511,18 +579,44 @@ func truncateResponses(responses map[string]interface{}, maxBytes int) map[strin
 	return out
 }
 
+// truncationMarker stands in for a response that was too large to embed. Every
+// key is underscore-prefixed so downstream tooling cannot mistake the marker
+// for a response, and an error response keeps its code and message, which is
+// the part worth reading.
+func truncationMarker(resp interface{}, size int) map[string]interface{} {
+	marker := map[string]interface{}{
+		"_truncated": true,
+		"_bytes":     size,
+		"_kind":      "result",
+	}
+	m, ok := resp.(map[string]interface{})
+	if !ok {
+		return marker
+	}
+	e, ok := m["error"].(map[string]interface{})
+	if !ok {
+		return marker
+	}
+	marker["_kind"] = "error"
+	marker["_error"] = map[string]interface{}{"code": e["code"], "message": e["message"]}
+	return marker
+}
+
 // Summary tallies the results by outcome category. Differ counts real result
 // mismatches; DifferEnv counts mismatches attributable to an environment or
 // capability error (see classifyError).
 type Summary struct {
-	Total          int
-	Identical      int
-	Differ         int
-	DifferEnv      int
-	TransportError int
-	SchemaError    int
-	EnvError       map[string]int
-	Skipped        int
+	Total          int            `json:"total"`
+	Identical      int            `json:"identical"`
+	Differ         int            `json:"differ"`
+	DifferEnv      int            `json:"differ_env"`
+	TransportError int            `json:"transport_error"`
+	SchemaError    int            `json:"schema_error"`
+	EnvError       map[string]int `json:"env_error,omitempty"`
+	// RateLimited counts the transport-error calls whose failure was a 429 that
+	// survived the retry budget.
+	RateLimited int `json:"rate_limited"`
+	Skipped     int `json:"skipped"`
 }
 
 // Summarize computes the outcome tally for the completed run.
@@ -530,14 +624,22 @@ func (c *Comparator) Summarize() Summary {
 	s := Summary{Total: len(c.results), EnvError: map[string]int{}, Skipped: len(c.skipped)}
 	for _, r := range c.results {
 		switch {
+		// A call that lost a client is bucketed here first: it was never
+		// compared, so it is neither identical nor differing.
+		case len(r.TransportErrors) > 0:
+			s.TransportError++
+			for _, cls := range r.TransportErrorClass {
+				if cls == TransportRateLimited {
+					s.RateLimited++
+					break
+				}
+			}
 		case r.hasDifferences():
 			if r.isEnvDifference() {
 				s.DifferEnv++
 			} else {
 				s.Differ++
 			}
-		case len(r.TransportErrors) > 0:
-			s.TransportError++
 		case len(r.SchemaErrors) > 0:
 			s.SchemaError++
 		default:
@@ -573,6 +675,17 @@ func (c *Comparator) HasRealDifferences() bool {
 	return false
 }
 
+// HasTransportErrors reports whether any call lost a client to a transport
+// failure, meaning the run did not compare everything it was asked to.
+func (c *Comparator) HasTransportErrors() bool {
+	for _, r := range c.results {
+		if len(r.TransportErrors) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // HasEnvDifferences reports whether any differing call is attributable to an
 // environment/capability error.
 func (c *Comparator) HasEnvDifferences() bool {
@@ -599,6 +712,7 @@ func (c *Comparator) Provenance() map[string]interface{} {
 		"block_override":          c.config.BlockOverride,
 		"rules":                   c.config.Rules,
 		"concurrency":             c.config.Concurrency,
+		"rate_limit_rps":          c.config.RateLimitRPS,
 		"timeout_seconds":         c.config.TimeoutSeconds,
 		"validate_against_schema": c.config.ValidateAgainstSchema,
 		"diff_only":               c.config.DiffOnly,

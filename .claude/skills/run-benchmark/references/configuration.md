@@ -79,7 +79,7 @@ Global flags (before the subcommand):
 |---|---|---|
 | `--config` | (required) | benchmark YAML |
 | `--clients` | — | clients registry YAML |
-| `--prometheus` | `http://localhost:9090` | Prometheus base URL (queries + remote-write root) |
+| `--prometheus` | unset (Prometheus disabled) | Prometheus base URL (queries + remote-write root). Omit it to skip export entirely — metrics then come from k6's `summary.json`. If the URL is set but unreachable, the run still completes and falls back to `summary.json`, warning twice (once before the run, once after). |
 | `--prometheus-rw-path` | `/api/v1/write` | remote-write path appended to `--prometheus` |
 | `--prometheus-rw-user` / `--prometheus-rw-pass` | — | remote-write basic auth |
 | `--html-report` | off | also generate `report.html` (JSON/CSV always produced) |
@@ -97,6 +97,10 @@ Global flags (before the subcommand):
   exports/
     results.json           # full structured result
     method_metrics.csv     # per-method latency/error stats  <- main analysis input
+                           #   Throughput (req/s) is requests over elapsed time (k6's own rate).
+                           #   Columns neither Prometheus nor summary.json can supply read NA,
+                           #   not 0.00: Variance, IQR, MAD, Timeout Rate, Connection Errors.
+                           #   Std Dev and CV are (max-min)/4 estimates, not sample statistics.
     client_comparison.csv  # per-client summary              <- main analysis input
     time_series.csv
     system_metrics.csv
@@ -110,7 +114,9 @@ Global flags (before the subcommand):
 ./benchmark --output <dir> generate-requests --config <bench yaml> --out <dir>/requests.csv
 ```
 
-Prints the CSV path (columns: id, name, method, payload). Reference it from every run's benchmark config via `calls_file`. A run with `calls_file` set uses that file verbatim and skips sampling; keep the `calls` section anyway for name/threshold metadata.
+Prints the CSV path (columns: id, name, method, payload). Reference it from every run's benchmark config via `calls_file`. A run with `calls_file` set uses that file verbatim and skips sampling; keep the `calls` section anyway for threshold metadata.
+
+Which column matters: **`method` (column 3) drives the per-method breakdown.** k6 tags every request with it as `rpc_method`, and that is what `method_metrics.csv` rows are keyed on for a `calls_file` run — so the `Method` column holds real RPC methods, and `name` (column 2) is free to be any label. The file is parsed at startup, so a missing path or a malformed row fails immediately instead of surfacing inside k6 minutes later.
 
 ## Related subcommands
 

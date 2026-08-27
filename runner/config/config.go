@@ -21,6 +21,17 @@ type Config struct {
 	CallsFile       string                `yaml:"calls_file"` // Optional: use file containing RPC calls instead of generating them
 	ResolvedClients []*types.ClientConfig `yaml:"-"`
 	Outputs         *Outputs              `yaml:"-"`
+
+	// CallsFileMethods holds the distinct RPC methods found in CallsFile, in
+	// first-seen order. It is what the per-method breakdown is keyed on for a
+	// calls-file run, since the file's names need not match the declared calls.
+	CallsFileMethods []string `yaml:"-"`
+}
+
+// UsesCallsFile reports whether the run's traffic comes from a pre-generated
+// requests CSV rather than from the declared calls.
+func (c *Config) UsesCallsFile() bool {
+	return c.CallsFile != "" && len(c.CallsFileMethods) > 0
 }
 
 // validateConfig performs validation on the loaded configuration
@@ -49,6 +60,14 @@ func validateConfig(cfg *Config) error {
 				}
 			}
 		}
+	} else {
+		// Read the file now rather than letting k6 discover a bad path minutes
+		// into the run, and record the methods the per-method export keys on.
+		methods, err := LoadCallsFileMethods(cfg.CallsFile)
+		if err != nil {
+			return err
+		}
+		cfg.CallsFileMethods = methods
 	}
 
 	// Validate duration

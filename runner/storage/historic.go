@@ -305,7 +305,7 @@ func (h *HistoricStorage) convertToTimeSeriesMetrics(result *types.BenchmarkResu
 			},
 			types.TimeSeriesMetric{
 				Time: timestamp, RunID: run.ID, Client: clientName, Method: "all",
-				MetricName: "total_requests", Value: float64(clientMetrics.TotalRequests),
+				MetricName: types.MetricTotalReqs, Value: float64(clientMetrics.TotalRequests),
 				Tags: map[string]string{"git_commit": run.GitCommit, "test_name": run.TestName},
 			},
 		)
@@ -363,6 +363,11 @@ func (h *HistoricStorage) convertToTimeSeriesMetrics(result *types.BenchmarkResu
 				types.TimeSeriesMetric{
 					Time: timestamp, RunID: run.ID, Client: clientName, Method: methodName,
 					MetricName: types.MetricThroughput, Value: methodMetrics.Throughput,
+					Tags: map[string]string{"git_commit": run.GitCommit, "test_name": run.TestName},
+				},
+				types.TimeSeriesMetric{
+					Time: timestamp, RunID: run.ID, Client: clientName, Method: methodName,
+					MetricName: types.MetricTotalReqs, Value: float64(methodMetrics.Count),
 					Tags: map[string]string{"git_commit": run.GitCommit, "test_name": run.TestName},
 				},
 			)

@@ -7,27 +7,15 @@ import (
 	"testing"
 )
 
-// writeCompareFixture writes contents to a temp file inside a fresh working
-// directory and returns the relative filename to feed LoadCompareConfig,
-// which rejects absolute paths via config.SafeReadPath.
+// writeCompareFixture writes contents to a temp file and returns its absolute
+// path.
 func writeCompareFixture(t *testing.T, contents string) string {
 	t.Helper()
-	dir := t.TempDir()
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(prev)
-	})
-	name := "compare.yaml"
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "compare.yaml")
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
-	return name
+	return path
 }
 
 func TestLoadCompareConfig_Valid(t *testing.T) {

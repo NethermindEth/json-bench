@@ -160,3 +160,116 @@ func TestApplySummaryFallback_MissingSummaryFile(t *testing.T) {
 		t.Errorf("expected one warn about unreadable summary, got:\n%s", out)
 	}
 }
+
+// The summary path must enumerate and look up the same keys the k6 thresholds
+// were registered under: for a calls-file run that is the rpc_method tag over
+// the file's methods, not the declared call name.
+func TestApplySummaryFallback_CallsFileKeysOnRPCMethod(t *testing.T) {
+	cfg := makeCfg()
+	cfg.Calls = []*config.Call{{Name: "multimethod", Method: "eth_call"}}
+	cfg.CallsFile = "requests.csv"
+	cfg.CallsFileMethods = []string{"eth_call", "eth_getLogs"}
+
+	metrics := make(map[string]k6MetricValue)
+	for _, client := range cfg.ResolvedClients {
+		for _, method := range cfg.CallsFileMethods {
+			base := "{scenario:" + client.Name + ",rpc_method:" + method + "}"
+			metrics["http_req_duration"+base] = k6MetricValue{Avg: 12, Min: 2, Max: 40, Med: 9, P90: 20, P95: 25, P99: 35}
+			metrics["http_reqs"+base] = k6MetricValue{Count: 150, Rate: 15}
+		}
+	}
+	// The declared name carries the zero-count submetric the old code found.
+	for _, client := range cfg.ResolvedClients {
+		metrics["http_req_duration{scenario:"+client.Name+",req_name:multimethod}"] = k6MetricValue{}
+	}
+
+	path := writeSummary(t, t.TempDir(), metrics)
+	clientsMetrics := emptyClientMetrics(cfg)
+	logger, _ := makeLogger()
+	applySummaryFallback(clientsMetrics, cfg, path, logger)
+
+	for _, client := range cfg.ResolvedClients {
+		cm := clientsMetrics[client.Name]
+		if _, ok := cm.Methods["multimethod"]; ok {
+			t.Errorf("%s: the declared call name should not be a method row for a calls-file run", client.Name)
+		}
+		for _, method := range cfg.CallsFileMethods {
+			got, ok := cm.Methods[method]
+			if !ok {
+				t.Fatalf("%s: missing method %s", client.Name, method)
+			}
+			if got.Count != 150 || got.Throughput != 15 {
+				t.Errorf("%s.%s = %+v, want count 150 and throughput 15", client.Name, method, got)
+			}
+		}
+	}
+}
+
+func TestExtractMethodFromSummary_ReadsP75AndP999(t *testing.T) {
+	metrics := map[string]k6MetricValue{
+		"http_req_duration{scenario:geth,req_name:eth_call}": {
+			Avg: 10, Min: 1, Max: 100, Med: 8, P75: 12, P90: 20, P95: 30, P99: 90, P999: 99,
+		},
+		"http_reqs{scenario:geth,req_name:eth_call}": {Count: 10, Rate: 5},
+	}
+	summary := &k6Summary{Metrics: metrics}
+
+	method := extractMethodFromSummary(summary, "req_name", "geth", "eth_call")
+	if method == nil {
+		t.Fatal("expected a method summary")
+	}
+	if method.P75 != 12 || method.P999 != 99 {
+		t.Errorf("P75/P99.9 = %v/%v, want 12/99", method.P75, method.P999)
+	}
+	if method.Throughput != 5 {
+		t.Errorf("throughput = %v, want k6's rate 5", method.Throughput)
+	}
+}
+
+// k6 reports http_req_failed as a Rate metric — passes/fails and a "value"
+// ratio, not the "rate" field a Counter carries. Reading the wrong field made
+// every run look 100% successful.
+func TestExtractMethodFromSummary_FailureRateForms(t *testing.T) {
+	tests := []struct {
+		name       string
+		failed     k6MetricValue
+		wantErrors int64
+		wantRate   float64
+	}{
+		// For http_req_failed a "pass" is an observation of the condition
+		// "the request failed", so passes counts failures. These two shapes are
+		// what k6 actually emitted for an all-200 run and for a run with a 429
+		// on every fourth request; reading fails/(passes+fails) instead would
+		// report the all-200 run as 100% failed.
+		{"passes counts failures", k6MetricValue{Passes: 25, Fails: 75, Value: 0.25}, 25, 25},
+		{"every request succeeded", k6MetricValue{Passes: 0, Fails: 100, Value: 0}, 0, 0},
+		{"every request failed", k6MetricValue{Passes: 100, Fails: 0, Value: 1}, 100, 100},
+		// value is authoritative when present, and passes/fails is the fallback
+		// for a summary that omits it.
+		{"passes and fails without value", k6MetricValue{Passes: 40, Fails: 60}, 40, 40},
+		{"value ratio only", k6MetricValue{Value: 0.5}, 50, 50},
+		{"rate field", k6MetricValue{Rate: 0.1}, 10, 10},
+		{"values map", k6MetricValue{Values: map[string]float64{"value": 0.2}}, 20, 20},
+	}
+	for _, tc := range tests {
+		summary := &k6Summary{Metrics: map[string]k6MetricValue{
+			"http_req_duration{scenario:geth,req_name:eth_call}": {Avg: 10, Min: 1, Max: 20},
+			"http_reqs{scenario:geth,req_name:eth_call}":         {Count: 100, Rate: 10},
+			"http_req_failed{scenario:geth,req_name:eth_call}":   tc.failed,
+		}}
+
+		method := extractMethodFromSummary(summary, "req_name", "geth", "eth_call")
+		if method == nil {
+			t.Fatalf("%s: expected a method summary", tc.name)
+		}
+		if method.ErrorCount != tc.wantErrors {
+			t.Errorf("%s: ErrorCount = %d, want %d", tc.name, method.ErrorCount, tc.wantErrors)
+		}
+		if method.ErrorRate != tc.wantRate {
+			t.Errorf("%s: ErrorRate = %v, want %v", tc.name, method.ErrorRate, tc.wantRate)
+		}
+		if want := 100 - tc.wantRate; method.SuccessRate != want {
+			t.Errorf("%s: SuccessRate = %v, want %v", tc.name, method.SuccessRate, want)
+		}
+	}
+}

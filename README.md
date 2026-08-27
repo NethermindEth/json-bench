@@ -173,7 +173,10 @@ go run ./runner benchmark \
 `--prometheus` is optional and disabled by default. When it is omitted (or
 empty), k6 remote-write is not enabled and per-client metrics are collected from
 k6's `summary.json` instead. Passing an endpoint opts into remote-write and
-post-run PromQL queries.
+post-run PromQL queries. An endpoint that cannot be reached is reported twice —
+once before the run and once when metrics are collected — and the run falls back
+to `summary.json` rather than producing empty exports; do not point
+`--prometheus` at an unused port to disable it, just omit the flag.
 
 `benchmark` always writes `outputs/results.json` and `outputs/results.csv`.
 The HTML report at `outputs/report.html` is opt-in via `--html-report`.
@@ -252,7 +255,10 @@ go run ./runner compare \
 
 These artefacts are always produced:
 
-- `<output>/comparison-results.json`
+- `<output>/comparison-results.json` — a self-describing document:
+  `{schema_version, name, description, generated_at, client_refs, summary,
+  results}`. (Before `schema_version: 2` this file was a bare array of
+  results, which is now the `results` field.)
 - `<output>/comparison-report.html`
 - `<output>/comparison-provenance.json` — the effective config (client refs,
   active rules, block override, output/retry settings, sample counts) so a
@@ -318,10 +324,18 @@ Instead of `--config`, point `--from-jsonl <dir>` at a corpus directory. It
 recurses and reads both line-delimited `*.jsonl` files and `*.json` files
 holding a JSON array of `{method, params}` objects. `--sample N` keeps at
 most N calls per method (deterministic; control the seed with
-`--sample-seed`). Head-dependent and unstorable methods (`eth_getProof`,
-`eth_gasPrice`, `eth_syncing`, `eth_blockNumber`, `eth_maxPriorityFeePerGas`,
-the `debug_` namespace) are excluded; `eth_feeHistory` is kept only when a
-block override pins its `newestBlock`.
+`--sample-seed`). The directory may be anywhere on disk — an absolute path is
+fine. Head-dependent and unstorable methods (`eth_getProof`, `eth_gasPrice`,
+`eth_syncing`, `eth_blockNumber`, `eth_maxPriorityFeePerGas`, the `debug_`
+namespace) are excluded; `eth_feeHistory` is kept only when a block override
+pins its `newestBlock`.
+
+A corpus tree usually holds files that are not corpora — generator inputs,
+benchmark scenarios. Those are skipped with a warning naming each file and its
+reason, and the run continues; the load ends with a line stating how many calls
+came from how many files, how many files held only excluded methods, and how
+many were skipped. The load fails only when nothing usable was found at all, so
+check the warnings when a corpus you expect to work comes up short.
 
 #### Smaller reports and CI gating
 
@@ -330,22 +344,35 @@ block override pins its `newestBlock`.
   to retain them or `--omit-matching-responses` to drop them entirely.
   `--max-response-bytes N` sets an explicit cap.
 - The run prints a category summary: identical / differ (real) / differ
-  (env/expected) / transport-error / schema-error / skipped, plus per-class
-  environment/capability error counts.
+  (env/expected) / transport-error (of which rate-limited) / schema-error /
+  skipped, plus per-class environment/capability error counts. A call that lost
+  any client to a transport error is counted only as transport-error — it was
+  never compared, so it is neither identical nor differing.
 - `--fail-on-diff` exits non-zero on **real** differences only (environment/
   capability differences are excluded by default); add `--fail-on-env-diff`
-  for strict mode that also fails on those.
+  for strict mode that also fails on those, and
+  `--fail-on-transport-error` so a run decimated by throttling cannot pass
+  silently.
 - `--skip-above-head` queries each client's head and skips calls pinned to a
   higher block, so a less-synced node does not produce false differences.
 
 #### Robustness against throttling nodes
 
-Transport errors and 5xx responses are retried with exponential backoff.
-`--max-retries` sets the attempt budget (falls back to a client's
-`max_retries` in `clients.yaml`, or 5 if unset) and `--retry-base-delay` the
-base backoff. A call that still fails is recorded per-call and the run
+Transport errors, 5xx and `429 Too Many Requests` are retried with jittered
+exponential backoff, honouring a `Retry-After` header when the server sends one
+(capped at 30s). `--max-retries` sets the attempt budget (falls back to a
+client's `max_retries` in `clients.yaml`, or 5 if unset) and
+`--retry-base-delay` the base backoff. A call that still fails is recorded
+per-call, classified (`rate_limited`, `timeout`, `other`), and the run
 continues, so a single dead endpoint never discards an otherwise good run.
-Keep `--concurrency` low (≤4) against nodes that throttle connection bursts.
+
+Retries alone do not absorb a *sustained* rate limit. `--rate-limit <rps>` caps
+requests per second **per client**, so a throttled reference endpoint does not
+hold back a fast local node; fractional rates are allowed
+(`--rate-limit 2.4`). Without the flag, a client's own `rate_limit`
+(`requests_per_second`, `burst`) from `clients.yaml` is enforced. Prefer this
+over lowering `--concurrency`: concurrency bounds calls in flight, not the rate,
+and it is shared across clients.
 
 ### OpenRPC-Driven Comparison
 
