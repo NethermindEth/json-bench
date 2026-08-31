@@ -1,0 +1,2 @@
+{"method":"eth_call","params":[{"data":"0xb9a8effa","to":"0xbA1333333333a1BA1108E8412f11850A5C319bA9"},"latest"]}
+{"method":"eth_call","params":[{"data":"0xd2c725e0","to":"0xbA1333333333a1BA1108E8412f11850A5C319bA9"},"latest"]}

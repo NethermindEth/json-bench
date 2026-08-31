@@ -1,0 +1,192 @@
+test_name: "eth_call across curated Gnosis contracts"
+description: "Exercises every Gnosis fixture under rpc-calls/contracts/ with equal weight. The clients listed here must point at Gnosis Chain (chain_id 100) endpoints — run against mainnet nodes every call returns empty or reverts. Companion to ethcall-contracts.yaml."
+clients:
+  - geth
+  - nethermind
+  - reth
+  - erigon
+  - besu
+duration: "2m"
+rps: 100
+vus: 20
+calls:
+  - name: "aave-v3-aeure"
+    file: "./rpc-calls/contracts/aave-v3-aeure-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "aave-v3-data-provider"
+    file: "./rpc-calls/contracts/aave-v3-data-provider-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "aave-v3-oracle"
+    file: "./rpc-calls/contracts/aave-v3-oracle-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "aave-v3-pool"
+    file: "./rpc-calls/contracts/aave-v3-pool-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "agave-lending-pool"
+    file: "./rpc-calls/contracts/agave-lending-pool-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "amb-home"
+    file: "./rpc-calls/contracts/amb-home-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "balancer-composable-stable"
+    file: "./rpc-calls/contracts/balancer-composable-stable-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "balancer-v2-vault"
+    file: "./rpc-calls/contracts/balancer-v2-vault-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "balancer-v3-vault"
+    file: "./rpc-calls/contracts/balancer-v3-vault-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-btc-usd"
+    file: "./rpc-calls/contracts/chainlink-btc-usd-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-dai-usd"
+    file: "./rpc-calls/contracts/chainlink-dai-usd-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-eth-usd"
+    file: "./rpc-calls/contracts/chainlink-eth-usd-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-gno-usd"
+    file: "./rpc-calls/contracts/chainlink-gno-usd-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "chainlink-usdc-usd"
+    file: "./rpc-calls/contracts/chainlink-usdc-usd-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "circles-v2-hub"
+    file: "./rpc-calls/contracts/circles-v2-hub-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "cow"
+    file: "./rpc-calls/contracts/cow-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "curve-3pool"
+    file: "./rpc-calls/contracts/curve-3pool-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "entrypoint-v07"
+    file: "./rpc-calls/contracts/entrypoint-v07-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "eure"
+    file: "./rpc-calls/contracts/eure-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "gbc-deposit"
+    file: "./rpc-calls/contracts/gbc-deposit-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "gno"
+    file: "./rpc-calls/contracts/gno-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "gpv2-settlement"
+    file: "./rpc-calls/contracts/gpv2-settlement-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "gyroscope-eclp-wsteth-weth"
+    file: "./rpc-calls/contracts/gyroscope-eclp-wsteth-weth-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "honeyswap-wxdai-gno"
+    file: "./rpc-calls/contracts/honeyswap-wxdai-gno-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "honeyswap-wxdai-weth"
+    file: "./rpc-calls/contracts/honeyswap-wxdai-weth-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "hopr-channels"
+    file: "./rpc-calls/contracts/hopr-channels-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "hopr"
+    file: "./rpc-calls/contracts/hopr-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "link"
+    file: "./rpc-calls/contracts/link-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "multicall3"
+    file: "./rpc-calls/contracts/multicall3-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "olas"
+    file: "./rpc-calls/contracts/olas-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "omnibridge-home-mediator"
+    file: "./rpc-calls/contracts/omnibridge-home-mediator-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "poap"
+    file: "./rpc-calls/contracts/poap-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "safe-proxy"
+    file: "./rpc-calls/contracts/safe-proxy-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "sdai"
+    file: "./rpc-calls/contracts/sdai-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "sushi-wxdai-weth"
+    file: "./rpc-calls/contracts/sushi-wxdai-weth-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uniswap-v3-gno-wxdai-0-3"
+    file: "./rpc-calls/contracts/uniswap-v3-gno-wxdai-0-3-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "uniswap-v3-wxdai-weth-0-05"
+    file: "./rpc-calls/contracts/uniswap-v3-wxdai-weth-0-05-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "usdc-bridged"
+    file: "./rpc-calls/contracts/usdc-bridged-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "usdce"
+    file: "./rpc-calls/contracts/usdce-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "usdt"
+    file: "./rpc-calls/contracts/usdt-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "wbtc"
+    file: "./rpc-calls/contracts/wbtc-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "weth"
+    file: "./rpc-calls/contracts/weth-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "wsteth"
+    file: "./rpc-calls/contracts/wsteth-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "wxdai"
+    file: "./rpc-calls/contracts/wxdai-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "xdai-bridge-home"
+    file: "./rpc-calls/contracts/xdai-bridge-home-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 1

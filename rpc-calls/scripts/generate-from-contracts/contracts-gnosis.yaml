@@ -1,0 +1,750 @@
+# Curated Gnosis Chain (chain_id 100) contracts and the view/pure calls we
+# synthesize for them. Same schema as contracts.yaml — see that file's header
+# for defaults and arg-typing rules.
+#
+# ABIs come from Gnosis Blockscout (keyless):
+#   bash rpc-calls/scripts/generate-from-contracts/init.sh \
+#     --config rpc-calls/scripts/generate-from-contracts/contracts-gnosis.yaml
+#
+# Every address, method and argument here was replayed against a Gnosis archive
+# node and returns a non-error, non-empty result. Arguments that name an account
+# (token holders, Aave suppliers, Safe owners, Circles avatars, Chainlink round
+# ids, Balancer pool ids, HOPR channel ids) were taken from on-chain state so the
+# calls touch real storage rather than empty slots.
+
+arg_registry:
+  addresses: []
+  uints: []
+
+contracts:
+  # ─── ERC-20 ──────────────────────────────────────────────────────────────
+  # Most Gnosis ERC-20s are Omnibridge-minted PermittableToken proxies; init.sh
+  # resolves the implementation so the ABI matches the executable code.
+  - name: WXDAI
+    address: "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xaf204776c7245bF4147c2612BF6e5972Ee483701"]
+      - method: balanceOf
+        args: ["0x7f90122BF0700F9E7e1F688fe926940E8839F353"]
+      - method: allowance
+        args:
+          - "0xaf204776c7245bF4147c2612BF6e5972Ee483701"
+          - "0x7f90122BF0700F9E7e1F688fe926940E8839F353"
+
+  - name: GNO
+    address: "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: bridgeContract }
+      - { method: DOMAIN_SEPARATOR }
+      - { method: getTokenInterfacesVersion }
+      - method: balanceOf
+        args: ["0x458cD345B4C05e8DF39d0A07220feb4Ec19F5e6f"]
+      - method: balanceOf
+        args: ["0x0B98057eA310F4d31F2a452B414647007d1645d9"]
+      - method: allowance
+        args:
+          - "0x458cD345B4C05e8DF39d0A07220feb4Ec19F5e6f"
+          - "0xBA12222222228d8Ba445958a75a0704d566BF2C8"
+
+  - name: USDC
+    slug: usdc-bridged
+    address: "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: bridgeContract }
+      - method: balanceOf
+        args: ["0x0392A2F5Ac47388945D8c84212469F545fAE52B2"]
+      - method: balanceOf
+        args: ["0x7f90122BF0700F9E7e1F688fe926940E8839F353"]
+
+  - name: USDCe
+    address: "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0"
+    chain_id: 100
+    category: erc20
+    # Circle's FiatTokenV2_2 behind a FiatTokenProxy, same lineage as mainnet USDC.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: currency }
+      - { method: masterMinter }
+      - { method: blacklister }
+      - { method: paused }
+      - method: balanceOf
+        args: ["0x509Ad7278A2F6530Bc24590C83E93fAF8fd46E99"]
+      - method: isBlacklisted
+        args: ["0x509Ad7278A2F6530Bc24590C83E93fAF8fd46E99"]
+
+  - name: USDT
+    address: "0x4ECaBa5870353805a9F068101A40E0f32ed605C6"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: bridgeContract }
+      - method: balanceOf
+        args: ["0x2CfF890f0378a11913B6129B2E97417a2c302680"]
+      - method: balanceOf
+        args: ["0x7f90122BF0700F9E7e1F688fe926940E8839F353"]
+
+  - name: WETH
+    address: "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: DOMAIN_SEPARATOR }
+      - method: balanceOf
+        args: ["0xD692Fd2D0b2Fbd2e52CFa5B5b9424bC981C30696"]
+      - method: balanceOf
+        args: ["0x8dD4Df4CE580b9644437F3375e54f1aB09808228"]
+
+  - name: WBTC
+    address: "0x8e5bBbb09Ed1ebdE8674Cda39A0c169401db4252"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0x889492FD3D11792d6802A4995A9907379Fcf9953"]
+
+  - name: wstETH
+    address: "0x6C76971f98945AE98dD7d4DFcA8711ebea946eA6"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: bridgeContract }
+      - method: balanceOf
+        args: ["0x23e4E76D01B2002BE436CE8d6044b0aA2f68B68a"]
+      - method: balanceOf
+        args: ["0x8dD4Df4CE580b9644437F3375e54f1aB09808228"]
+
+  - name: EURe
+    address: "0xcB444e90D8198415266c6a2724b7900fb12FC56E"
+    chain_id: 100
+    category: erc20
+    # Monerium EUR e-money — a euro stablecoin with no mainnet equivalent in the
+    # curated corpus, and one of the busiest tokens on Gnosis.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: ticker }
+      - { method: getController }
+      - method: balanceOf
+        args: ["0xEdBC7449a9b594CA4E053D9737EC5Dc4CbCcBfb2"]
+      - method: balanceOf
+        args: ["0xFBc6180cCac465E1aa6060C75dd904274ae338c4"]
+
+  - name: COW
+    address: "0x177127622c4A00F3d409B75571e12cB3c8973d3c"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0x3d610e917130f9D036e85A030596807f57e11093"]
+
+  - name: LINK
+    address: "0xE2e73A1c69ecF83F464EFCE6A5be353a37cA09b2"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0x1FCc3B22955e76Ca48bF025f1A6993685975Bb9e"]
+
+  - name: OLAS
+    address: "0xcE11e14225575945b8E6Dc0D4F2dD4C570f79d9f"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0xBA12222222228d8Ba445958a75a0704d566BF2C8"]
+
+  - name: HOPR
+    address: "0xD057604A14982FE8D88c5fC25Aac3267eA142a08"
+    chain_id: 100
+    category: erc20
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - method: balanceOf
+        args: ["0x097707143e01318734535676cfe2e5cF8b656ae8"]
+
+  # ─── ERC-4626 ────────────────────────────────────────────────────────────
+  - name: sDAI
+    address: "0xaf204776c7245bF4147c2612BF6e5972Ee483701"
+    chain_id: 100
+    category: erc4626
+    # Savings xDAI. No mainnet analogue in the corpus; every preview/convert call
+    # reads the accrued-yield accumulator.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: totalAssets }
+      - { method: asset }
+      - method: convertToAssets
+        args: ["1000000000000000000"]
+      - method: convertToShares
+        args: ["1000000000000000000"]
+      - method: previewRedeem
+        args: ["1000000000000000000"]
+      - method: maxWithdraw
+        args: ["0x7a5c3860a77a8DC1b225BD46d0fb2ac1C6D191BC"]
+      - method: balanceOf
+        args: ["0x7a5c3860a77a8DC1b225BD46d0fb2ac1C6D191BC"]
+
+  # ─── Lending ─────────────────────────────────────────────────────────────
+  - name: Aave v3 Pool
+    address: "0xb50201558B00496A145fE76f7424749556E326D8"
+    chain_id: 100
+    category: aave_v3
+    calls:
+      - { method: getReservesList }
+      - { method: getReservesCount }
+      - { method: ADDRESSES_PROVIDER }
+      - { method: FLASHLOAN_PREMIUM_TOTAL }
+      - method: getReserveData
+        args: ["0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+      - method: getReserveData
+        args: ["0xcB444e90D8198415266c6a2724b7900fb12FC56E"]
+      - method: getConfiguration
+        args: ["0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+      - method: getReserveNormalizedIncome
+        args: ["0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+      - method: getReserveNormalizedVariableDebt
+        args: ["0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+      - method: getUserAccountData
+        args: ["0x9F40cA84a70685d2C48003b9DEc27B3D98ACe348"]
+      - method: getUserConfiguration
+        args: ["0x9F40cA84a70685d2C48003b9DEc27B3D98ACe348"]
+
+  - name: Aave v3 Data Provider
+    address: "0xf1F5aCB596568895393Cb5E4d0452D6592a2fa70"
+    chain_id: 100
+    category: aave_v3
+    calls:
+      - { method: getAllReservesTokens }
+      - { method: getAllATokens }
+      - { method: POOL }
+      - method: getReserveData
+        args: ["0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+      - method: getReserveTokensAddresses
+        args: ["0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+      - method: getUserReserveData
+        args:
+          - "0xcB444e90D8198415266c6a2724b7900fb12FC56E"
+          - "0x9F40cA84a70685d2C48003b9DEc27B3D98ACe348"
+
+  - name: Aave v3 Oracle
+    address: "0xeb0a051be10228213BAEb449db63719d6742F7c4"
+    chain_id: 100
+    category: aave_v3
+    calls:
+      - { method: BASE_CURRENCY }
+      - { method: BASE_CURRENCY_UNIT }
+      - method: getAssetPrice
+        args: ["0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb"]
+      - method: getAssetPrice
+        args: ["0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1"]
+      - method: getSourceOfAsset
+        args: ["0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb"]
+
+  - name: Aave v3 aEURe
+    address: "0xEdBC7449a9b594CA4E053D9737EC5Dc4CbCcBfb2"
+    chain_id: 100
+    category: aave_v3
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: decimals }
+      - { method: totalSupply }
+      - { method: scaledTotalSupply }
+      - { method: UNDERLYING_ASSET_ADDRESS }
+      - method: balanceOf
+        args: ["0x9F40cA84a70685d2C48003b9DEc27B3D98ACe348"]
+      - method: scaledBalanceOf
+        args: ["0x9F40cA84a70685d2C48003b9DEc27B3D98ACe348"]
+
+  - name: Agave Lending Pool
+    address: "0x5E15d5E33d318dCEd84Bfe3F4EACe07909bE6d9c"
+    chain_id: 100
+    category: aave_v2
+    # Aave v2 fork native to Gnosis.
+    calls:
+      - { method: getReservesList }
+      - { method: getAddressesProvider }
+      - { method: paused }
+      - method: getReserveData
+        args: ["0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+      - method: getUserAccountData
+        args: ["0x9F40cA84a70685d2C48003b9DEc27B3D98ACe348"]
+
+  # ─── Balancer ────────────────────────────────────────────────────────────
+  - name: Balancer v2 Vault
+    address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8"
+    chain_id: 100
+    category: balancer
+    # Pool ids are the busiest Gnosis pools by Swap-event count.
+    calls:
+      - { method: getAuthorizer }
+      - { method: WETH }
+      - { method: getProtocolFeesCollector }
+      - { method: getDomainSeparator }
+      - method: getPoolTokens
+        args: ["0x8dd4df4ce580b9644437f3375e54f1ab0980822800020000000000000000009c"]
+      - method: getPoolTokens
+        args: ["0x7644fa5d0ea14fcf3e813fdf93ca9544f8567655000000000000000000000066"]
+      - method: getPoolTokens
+        args: ["0x4d7adc5e362a97b5ba1b02bc0447249ac81e76ad00010000000000000000003e"]
+      - method: getPool
+        args: ["0x8dd4df4ce580b9644437f3375e54f1ab0980822800020000000000000000009c"]
+      - method: getPool
+        args: ["0x8189c4c96826d016a99986394103dfa9ae41e7ee0002000000000000000000aa"]
+
+  - name: Balancer v3 Vault
+    address: "0xbA1333333333a1BA1108E8412f11850A5C319bA9"
+    chain_id: 100
+    category: balancer
+    calls:
+      - { method: getVaultExtension }
+      - { method: reentrancyGuardEntered }
+
+  - name: Gyroscope ECLP wstETH WETH
+    slug: gyroscope-eclp-wsteth-weth
+    address: "0x8dD4Df4CE580b9644437F3375e54f1aB09808228"
+    chain_id: 100
+    category: balancer
+    # Busiest Balancer pool on Gnosis; the ECLP maths make getRate/getPrice the
+    # most compute-heavy eth_call in this corpus.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: getPoolId }
+      - { method: getRate }
+      - { method: getPrice }
+      - { method: getInvariant }
+      - { method: getECLPParams }
+      - { method: getTokenRates }
+      - { method: getActualSupply }
+      - { method: getInvariantDivActualSupply }
+      - { method: getSwapFeePercentage }
+      - { method: totalSupply }
+
+  - name: Balancer Composable Stable
+    address: "0x7644Fa5d0ea14fCf3E813fdf93Ca9544f8567655"
+    chain_id: 100
+    category: balancer
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: getPoolId }
+      - { method: getRate }
+      - { method: getActualSupply }
+      - { method: getScalingFactors }
+      - { method: getRateProviders }
+      - { method: getAmplificationParameter }
+      - { method: getBptIndex }
+      - { method: getSwapFeePercentage }
+      - { method: totalSupply }
+
+  # ─── Curve ───────────────────────────────────────────────────────────────
+  - name: Curve 3pool
+    address: "0x7f90122BF0700F9E7e1F688fe926940E8839F353"
+    chain_id: 100
+    category: curve
+    # WXDAI / USDC / USDT.
+    calls:
+      - { method: get_virtual_price }
+      - { method: A }
+      - { method: A_precise }
+      - { method: fee }
+      - { method: admin_fee }
+      - { method: lp_token }
+      - method: coins
+        args: [0]
+      - method: coins
+        args: [1]
+      - method: coins
+        args: [2]
+      - method: balances
+        args: [0]
+      - method: balances
+        args: [1]
+      - method: balances
+        args: [2]
+      - method: get_dy
+        args: [0, 1, "1000000000000000000"]
+      - method: get_dy
+        args: [1, 2, "1000000"]
+
+  # ─── Uniswap-v2-style pairs ──────────────────────────────────────────────
+  - name: Honeyswap WXDAI GNO
+    address: "0x321704900D52F44180068cAA73778d5cD60695A6"
+    chain_id: 100
+    category: uniswap_v2_pair
+    calls:
+      - { method: getReserves }
+      - { method: token0 }
+      - { method: token1 }
+      - { method: totalSupply }
+      - { method: price0CumulativeLast }
+      - { method: price1CumulativeLast }
+      - { method: kLast }
+      - { method: factory }
+
+  - name: Honeyswap WXDAI WETH
+    address: "0x7Bea4aF5D425F2d4485bDaD1859C88617dF31A67"
+    chain_id: 100
+    category: uniswap_v2_pair
+    calls:
+      - { method: getReserves }
+      - { method: token0 }
+      - { method: token1 }
+      - { method: totalSupply }
+      - { method: price0CumulativeLast }
+      - { method: price1CumulativeLast }
+      - { method: kLast }
+
+  - name: Sushi WXDAI WETH
+    address: "0x8c0C36c85192204c8d782F763fF5a30f5bA0192F"
+    chain_id: 100
+    category: uniswap_v2_pair
+    calls:
+      - { method: getReserves }
+      - { method: token0 }
+      - { method: token1 }
+      - { method: totalSupply }
+      - { method: price0CumulativeLast }
+      - { method: price1CumulativeLast }
+      - { method: kLast }
+
+  # ─── Uniswap v3 pools ────────────────────────────────────────────────────
+  - name: Uniswap v3 WXDAI WETH 0.05
+    slug: uniswap-v3-wxdai-weth-0-05
+    address: "0x4a562E482e9e6B140b322cA50Cc4D8535cdF85C9"
+    chain_id: 100
+    category: uniswap_v3_pool
+    calls:
+      - { method: slot0 }
+      - { method: liquidity }
+      - { method: token0 }
+      - { method: token1 }
+      - { method: fee }
+      - { method: tickSpacing }
+      - { method: feeGrowthGlobal0X128 }
+      - { method: feeGrowthGlobal1X128 }
+      - { method: protocolFees }
+      - method: observations
+        args: [0]
+
+  - name: Uniswap v3 GNO WXDAI 0.3
+    slug: uniswap-v3-gno-wxdai-0-3
+    address: "0xb689D4398c9BBdcFB85292D68ae3C96790569A14"
+    chain_id: 100
+    category: uniswap_v3_pool
+    calls:
+      - { method: slot0 }
+      - { method: liquidity }
+      - { method: token0 }
+      - { method: token1 }
+      - { method: fee }
+      - { method: tickSpacing }
+      - { method: feeGrowthGlobal0X128 }
+      - { method: feeGrowthGlobal1X128 }
+      - method: observations
+        args: [0]
+
+  # ─── Chainlink feeds ─────────────────────────────────────────────────────
+  # getRoundData ids are phase-encoded (phaseId << 64 | aggregatorRoundId) and
+  # were taken from each proxy's latestRound(), so they stay valid indefinitely.
+  - name: Chainlink GNO USD
+    address: "0x22441d81416430A54336aB28765abd31a792Ad37"
+    chain_id: 100
+    category: chainlink_aggregator
+    calls:
+      - { method: decimals }
+      - { method: description }
+      - { method: latestAnswer }
+      - { method: latestRound }
+      - { method: latestRoundData }
+      - { method: aggregator }
+      - { method: phaseId }
+      - method: getRoundData
+        args: ["0x30000000000000400"]
+
+  - name: Chainlink ETH USD
+    address: "0xa767f745331D267c7751297D982b050c93985627"
+    chain_id: 100
+    category: chainlink_aggregator
+    calls:
+      - { method: decimals }
+      - { method: description }
+      - { method: latestAnswer }
+      - { method: latestRound }
+      - { method: latestRoundData }
+      - method: getRoundData
+        args: ["0x30000000000000300"]
+
+  - name: Chainlink DAI USD
+    address: "0x678df3415fc31947dA4324eC63212874be5a82f8"
+    chain_id: 100
+    category: chainlink_aggregator
+    calls:
+      - { method: decimals }
+      - { method: description }
+      - { method: latestAnswer }
+      - { method: latestRoundData }
+      - method: getRoundData
+        args: ["0x30000000000000020"]
+
+  - name: Chainlink BTC USD
+    address: "0x6C1d7e76EF7304a40e8456ce883BC56d3dEA3F7d"
+    chain_id: 100
+    category: chainlink_aggregator
+    calls:
+      - { method: decimals }
+      - { method: description }
+      - { method: latestAnswer }
+      - { method: latestRoundData }
+      - method: getRoundData
+        args: ["0x30000000000000200"]
+
+  - name: Chainlink USDC USD
+    address: "0x26C31ac71010aF62E6B486D1132E266D6298857D"
+    chain_id: 100
+    category: chainlink_aggregator
+    calls:
+      - { method: decimals }
+      - { method: description }
+      - { method: latestAnswer }
+      - { method: latestRoundData }
+      - method: getRoundData
+        args: ["0x40000000000000020"]
+
+  # ─── Infra ───────────────────────────────────────────────────────────────
+  - name: Multicall3
+    address: "0xcA11bde05977b3631167028862bE2a173976CA11"
+    chain_id: 100
+    category: infra
+    calls:
+      - { method: getBlockNumber }
+      - { method: getCurrentBlockTimestamp }
+      - { method: getCurrentBlockCoinbase }
+      - { method: getCurrentBlockDifficulty }
+      - { method: getCurrentBlockGasLimit }
+      - { method: getChainId }
+      - { method: getBasefee }
+      - { method: getLastBlockHash }
+      - method: getEthBalance
+        args: ["0x4cd934beae89200b3e5f16783897c9424e25f3df"]
+
+  - name: EntryPoint v0.7
+    slug: entrypoint-v07
+    address: "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+    chain_id: 100
+    category: erc4337
+    # ERC-4337 is the single busiest log source on Gnosis; the mainnet corpus has
+    # no account-abstraction coverage at all.
+    calls:
+      - method: balanceOf
+        args: ["0x777777777777AeC03fd955926DbF81597e66834C"]
+      - method: getDepositInfo
+        args: ["0x777777777777AeC03fd955926DbF81597e66834C"]
+      - method: getNonce
+        args: ["0xdc0DEa7A62B02cE24CC8Ce8DEad861614D15C3c1", 0]
+
+  - name: Safe Proxy
+    address: "0xdc0DEa7A62B02cE24CC8Ce8DEad861614D15C3c1"
+    chain_id: 100
+    category: safe
+    # SafeL2 behind a SafeProxy — Safe accounts are the dominant contract-wallet
+    # shape on Gnosis.
+    calls:
+      - { method: getOwners }
+      - { method: getThreshold }
+      - { method: nonce }
+      - { method: VERSION }
+      - { method: domainSeparator }
+      - { method: getChainId }
+      - method: isOwner
+        args: ["0x164B4c85EF457B9b60eDa1AEf2E22F0a00BdB11F"]
+      - method: getStorageAt
+        args: [3, 1]
+
+  # ─── Gnosis-specific core contracts ──────────────────────────────────────
+  - name: GBC Deposit
+    address: "0x0B98057eA310F4d31F2a452B414647007d1645d9"
+    chain_id: 100
+    category: gnosis_core
+    # Gnosis Beacon Chain deposit contract — GNO-denominated, unlike mainnet's.
+    calls:
+      - { method: get_deposit_root }
+      - { method: get_deposit_count }
+      - { method: stake_token }
+      - { method: paused }
+
+  - name: AMB Home
+    address: "0x75Df5AF045d91108662D8080fD1FEFAd6aA0bb59"
+    chain_id: 100
+    category: gnosis_core
+    calls:
+      - { method: getBridgeMode }
+      - { method: getBridgeInterfacesVersion }
+      - { method: sourceChainId }
+      - { method: destinationChainId }
+      - { method: requiredSignatures }
+      - { method: requiredBlockConfirmations }
+      - { method: validatorContract }
+      - { method: maxGasPerTx }
+      - { method: deployedAtBlock }
+
+  - name: Omnibridge Home Mediator
+    address: "0xf6A78083ca3e2a662D6dd1703c939c8aCE2e268d"
+    chain_id: 100
+    category: gnosis_core
+    calls:
+      - { method: bridgeContract }
+      - { method: mediatorContractOnOtherSide }
+      - { method: tokenFactory }
+      - { method: gasLimitManager }
+      - { method: forwardingRulesManager }
+      - { method: getBridgeMode }
+      - { method: getCurrentDay }
+
+  - name: xDai Bridge Home
+    address: "0x7301CFA0e1756B71869E93d4e4Dca5c7d0eb0AA6"
+    chain_id: 100
+    category: gnosis_core
+    # The xDAI <-> DAI native-asset bridge; totalBurntCoins tracks native supply.
+    calls:
+      - { method: totalBurntCoins }
+      - { method: dailyLimit }
+      - { method: maxPerTx }
+      - { method: minPerTx }
+      - { method: executionDailyLimit }
+      - { method: executionMaxPerTx }
+      - { method: maxAvailablePerTx }
+      - { method: getCurrentDay }
+      - { method: getHomeFee }
+      - { method: getForeignFee }
+      - { method: blockRewardContract }
+      - { method: validatorContract }
+
+  - name: GPv2 Settlement
+    address: "0x9008D19f58AAbD9eD0D60971565AA8510560ab41"
+    chain_id: 100
+    category: cow
+    calls:
+      - { method: domainSeparator }
+      - { method: authenticator }
+      - { method: vault }
+      - { method: vaultRelayer }
+
+  - name: Circles v2 Hub
+    address: "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8"
+    chain_id: 100
+    category: circles
+    # Circles is Gnosis-only and one of the chain's heaviest ERC-1155 users.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: inflationDayZero }
+      - { method: invitationOnlyTime }
+      - method: isHuman
+        args: ["0x00F75383391de4d08f487e479EAdE905b9CD3C15"]
+      - method: avatars
+        args: ["0x00F75383391de4d08f487e479EAdE905b9CD3C15"]
+      - method: balanceOf
+        args:
+          - "0x00F75383391de4d08f487e479EAdE905b9CD3C15"
+          - "0x00F75383391de4d08f487e479EAdE905b9CD3C15"
+      - method: isTrusted
+        args:
+          - "0x00F75383391de4d08f487e479EAdE905b9CD3C15"
+          - "0x017D16F1AF85034D8d17Ec018c58EeAf1f9cC75f"
+
+  - name: HOPR Channels
+    address: "0x693BAc5ce61c720dDC68533991Ceb41199d8f8ae"
+    chain_id: 100
+    category: hopr
+    calls:
+      - { method: VERSION }
+      - { method: token }
+      - { method: domainSeparator }
+      - { method: ledgerDomainSeparator }
+      - { method: noticePeriodChannelClosure }
+      - { method: MAX_USED_BALANCE }
+      - method: channels
+        args: ["0x02859416995dc3db549b4b3dba14c47fe175155d3b3d265f2cc1a8faea32152b"]
+      - method: channels
+        args: ["0x07176dcc74930fa2bf68b4026b64bc9529fbe29d923f20001008eadf5a46495f"]
+
+  # ─── ERC-721 ─────────────────────────────────────────────────────────────
+  - name: POAP
+    address: "0x22C1f6050E56d2876009903609a2cC3fEf83B415"
+    chain_id: 100
+    category: erc721
+    # POAP lives on Gnosis, not mainnet — ~7.4M tokens minted.
+    calls:
+      - { method: name }
+      - { method: symbol }
+      - { method: totalSupply }
+      - { method: lastId }
+      - { method: paused }
+      - method: ownerOf
+        args: [1000000]
+      - method: tokenURI
+        args: [1000000]
+      - method: tokenEvent
+        args: [1000000]
+      - method: tokenByIndex
+        args: [1000]
