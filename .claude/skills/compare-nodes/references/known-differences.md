@@ -257,6 +257,32 @@ tooling trap above by the byte count in the error message (a fixed, small,
 repeating size) and by `Content-Length` agreeing with the delivered body.
 Workaround while it stands: compare `trace_*` at `--concurrency 1`.
 
+## Expected — `eth_call` without `gas` inherits the node's default cap
+
+An `eth_call` whose params omit a `gas` field is executed with whatever cap the
+node is configured with, so any contract that observes `gasleft()` — routers,
+aggregators and anything doing a gas-budgeted sub-call — returns a **different
+answer per node**. It reads as a real correctness difference and it is not.
+
+Seen 2026-08-31 comparing two Nethermind versions on Gnosis: 2 of 1304 replayed
+`eth_call` fixtures differed, in the final 32-byte word only, with the first
+words identical:
+
+```
+trie_archive (v2.0.0-rc)        0x23bd7860 = 598,738,528   (cap ~600M)
+flat_history (v1.40.0-unstable) 0x05f01360 =  99,881,824   (cap ~100M)
+```
+
+Diagnostic: re-issue the call with an explicit `gas`. If both nodes then agree,
+it is the cap, not the execution. In the case above, adding `"gas":"0x1c9c380"`
+made both return `0x01c3f5e0` identically.
+
+Fix it in the corpus rather than suppressing it with a rule — a fixture whose
+result depends on node configuration is not a stable comparison input.
+`generate-from-chain` pins each replayed transaction's own gas limit for exactly
+this reason. If you cannot regenerate, scope an `ignore` rule to the affected
+path, never to `result` wholesale.
+
 ## Expected — head-relative calls race with block production
 
 `eth_getProof` at `latest` (and any other head-targeted call) compares two nodes

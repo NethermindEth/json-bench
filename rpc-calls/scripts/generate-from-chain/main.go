@@ -34,9 +34,12 @@ type block struct {
 	Number       string `json:"number"`
 	Hash         string `json:"hash"`
 	Transactions []struct {
-		Hash string `json:"hash"`
-		From string `json:"from"`
-		To   string `json:"to"`
+		Hash  string `json:"hash"`
+		From  string `json:"from"`
+		To    string `json:"to"`
+		Input string `json:"input"`
+		Value string `json:"value"`
+		Gas   string `json:"gas"`
 	} `json:"transactions"`
 }
 
@@ -127,6 +130,7 @@ type config struct {
 	includeTrace   bool
 	includeProof   bool
 	proofSlots     int
+	callsPerBlock  int
 }
 
 // fileNameFor renders <family>-<network>.jsonl, preserving the corpus
@@ -162,6 +166,7 @@ func main() {
 	includeTrace := flag.Bool("trace", true, "emit trace_* fixtures (requires the trace namespace)")
 	includeProof := flag.Bool("proof", true, "emit eth_getProof fixtures into --proof-output-dir")
 	proofSlots := flag.Int("proof-slots", 3, "how many populated storage slots to prove per account")
+	callsPerBlock := flag.Int("calls-per-block", 4, "eth_call fixtures to replay per sampled block; 0 disables")
 	timeout := flag.Duration("timeout", 120*time.Second, "per-request timeout")
 	attempts := flag.Int("attempts", 4, "attempts per request; only transport faults are retried")
 	flag.Parse()
@@ -170,7 +175,7 @@ func main() {
 		network: *network, outputDir: *outputDir, proofOutputDir: *proofOutputDir, samples: *samples,
 		oldestBlock: *oldest, headLag: *headLag, logWindow: *logWindow,
 		seed: *seed, includeTrace: *includeTrace, includeProof: *includeProof,
-		proofSlots: *proofSlots,
+		proofSlots: *proofSlots, callsPerBlock: *callsPerBlock,
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	// See verify-calls: a reused half-closed keep-alive connection surfaces as a
@@ -259,6 +264,11 @@ func run(c *client, cfg config) error {
 
 	if err := emitLogs(c, rng, cfg, blocks, emit); err != nil {
 		return err
+	}
+	if cfg.callsPerBlock > 0 {
+		if err := emitCalls(c, cfg, blocks, emit); err != nil {
+			return err
+		}
 	}
 	contracts, err := emitState(c, cfg, blocks, emit)
 	if err != nil {
@@ -474,6 +484,70 @@ func emitState(c *client, cfg config, blocks []block, emit func(string, outRecor
 		emit("eth_getTransactionCount", outRecord{"eth_getTransactionCount", []any{t.address, t.block}})
 	}
 	return targets, nil
+}
+
+// emitCalls turns real transactions into eth_call fixtures, replayed against the
+// parent block so the call sees the state the transaction itself executed
+// against. Synthesising eth_call payloads by hand only ever reaches the shallow
+// view functions an ABI makes obvious; replaying transactions that actually ran
+// on the chain exercises whatever those contracts really do, at whatever depth
+// they really do it, including the paths no ABI reading would suggest.
+//
+// Each fixture is executed once during generation and kept only if the node
+// answers without an error, so a corpus entry is always a call the chain can
+// serve rather than a benchmark of the revert path.
+func emitCalls(c *client, cfg config, blocks []block, emit func(string, outRecord)) error {
+	kept, dropped := 0, 0
+
+	for _, b := range blocks {
+		n := parseHexUint(b.Number)
+		if n == 0 {
+			continue
+		}
+		parent := hexU64(n - 1)
+
+		perBlock := 0
+		for _, tx := range b.Transactions {
+			if perBlock >= cfg.callsPerBlock {
+				break
+			}
+			// Contract creations have no callee to re-invoke.
+			if tx.To == "" || len(tx.Input) <= 2 {
+				continue
+			}
+
+			call := map[string]string{"from": tx.From, "to": tx.To, "data": tx.Input}
+			if tx.Value != "" && tx.Value != "0x0" {
+				call["value"] = tx.Value
+			}
+			// Pin the transaction's own gas limit. An eth_call that omits `gas`
+			// inherits whatever cap the node happens to be configured with, and
+			// any contract that observes gasleft() then returns a different
+			// answer per node — a config delta masquerading as a correctness
+			// difference. Two Nethermind versions were seen defaulting to ~600M
+			// and ~100M, which diverged on exactly such calls.
+			if tx.Gas != "" {
+				call["gas"] = tx.Gas
+			}
+
+			raw, err := c.call("eth_call", call, parent)
+			if err != nil {
+				dropped++
+				continue
+			}
+			var out string
+			if err := json.Unmarshal(raw, &out); err != nil {
+				dropped++
+				continue
+			}
+
+			emit("eth_call", outRecord{"eth_call", []any{call, parent}})
+			kept++
+			perBlock++
+		}
+	}
+	slog.Info("replayed transactions as eth_call", "kept", kept, "dropped", dropped)
+	return nil
 }
 
 // emitProofs writes eth_getProof fixtures into their own directory and their
