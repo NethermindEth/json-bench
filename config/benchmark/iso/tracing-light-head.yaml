@@ -1,0 +1,28 @@
+test_name: "Tracing light (head only)"
+description: "Single-call tracers at latest: debug_traceCall across mixed tracers plus Parity trace_call. Bounds the Tracing cost class with per-request work in the tens-of-milliseconds range."
+clients:
+  - nethermind
+duration: "1m"
+rps: 10
+vus: 50
+calls:
+  - name: "debug_traceCall (head)"
+    file: "./rpc-calls/debug_traceCall-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 60
+  - name: "trace_call WETH balanceOf (trace)"
+    method: "trace_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"
+      - ["trace"]
+      - "latest"
+    weight: 25
+  - name: "trace_call WETH balanceOf (stateDiff)"
+    method: "trace_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"
+      - ["stateDiff"]
+      - "latest"
+    weight: 15

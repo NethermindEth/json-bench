@@ -1,0 +1,29 @@
+test_name: "EVM execution beyond eth_call (head only)"
+description: "The EvmExecution cost-class members that the eth_call corpus does not cover: eth_estimateGas, eth_createAccessList and eth_simulateV1, all at latest."
+clients:
+  - nethermind
+duration: "1m"
+rps: 20
+vus: 50
+calls:
+  - name: "eth_estimateGas (head)"
+    file: "./rpc-calls/eth_estimateGas-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 50
+  - name: "eth_createAccessList WETH balanceOf"
+    method: "eth_createAccessList"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"
+      - "latest"
+    weight: 30
+  - name: "eth_simulateV1 single transfer"
+    method: "eth_simulateV1"
+    params:
+      - blockStateCalls:
+          - calls:
+              - from: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045"
+                to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+                data: "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"
+      - "latest"
+    weight: 20

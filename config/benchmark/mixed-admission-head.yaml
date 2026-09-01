@@ -1,0 +1,64 @@
+test_name: "Mixed traffic across admission cost classes (head only)"
+description: "A realistic blend of ungated reads (Default), eth_call-style EVM execution, tracing (including full-block re-execution) and proof generation, all at latest. Built to measure cross-class isolation: whether heavy tracing traffic degrades the latency of cheap reads and eth_call, per arm of an A/B sweep."
+clients:
+  - nethermind
+duration: "1m"
+rps: 100
+vus: 500
+calls:
+  - name: "eth_call (head)"
+    file: "./rpc-calls/eth_call-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 30
+  - name: "eth_getBalance"
+    method: "eth_getBalance"
+    params:
+      - "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+      - "latest"
+    weight: 15
+  - name: "eth_getBlockByNumber (latest)"
+    method: "eth_getBlockByNumber"
+    params:
+      - "latest"
+      - false
+    weight: 10
+  - name: "eth_blockNumber"
+    method: "eth_blockNumber"
+    params: []
+    weight: 5
+  - name: "eth_getStorageAt (head)"
+    file: "./rpc-calls/eth_getStorageAt-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 10
+  - name: "eth_estimateGas (head)"
+    file: "./rpc-calls/eth_estimateGas-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 5
+  - name: "eth_getProof (head)"
+    file: "./rpc-calls/eth_getProof-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 5
+  - name: "debug_traceCall (head)"
+    file: "./rpc-calls/debug_traceCall-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 8
+  - name: "trace_call WETH balanceOf (trace)"
+    method: "trace_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"
+      - ["trace"]
+      - "latest"
+    weight: 5
+  - name: "trace_replayBlockTransactions (latest)"
+    method: "trace_replayBlockTransactions"
+    params:
+      - "latest"
+      - ["trace"]
+    weight: 4
+  - name: "debug_traceBlockByNumber callTracer (latest)"
+    method: "debug_traceBlockByNumber"
+    params:
+      - "latest"
+      - tracer: "callTracer"
+    weight: 3

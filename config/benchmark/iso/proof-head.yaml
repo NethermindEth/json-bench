@@ -1,0 +1,19 @@
+test_name: "Proof generation (head only)"
+description: "Merkle proof generation at latest: eth_getProof across accounts and storage slots plus proof_call. Bounds the Proof cost class."
+clients:
+  - nethermind
+duration: "1m"
+rps: 20
+vus: 50
+calls:
+  - name: "eth_getProof (head)"
+    file: "./rpc-calls/eth_getProof-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 80
+  - name: "proof_call WETH balanceOf"
+    method: "proof_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045"
+      - "latest"
+    weight: 20

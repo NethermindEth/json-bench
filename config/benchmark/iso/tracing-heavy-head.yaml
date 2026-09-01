@@ -1,0 +1,25 @@
+test_name: "Tracing heavy (head only)"
+description: "Full-block re-execution with a tracer at latest: trace_replayBlockTransactions, debug_traceBlockByNumber and trace_block. Each request costs hundreds of ms to seconds — sized to saturate the Tracing admission gate at single-digit rps."
+clients:
+  - nethermind
+duration: "2m"
+rps: 5
+vus: 200
+calls:
+  - name: "trace_replayBlockTransactions (latest)"
+    method: "trace_replayBlockTransactions"
+    params:
+      - "latest"
+      - ["trace"]
+    weight: 40
+  - name: "debug_traceBlockByNumber callTracer (latest)"
+    method: "debug_traceBlockByNumber"
+    params:
+      - "latest"
+      - tracer: "callTracer"
+    weight: 40
+  - name: "trace_block (latest)"
+    method: "trace_block"
+    params:
+      - "latest"
+    weight: 20
