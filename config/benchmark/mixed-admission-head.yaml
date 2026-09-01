@@ -31,7 +31,7 @@ calls:
     file_type: "jsonl"
     weight: 10
   - name: "eth_estimateGas (head)"
-    file: "./rpc-calls/eth_estimateGas-mainnet-latest.jsonl"
+    file: "./rpc-calls/eth_estimateGas-mainnet-latest-safe.jsonl"
     file_type: "jsonl"
     weight: 5
   - name: "eth_getProof (head)"

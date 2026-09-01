@@ -7,7 +7,7 @@ rps: 20
 vus: 50
 calls:
   - name: "eth_estimateGas (head)"
-    file: "./rpc-calls/eth_estimateGas-mainnet-latest.jsonl"
+    file: "./rpc-calls/eth_estimateGas-mainnet-latest-safe.jsonl"
     file_type: "jsonl"
     weight: 50
   - name: "eth_createAccessList WETH balanceOf"
