@@ -7,7 +7,7 @@ rps: 10
 vus: 50
 calls:
   - name: "debug_traceCall (head)"
-    file: "./rpc-calls/debug_traceCall-mainnet-latest.jsonl"
+    file: "./rpc-calls/debug_traceCall-mainnet-latest-safe.jsonl"
     file_type: "jsonl"
     weight: 60
   - name: "trace_call WETH balanceOf (trace)"
