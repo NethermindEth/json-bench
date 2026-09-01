@@ -15,6 +15,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -102,6 +103,16 @@ func (c *client) callOnce(method string, params []any) (json.RawMessage, error) 
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	// Check the status before parsing. A proxy or an overloaded node answers
+	// 429/5xx, sometimes with a JSON body — decoding first would turn that into
+	// an rpcError, which call() treats as the request's own fault and never
+	// retries. Non-200 is a transport condition and stays retryable.
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("%s: HTTP %d: %s", method, resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
 	var envelope struct {
 		Result json.RawMessage `json:"result"`
 		Error  *struct {

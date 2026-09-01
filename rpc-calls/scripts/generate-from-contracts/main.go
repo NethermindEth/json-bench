@@ -258,7 +258,7 @@ func convertArg(yamlArg any, t abi.Type, ctx string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return narrowInt(n, t), nil
+		return narrowInt(n, t, ctx)
 
 	case abi.FixedBytesTy:
 		s, ok := yamlArg.(string)
@@ -305,31 +305,60 @@ func convertInt(yamlArg any, ctx string) (*big.Int, error) {
 // narrowInt maps a big.Int onto the concrete Go type go-ethereum's ABI packer
 // expects. Only the four machine widths get a native type; every other width
 // (uint24, uint80, uint192, …) stays a *big.Int.
-func narrowInt(n *big.Int, t abi.Type) any {
+//
+// The range is checked first for every width, not just the narrowed ones. A
+// value that does not fit is a typo in the YAML, and silently wrapping it would
+// emit calldata that encodes cleanly and means something entirely different —
+// the worst failure mode for a corpus whose whole purpose is being correct.
+func narrowInt(n *big.Int, t abi.Type, ctx string) (any, error) {
+	if err := checkIntRange(n, t, ctx); err != nil {
+		return nil, err
+	}
 	if t.T == abi.UintTy {
 		switch t.Size {
 		case 8:
-			return uint8(n.Uint64())
+			return uint8(n.Uint64()), nil
 		case 16:
-			return uint16(n.Uint64())
+			return uint16(n.Uint64()), nil
 		case 32:
-			return uint32(n.Uint64())
+			return uint32(n.Uint64()), nil
 		case 64:
-			return n.Uint64()
+			return n.Uint64(), nil
 		}
-		return n
+		return n, nil
 	}
 	switch t.Size {
 	case 8:
-		return int8(n.Int64())
+		return int8(n.Int64()), nil
 	case 16:
-		return int16(n.Int64())
+		return int16(n.Int64()), nil
 	case 32:
-		return int32(n.Int64())
+		return int32(n.Int64()), nil
 	case 64:
-		return n.Int64()
+		return n.Int64(), nil
 	}
-	return n
+	return n, nil
+}
+
+// checkIntRange rejects a value the ABI type cannot represent: anything
+// negative for a uintN, and anything outside [0, 2^N) or [-2^(N-1), 2^(N-1))
+// respectively.
+func checkIntRange(n *big.Int, t abi.Type, ctx string) error {
+	if t.T == abi.UintTy {
+		if n.Sign() < 0 {
+			return fmt.Errorf("%s: %s cannot hold a negative value (%s)", ctx, t.String(), n)
+		}
+		if n.BitLen() > t.Size {
+			return fmt.Errorf("%s: %s overflows (%s needs %d bits)", ctx, t.String(), n, n.BitLen())
+		}
+		return nil
+	}
+	// Signed: [-2^(N-1), 2^(N-1)-1].
+	limit := new(big.Int).Lsh(big.NewInt(1), uint(t.Size-1))
+	if n.Cmp(limit) >= 0 || n.Cmp(new(big.Int).Neg(limit)) < 0 {
+		return fmt.Errorf("%s: %s cannot represent %s", ctx, t.String(), n)
+	}
+	return nil
 }
 
 func parseBase(s string) int {

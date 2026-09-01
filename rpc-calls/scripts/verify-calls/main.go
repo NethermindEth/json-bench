@@ -50,6 +50,24 @@ func main() {
 	maxReport := flag.Int("max-report", 25, "cap the number of failures printed per file")
 	flag.Parse()
 
+	// Guard the knobs that fail silently rather than loudly. concurrency <= 0
+	// starts no workers while verifyFile still sends on an unbuffered channel,
+	// which deadlocks; attempts <= 0 skips the retry loop entirely so every call
+	// returns an empty reason and the run reports a clean pass having checked
+	// nothing. The second is the dangerous one for a correctness gate.
+	if *concurrency < 1 {
+		fmt.Fprintf(os.Stderr, "--concurrency must be at least 1 (got %d)\n", *concurrency)
+		os.Exit(2)
+	}
+	if *attempts < 1 {
+		fmt.Fprintf(os.Stderr, "--attempts must be at least 1 (got %d)\n", *attempts)
+		os.Exit(2)
+	}
+	if *timeout <= 0 {
+		fmt.Fprintf(os.Stderr, "--timeout must be positive (got %s)\n", *timeout)
+		os.Exit(2)
+	}
+
 	files, err := collect(*inputs, *suffix)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "collect inputs: %v\n", err)
