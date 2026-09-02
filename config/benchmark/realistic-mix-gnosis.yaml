@@ -72,7 +72,7 @@ calls:
     file_type: "jsonl"
     weight: 40
   - name: "eth_getProof (head)"
-    file: "./rpc-calls/eth_getProof-gnosis.jsonl"
+    file: "./rpc-calls/proofs/eth_getProof-gnosis-latest.jsonl"
     file_type: "jsonl"
     weight: 20
   - name: "eth_getCode (historical)"
