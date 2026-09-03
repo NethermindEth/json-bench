@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/jsonrpc-bench/runner/generator"
+	"github.com/jsonrpc-bench/runner/engine"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 
 var generateRequestsCmd = &cobra.Command{
 	Use:   "generate-requests",
-	Short: "Pre-generate the k6 requests CSV for a benchmark config without running k6",
+	Short: "Pre-generate the requests CSV for a benchmark config without running the benchmark",
 	RunE:  runGenerateRequests,
 }
 
@@ -50,19 +50,28 @@ func runGenerateRequests(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	requestsPath, err := generator.GenerateK6Requests(cfg, outputDir)
+	requests, err := engine.BuildSequence(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to generate requests: %w", err)
 	}
 
-	if genRequestsOutPath != "" {
-		if err := os.MkdirAll(filepath.Dir(genRequestsOutPath), 0o755); err != nil {
-			return fmt.Errorf("failed to create destination directory: %w", err)
-		}
-		if err := os.Rename(requestsPath, genRequestsOutPath); err != nil {
-			return fmt.Errorf("failed to move requests file to %s: %w", genRequestsOutPath, err)
-		}
-		requestsPath = genRequestsOutPath
+	requestsPath := genRequestsOutPath
+	if requestsPath == "" {
+		requestsPath = filepath.Join(outputDir, "requests.csv")
+	}
+	if err := os.MkdirAll(filepath.Dir(requestsPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+	file, err := os.Create(requestsPath)
+	if err != nil {
+		return fmt.Errorf("failed to create requests file: %w", err)
+	}
+	if err := engine.WriteSequenceCSV(file, requests); err != nil {
+		file.Close()
+		return fmt.Errorf("failed to write requests: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close requests file: %w", err)
 	}
 
 	info, statErr := os.Stat(requestsPath)

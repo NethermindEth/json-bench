@@ -103,22 +103,22 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 				fmt.Sprintf("%.2f", metrics.SuccessRate),
 				fmt.Sprintf("%.2f", metrics.Min),
 				fmt.Sprintf("%.2f", metrics.P50),
-				unmeasuredFloat(metrics.P75),
+				formatFloat(metrics.P75),
 				fmt.Sprintf("%.2f", metrics.P90),
 				fmt.Sprintf("%.2f", metrics.P95),
 				fmt.Sprintf("%.2f", metrics.P99),
-				unmeasuredFloat(metrics.P999),
+				formatFloat(metrics.P999),
 				fmt.Sprintf("%.2f", metrics.Max),
 				fmt.Sprintf("%.2f", metrics.Avg),
 				fmt.Sprintf("%.2f", metrics.StdDev),
-				unmeasuredFloat(metrics.Variance),
+				formatFloat(metrics.Variance),
 				fmt.Sprintf("%.2f", metrics.CoeffVar),
-				unmeasuredFloat(metrics.IQR),
-				unmeasuredFloat(metrics.MAD),
-				unmeasuredFloat(metrics.Throughput),
+				formatFloat(metrics.IQR),
+				formatFloat(metrics.MAD),
+				formatFloat(metrics.Throughput),
 				strconv.FormatInt(metrics.ErrorCount, 10),
-				unmeasuredFloat(metrics.TimeoutRate),
-				unmeasuredInt(metrics.ConnectionErrors),
+				formatFloat(metrics.TimeoutRate),
+				strconv.FormatInt(metrics.ConnectionErrors, 10),
 			}
 
 			if err := writer.Write(row); err != nil {
@@ -130,24 +130,8 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 	return nil
 }
 
-// unmeasuredValue marks a column the runner cannot fill from either metrics
-// source, so a reader does not take it for a measured zero. Variance, IQR, MAD,
-// timeout rate and connection errors need per-sample data that neither
-// Prometheus (which stores k6's aggregates) nor k6's summary retains.
-const unmeasuredValue = "NA"
-
-func unmeasuredFloat(v float64) string {
-	if v == 0 {
-		return unmeasuredValue
-	}
+func formatFloat(v float64) string {
 	return fmt.Sprintf("%.2f", v)
-}
-
-func unmeasuredInt(v int64) string {
-	if v == 0 {
-		return unmeasuredValue
-	}
-	return strconv.FormatInt(v, 10)
 }
 
 // ExportClientComparisonCSV exports client-level comparison data
