@@ -289,4 +289,3 @@ func TestSubstituteEnvVars_EdgeCases(t *testing.T) {
 		})
 	}
 }
-

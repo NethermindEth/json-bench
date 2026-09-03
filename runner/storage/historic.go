@@ -573,7 +573,7 @@ func (h *HistoricStorage) GetHistoricTrends(ctx context.Context, filter types.Tr
 	}
 
 	metrics := []struct {
-		name   string
+		name    string
 		select_ func(sample) float64
 	}{
 		{"avg_latency", func(s sample) float64 { return s.avgLatency }},

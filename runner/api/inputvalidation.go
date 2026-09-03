@@ -57,4 +57,3 @@ func ValidateSeverity(s string) error {
 	}
 	return nil
 }
-

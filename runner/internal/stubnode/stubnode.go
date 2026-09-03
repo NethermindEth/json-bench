@@ -1,0 +1,444 @@
+// Package stubnode serves a JSON-RPC endpoint whose latency and failures are
+// configured rather than real, so load-engine behaviour can be tested against a
+// known distribution.
+//
+// Every response is derived from the request's JSON-RPC id, not from a random
+// source: two runs of the same request sequence see identical service times and
+// identical injected failures, in any arrival order and at any concurrency.
+// That is what makes an A/B comparison between two load engines reproducible
+// instead of statistical, and what removes the stub as a source of variance
+// when several clients replay one sequence.
+package stubnode
+
+import (
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"hash/fnv"
+	"math"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+)
+
+const (
+	LatencyFixed     = "fixed"
+	LatencyUniform   = "uniform"
+	LatencyLogNormal = "lognormal"
+)
+
+// Latency describes the service time distribution for a method.
+type Latency struct {
+	Kind  string  `json:"kind"`
+	MS    float64 `json:"ms"`
+	MinMS float64 `json:"min_ms"`
+	MaxMS float64 `json:"max_ms"`
+	P50MS float64 `json:"p50_ms"`
+	Sigma float64 `json:"sigma"`
+}
+
+// Method overrides the default behaviour for one RPC method.
+type Method struct {
+	Latency         *Latency `json:"latency,omitempty"`
+	RPCErrorRate    float64  `json:"rpc_error_rate,omitempty"`
+	RPCErrorCode    int      `json:"rpc_error_code,omitempty"`
+	RPCErrorMessage string   `json:"rpc_error_message,omitempty"`
+	NullResultRate  float64  `json:"null_result_rate,omitempty"`
+	ResultBytes     int      `json:"result_bytes,omitempty"`
+}
+
+// Faults are injected regardless of method.
+type Faults struct {
+	HTTP500Rate  float64 `json:"http_500_rate,omitempty"`
+	HTTP429Rate  float64 `json:"http_429_rate,omitempty"`
+	TruncateRate float64 `json:"truncate_rate,omitempty"`
+	TimeoutRate  float64 `json:"timeout_rate,omitempty"`
+	TimeoutMS    float64 `json:"timeout_ms,omitempty"`
+}
+
+// Config is the whole stub definition, loadable from JSON.
+type Config struct {
+	Seed    int64             `json:"seed"`
+	Default Method            `json:"default"`
+	Methods map[string]Method `json:"methods,omitempty"`
+	Faults  Faults            `json:"faults,omitempty"`
+}
+
+// Outcome names what the stub did with a request, matching the classes a load
+// engine is expected to distinguish.
+type Outcome string
+
+const (
+	OutcomeOK        Outcome = "ok"
+	OutcomeRPCError  Outcome = "rpc_error"
+	OutcomeRPCNull   Outcome = "rpc_null"
+	OutcomeHTTPError Outcome = "http_error"
+	OutcomeTruncated Outcome = "truncated"
+	OutcomeTimeout   Outcome = "timeout"
+	OutcomeBadInput  Outcome = "bad_input"
+)
+
+// Stats is the tally the stub kept, used to assert what an engine reported
+// against what was actually served.
+type Stats struct {
+	Total    int64                        `json:"total"`
+	ByMethod map[string]map[Outcome]int64 `json:"by_method"`
+}
+
+type Stub struct {
+	cfg Config
+	pad []byte
+
+	mu    sync.Mutex
+	total int64
+	seen  map[string]map[Outcome]int64
+}
+
+// DefaultConfig is a fast, failure-free node.
+func DefaultConfig() Config {
+	return Config{
+		Seed:    1,
+		Default: Method{Latency: &Latency{Kind: LatencyUniform, MinMS: 2, MaxMS: 8}},
+	}
+}
+
+func New(cfg Config) (*Stub, error) {
+	if cfg.Default.Latency == nil {
+		cfg.Default.Latency = DefaultConfig().Default.Latency
+	}
+	if err := validate(cfg); err != nil {
+		return nil, err
+	}
+
+	maxBytes := cfg.Default.ResultBytes
+	for _, m := range cfg.Methods {
+		if m.ResultBytes > maxBytes {
+			maxBytes = m.ResultBytes
+		}
+	}
+	pad := make([]byte, maxBytes)
+	for i := range pad {
+		pad[i] = "0123456789abcdef"[i%16]
+	}
+
+	return &Stub{cfg: cfg, pad: pad, seen: make(map[string]map[Outcome]int64)}, nil
+}
+
+func validate(cfg Config) error {
+	check := func(name string, m Method) error {
+		if m.Latency != nil {
+			switch m.Latency.Kind {
+			case LatencyFixed, LatencyUniform, LatencyLogNormal, "":
+			default:
+				return fmt.Errorf("%s: unknown latency kind %q", name, m.Latency.Kind)
+			}
+			if m.Latency.Kind == LatencyUniform && m.Latency.MaxMS < m.Latency.MinMS {
+				return fmt.Errorf("%s: max_ms is below min_ms", name)
+			}
+		}
+		for label, rate := range map[string]float64{
+			"rpc_error_rate":   m.RPCErrorRate,
+			"null_result_rate": m.NullResultRate,
+		} {
+			if rate < 0 || rate > 1 {
+				return fmt.Errorf("%s: %s must be within 0..1", name, label)
+			}
+		}
+		return nil
+	}
+	if err := check("default", cfg.Default); err != nil {
+		return err
+	}
+	for name, m := range cfg.Methods {
+		if err := check(name, m); err != nil {
+			return err
+		}
+	}
+	if total := cfg.Faults.HTTP500Rate + cfg.Faults.HTTP429Rate + cfg.Faults.TruncateRate + cfg.Faults.TimeoutRate; total > 1 {
+		return fmt.Errorf("fault rates sum to %.2f, which exceeds 1", total)
+	}
+	return nil
+}
+
+func (s *Stub) Stats() Stats {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := Stats{Total: s.total, ByMethod: make(map[string]map[Outcome]int64, len(s.seen))}
+	for method, outcomes := range s.seen {
+		copied := make(map[Outcome]int64, len(outcomes))
+		for o, n := range outcomes {
+			copied[o] = n
+		}
+		out.ByMethod[method] = copied
+	}
+	return out
+}
+
+func (s *Stub) record(method string, outcome Outcome) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.total++
+	if s.seen[method] == nil {
+		s.seen[method] = make(map[Outcome]int64, 4)
+	}
+	s.seen[method][outcome]++
+}
+
+// Handler serves JSON-RPC on POST / and the tally on GET /__stats.
+func (s *Stub) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/__stats", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(s.Stats())
+	})
+	mux.HandleFunc("/", s.serveRPC)
+	return mux
+}
+
+type rpcRequest struct {
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+	ID      json.RawMessage `json:"id"`
+}
+
+func (s *Stub) serveRPC(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "expected POST", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, err := readAll(r)
+	if err != nil {
+		s.record("", OutcomeBadInput)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Batches are not modelled yet. Answering with an explicit JSON-RPC error
+	// beats a parse failure that looks like a truncated response.
+	if firstNonSpace(body) == '[' {
+		s.record("batch", OutcomeBadInput)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": nil,
+			"error": map[string]any{"code": -32600, "message": "stubnode: batch requests are not supported"},
+		})
+		return
+	}
+
+	var req rpcRequest
+	if err := json.Unmarshal(body, &req); err != nil || req.Method == "" {
+		s.record("", OutcomeBadInput)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": nil,
+			"error": map[string]any{"code": -32700, "message": "stubnode: parse error"},
+		})
+		return
+	}
+
+	key := requestKey(req.ID, body)
+	method := s.methodConfig(req.Method)
+
+	if !s.sleep(r, method.Latency, req.Method, key) {
+		s.record(req.Method, OutcomeTimeout)
+		return
+	}
+
+	switch outcome := s.fault(req.Method, key); outcome {
+	case OutcomeHTTPError:
+		s.serveHTTPFault(w, req.Method, key)
+		return
+	case OutcomeTruncated:
+		s.record(req.Method, OutcomeTruncated)
+		serveTruncated(w, req.ID)
+		return
+	case OutcomeTimeout:
+		s.hang(r, req.Method)
+		return
+	}
+
+	if s.draw(req.Method, key, "rpcerr") < method.RPCErrorRate {
+		code := method.RPCErrorCode
+		if code == 0 {
+			code = -32000
+		}
+		message := method.RPCErrorMessage
+		if message == "" {
+			message = "execution reverted"
+		}
+		s.record(req.Method, OutcomeRPCError)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": rawOrNull(req.ID),
+			"error": map[string]any{"code": code, "message": message},
+		})
+		return
+	}
+
+	if s.draw(req.Method, key, "null") < method.NullResultRate {
+		s.record(req.Method, OutcomeRPCNull)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": nil,
+		})
+		return
+	}
+
+	s.record(req.Method, OutcomeOK)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": s.result(method.ResultBytes),
+	})
+}
+
+func (s *Stub) serveHTTPFault(w http.ResponseWriter, method string, key uint64) {
+	s.record(method, OutcomeHTTPError)
+	total := s.cfg.Faults.HTTP500Rate + s.cfg.Faults.HTTP429Rate
+	if total > 0 && s.draw(method, key, "faultkind")*total < s.cfg.Faults.HTTP429Rate {
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
+		return
+	}
+	http.Error(w, "internal error", http.StatusInternalServerError)
+}
+
+// hang holds the request open past any sane client deadline so the engine has
+// to classify it as a timeout, releasing the goroutine as soon as the client
+// gives up.
+func (s *Stub) hang(r *http.Request, method string) {
+	d := time.Duration(s.cfg.Faults.TimeoutMS) * time.Millisecond
+	if d <= 0 {
+		d = time.Minute
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-r.Context().Done():
+	}
+	s.record(method, OutcomeTimeout)
+}
+
+func (s *Stub) sleep(r *http.Request, l *Latency, method string, key uint64) bool {
+	d := s.latency(l, method, key)
+	if d <= 0 {
+		return true
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-r.Context().Done():
+		return false
+	}
+}
+
+func (s *Stub) latency(l *Latency, method string, key uint64) time.Duration {
+	if l == nil {
+		return 0
+	}
+	var ms float64
+	switch l.Kind {
+	case LatencyFixed:
+		ms = l.MS
+	case LatencyUniform:
+		ms = l.MinMS + s.draw(method, key, "latency")*(l.MaxMS-l.MinMS)
+	case LatencyLogNormal:
+		sigma := l.Sigma
+		if sigma <= 0 {
+			sigma = 0.5
+		}
+		ms = l.P50MS * math.Exp(sigma*s.normal(method, key))
+	}
+	if ms <= 0 {
+		return 0
+	}
+	return time.Duration(ms * float64(time.Millisecond))
+}
+
+func (s *Stub) fault(method string, key uint64) Outcome {
+	f := s.cfg.Faults
+	r := s.draw(method, key, "fault")
+	switch {
+	case r < f.HTTP500Rate+f.HTTP429Rate:
+		return OutcomeHTTPError
+	case r < f.HTTP500Rate+f.HTTP429Rate+f.TruncateRate:
+		return OutcomeTruncated
+	case r < f.HTTP500Rate+f.HTTP429Rate+f.TruncateRate+f.TimeoutRate:
+		return OutcomeTimeout
+	}
+	return OutcomeOK
+}
+
+func (s *Stub) methodConfig(method string) Method {
+	if m, ok := s.cfg.Methods[method]; ok {
+		if m.Latency == nil {
+			m.Latency = s.cfg.Default.Latency
+		}
+		return m
+	}
+	return s.cfg.Default
+}
+
+func (s *Stub) result(resultBytes int) string {
+	if resultBytes <= 0 {
+		return "0x1"
+	}
+	return "0x" + string(s.pad[:resultBytes])
+}
+
+// draw returns a value in [0,1) fixed by the seed, method, request key and
+// stream name, so each decision has its own reproducible sequence.
+func (s *Stub) draw(method string, key uint64, stream string) float64 {
+	h := fnv.New64a()
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], uint64(s.cfg.Seed))
+	_, _ = h.Write(buf[:])
+	binary.LittleEndian.PutUint64(buf[:], key)
+	_, _ = h.Write(buf[:])
+	_, _ = h.Write([]byte(method))
+	_, _ = h.Write([]byte(stream))
+	return float64(h.Sum64()>>11) / float64(uint64(1)<<53)
+}
+
+func (s *Stub) normal(method string, key uint64) float64 {
+	u1 := s.draw(method, key, "normal1")
+	u2 := s.draw(method, key, "normal2")
+	if u1 <= 0 {
+		u1 = math.SmallestNonzeroFloat64
+	}
+	return math.Sqrt(-2*math.Log(u1)) * math.Cos(2*math.Pi*u2)
+}
+
+// requestKey identifies a request for the purposes of determinism. The runner
+// numbers generated requests sequentially, so the id is stable across clients
+// and across runs of the same sequence; a request without a usable numeric id
+// falls back to its own bytes.
+func requestKey(id json.RawMessage, body []byte) uint64 {
+	if n, err := strconv.ParseUint(string(id), 10, 64); err == nil {
+		return n
+	}
+	h := fnv.New64a()
+	_, _ = h.Write(body)
+	return h.Sum64()
+}
+
+func rawOrNull(id json.RawMessage) any {
+	if len(id) == 0 {
+		return nil
+	}
+	return id
+}
+
+func firstNonSpace(b []byte) byte {
+	for _, c := range b {
+		switch c {
+		case ' ', '\t', '\r', '\n':
+			continue
+		default:
+			return c
+		}
+	}
+	return 0
+}

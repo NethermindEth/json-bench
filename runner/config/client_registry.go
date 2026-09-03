@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/jsonrpc-bench/runner/types"
-	"gopkg.in/yaml.v3"
 )
 
 // ClientRegistry manages client configurations and provides thread-safe access
@@ -39,7 +38,7 @@ func (cr *ClientRegistry) LoadFromFile(filename string) error {
 	data = []byte(substituted)
 
 	var config types.ClientsConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := UnmarshalStrict(data, &config); err != nil {
 		return fmt.Errorf("failed to unmarshal clients config: %w", err)
 	}
 

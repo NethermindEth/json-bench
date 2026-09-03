@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -28,11 +29,6 @@ type MethodResponse struct {
 
 // TestP99DataFlow tests the complete p99 data flow from database to API
 func TestP99DataFlow(t *testing.T) {
-	// Skip if not running integration tests
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-
 	// Setup test database connection
 	db := setupTestDB(t)
 	defer db.Close()
@@ -198,10 +194,16 @@ func TestP99DataFlow(t *testing.T) {
 }
 
 // setupTestDB creates a test database connection
+// testPostgresDSNEnv names the connection string for the throwaway database
+// this test writes to. Without it the test skips, so `go test ./...` passes on
+// a machine with no Postgres instead of failing on a refused connection.
+const testPostgresDSNEnv = "BENCH_TEST_POSTGRES_DSN"
+
 func setupTestDB(t *testing.T) *sql.DB {
-	// Use test database connection string
-	// This should be configured in your test environment
-	connStr := "postgres://postgres:postgres@localhost:5432/jsonrpc_bench_test?sslmode=disable"
+	connStr := os.Getenv(testPostgresDSNEnv)
+	if connStr == "" {
+		t.Skipf("set %s to a scratch database to run this test", testPostgresDSNEnv)
+	}
 
 	db, err := sql.Open("postgres", connStr)
 	require.NoError(t, err, "Failed to open database connection")

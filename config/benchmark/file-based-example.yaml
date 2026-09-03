@@ -9,6 +9,7 @@ clients:
   - besu_40031
 duration: "2m"
 rps: 100
+vus: 20
 calls:
   # Regular endpoint definition
   - name: "eth_blockNumber"

@@ -36,7 +36,7 @@ func (cl *ConfigLoader) LoadTestConfig(filename string) (*Config, error) {
 	data = []byte(substituted)
 
 	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := UnmarshalStrict(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal test config: %w", err)
 	}
 
@@ -141,6 +141,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Clients     []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
 		Duration    string               `yaml:"duration"`
 		RPS         int                  `yaml:"rps"`
+		Iterations  int                  `yaml:"iterations"`
 		VUs         int                  `yaml:"vus"`
 		Seed        int64                `yaml:"seed"`
 		Calls       []*Call              `yaml:"calls"`
@@ -148,7 +149,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 	}
 
 	var oldConfig oldStyleConfig
-	if err := yaml.Unmarshal(data, &oldConfig); err != nil {
+	if err := UnmarshalStrict(data, &oldConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal old-style config: %w", err)
 	}
 
@@ -158,6 +159,7 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 		Description:     oldConfig.Description,
 		Duration:        oldConfig.Duration,
 		RPS:             oldConfig.RPS,
+		Iterations:      oldConfig.Iterations,
 		VUs:             oldConfig.VUs,
 		Seed:            oldConfig.Seed,
 		Calls:           oldConfig.Calls,
