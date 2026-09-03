@@ -191,12 +191,16 @@ func summarizeValues(observations []float64) types.MetricSummary {
 	}
 }
 
-// seriesKey is the identity the metrics are grouped by. It follows k6's
-// grouping minus url and group, neither of which any dashboard panel reads.
+// seriesKey is the identity distributions and counters are grouped by. It
+// follows k6's grouping minus url and group, neither of which any dashboard
+// panel reads, plus the outcome — so "p99 of the calls that succeeded" is a
+// query rather than an unanswerable question. A client that fails fast on a
+// third of its calls otherwise reports a flattering p99.
 type seriesKey struct {
-	name   string
-	method string
-	status int
+	name    string
+	method  string
+	status  int
+	outcome Outcome
 }
 
 type clientAccum struct {
@@ -231,7 +235,7 @@ func (a *Accumulator) Add(s Sample) {
 		a.clients[s.Client] = client
 	}
 
-	key := seriesKey{name: s.Name, method: s.Method, status: s.Status}
+	key := seriesKey{name: s.Name, method: s.Method, status: s.Status, outcome: s.Outcome}
 	g, ok := client.keyed[key]
 	if !ok {
 		g = newGroup()
@@ -328,18 +332,29 @@ func (a *Accumulator) ClientMetrics(name string, delivery Delivery) *types.Clien
 
 // MethodSeries is one series identity's cumulative state at a push instant.
 type MethodSeries struct {
-	Name   string
-	Method string
-	Status int
+	Name    string
+	Method  string
+	Status  int
+	Outcome Outcome
 
 	Phases    map[Phase]types.MetricSummary
 	RespBytes types.MetricSummary
+	Count     int64
+}
+
+// MethodTotals is one method's cumulative state, merged across statuses and
+// outcomes. The ratio families are reported here rather than per series: a
+// failure rate inside a single status bucket is 0 or 1, which is what made k6's
+// http_req_failed unusable — the dashboard averaged those buckets by series
+// count instead of by request count.
+type MethodTotals struct {
+	Name      string
+	Method    string
 	Count     int64
 	Errors    int64
 	HTTPFails int64
 	RPCErrors int64
 	RPCCodes  map[int]int64
-	Outcomes  map[Outcome]int64
 }
 
 // ClientSeries is one client's cumulative state at a push instant.
@@ -347,6 +362,7 @@ type ClientSeries struct {
 	Name       string
 	ClientType string
 	Series     []MethodSeries
+	Totals     []MethodTotals
 
 	Duration   types.MetricSummary
 	QueueDelay types.MetricSummary
@@ -409,8 +425,14 @@ func (a *Accumulator) Snapshot(testName string, at time.Time, deliveries map[str
 			if keys[i].name != keys[j].name {
 				return keys[i].name < keys[j].name
 			}
-			return keys[i].status < keys[j].status
+			if keys[i].status != keys[j].status {
+				return keys[i].status < keys[j].status
+			}
+			return keys[i].outcome < keys[j].outcome
 		})
+
+		type totalsKey struct{ name, method string }
+		totals := make(map[totalsKey]*group)
 
 		for _, key := range keys {
 			g := client.keyed[key]
@@ -418,22 +440,49 @@ func (a *Accumulator) Snapshot(testName string, at time.Time, deliveries map[str
 			for _, phase := range PhaseNames {
 				phases[phase] = summarizeValues(g.phases[phase])
 			}
-			var rpcErrors int64
-			for _, n := range g.rpcCodes {
-				rpcErrors += n
-			}
 			cs.Series = append(cs.Series, MethodSeries{
 				Name:      key.name,
 				Method:    key.method,
 				Status:    key.status,
+				Outcome:   key.outcome,
 				Phases:    phases,
 				RespBytes: summarizeValues(g.respBytes),
+				Count:     g.count(),
+			})
+
+			tk := totalsKey{key.name, key.method}
+			merged, ok := totals[tk]
+			if !ok {
+				merged = newGroup()
+				totals[tk] = merged
+			}
+			merged.merge(g)
+		}
+
+		totalKeys := make([]totalsKey, 0, len(totals))
+		for tk := range totals {
+			totalKeys = append(totalKeys, tk)
+		}
+		sort.Slice(totalKeys, func(i, j int) bool {
+			if totalKeys[i].method != totalKeys[j].method {
+				return totalKeys[i].method < totalKeys[j].method
+			}
+			return totalKeys[i].name < totalKeys[j].name
+		})
+		for _, tk := range totalKeys {
+			g := totals[tk]
+			var rpcErrors int64
+			for _, n := range g.rpcCodes {
+				rpcErrors += n
+			}
+			cs.Totals = append(cs.Totals, MethodTotals{
+				Name:      tk.name,
+				Method:    tk.method,
 				Count:     g.count(),
 				Errors:    g.errors(),
 				HTTPFails: g.httpFailures(),
 				RPCErrors: rpcErrors,
 				RPCCodes:  g.rpcCodes,
-				Outcomes:  g.outcomes,
 			})
 		}
 

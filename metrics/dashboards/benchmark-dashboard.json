@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Visualize k6 OSS results stored in Prometheus",
+  "description": "Live benchmark dashboard, fed by the runner's bench_* remote-write series. Trend values are cumulative from the start of a run, so a latency panel reads \"p99 so far\" rather than p99 within the window. See metrics/METRICS.md for every series, its labels and its meaning.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "gnetId": 19665,
@@ -29,10 +29,10 @@
       "keepTime": false,
       "tags": [],
       "targetBlank": true,
-      "title": "Grafana k6 OSS Docs: Prometheus Remote Write",
+      "title": "Prometheus remote write",
       "tooltip": "Open docs in a new tab",
       "type": "link",
-      "url": "https://k6.io/docs/results-output/real-time/prometheus-remote-write/"
+      "url": "https://prometheus.io/docs/specs/remote_write_spec/"
     }
   ],
   "liveNow": false,
@@ -226,7 +226,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(k6_vus{testid=~\"$testid\"})",
+          "expr": "sum(bench_inflight{testid=~\"$testid\"})",
           "instant": false,
           "legendFormat": "vus",
           "range": true,
@@ -238,7 +238,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario) (bench_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_duration_$quantile_stat - {{ scenario }}",
@@ -251,7 +251,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario) (irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "sum by (scenario) (irate(bench_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_s - {{ scenario }}",
@@ -264,10 +264,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (scenario) (round(k6_http_req_failed_rate{testid=~\"$testid\"}, 0.1)*100)",
+          "expr": "sum by (scenario) (bench_http_reqs_total{testid=~\"$testid\", outcome!~\"ok|rpc_null\"}) / sum by (scenario) (bench_http_reqs_total{testid=~\"$testid\"}) * 100",
           "hide": true,
           "instant": false,
-          "legendFormat": "http_req_failed - {{ scenario }}",
+          "legendFormat": "{{scenario}} failure %",
           "range": true,
           "refId": "E"
         },
@@ -277,7 +277,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario) (irate(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"false\"}[$__rate_interval]))",
+          "expr": "sum by (scenario) (irate(bench_http_reqs_total{testid=~\"$testid\", outcome!~\"ok|rpc_null\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_s_errors - {{ scenario }}",
@@ -356,7 +356,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario) (k6_http_reqs_total{testid=~\"$testid\"})",
+          "expr": "sum by (scenario) (bench_http_reqs_total{testid=~\"$testid\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -421,7 +421,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario) (irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "sum by (scenario) (irate(bench_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
           "instant": false,
           "interval": "",
           "legendFormat": "__auto",
@@ -487,7 +487,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario) (k6_http_reqs_total{testid=~\"$testid\", expected_response=\"false\"})",
+          "expr": "sum by (scenario) (bench_http_reqs_total{testid=~\"$testid\", outcome!~\"ok|rpc_null\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -551,7 +551,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (scenario) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by (scenario) (bench_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -643,7 +643,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (scenario) (irate(k6_data_sent_total{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "avg by (scenario) (irate(bench_data_sent_total{testid=~\"$testid\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "data_sent - {{ scenario }}",
           "range": true,
@@ -656,7 +656,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg by (scenario) (irate(k6_data_received_total{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "avg by (scenario) (irate(bench_data_received_total{testid=~\"$testid\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
           "legendFormat": "data_received - {{ scenario }}",
@@ -762,7 +762,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by (scenario) (k6_iteration_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by (scenario) (bench_iteration_duration_$quantile_stat{testid=~\"$testid\"})",
           "instant": false,
           "legendFormat": "iteration_duration_$quantile_stat - {{scenario}}",
           "range": true,
@@ -775,7 +775,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg by (scenario) (k6_dropped_iterations_total{testid=~\"$testid\"})",
+          "expr": "avg by (scenario) (bench_requests_dropped_total{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "dropped_iterations - {{scenario}}",
@@ -950,7 +950,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_duration_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
@@ -963,7 +963,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"true\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_duration_$quantile_stat{testid=~\"$testid\", outcome=~\"ok|rpc_null\"})",
           "instant": false,
           "legendFormat": "success_http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
           "range": true,
@@ -975,7 +975,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_duration_$quantile_stat{testid=~\"$testid\", expected_response=\"false\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_duration_$quantile_stat{testid=~\"$testid\", outcome!~\"ok|rpc_null\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "errors_http_req_duration_$quantile_stat - {{scenario}} - {{req_name}}",
@@ -1091,7 +1091,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_blocked_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_blocked_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_blocked_$quantile_stat - {{scenario}} - {{req_name}}",
@@ -1104,7 +1104,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_tls_handshaking_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_tls_handshaking_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_tls_handshaking_$quantile_stat - {{scenario}} - {{req_name}}",
@@ -1117,7 +1117,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_sending_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_sending_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_sending_$quantile_stat - {{scenario}} - {{req_name}}",
@@ -1130,7 +1130,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_waiting_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_waiting_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_waiting_$quantile_stat - {{scenario}} - {{req_name}}",
@@ -1143,7 +1143,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(scenario, req_name) (k6_http_req_receiving_$quantile_stat{testid=~\"$testid\"})",
+          "expr": "avg by(scenario, req_name) (bench_http_req_receiving_$quantile_stat{testid=~\"$testid\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_receiving_$quantile_stat - {{scenario}} - {{req_name}}",
@@ -1320,7 +1320,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario, req_name) (irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "sum by (scenario, req_name) (irate(bench_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "http_req_s - {{scenario}} - {{req_name}}",
           "range": true,
@@ -1332,7 +1332,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario, req_name) (irate(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"false\"}[$__rate_interval]))",
+          "expr": "sum by (scenario, req_name) (irate(bench_http_reqs_total{testid=~\"$testid\", outcome!~\"ok|rpc_null\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_s_errors - {{scenario}} - {{req_name}}",
@@ -1345,7 +1345,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario, req_name) (irate(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"true\"}[$__rate_interval]))",
+          "expr": "sum by (scenario, req_name) (irate(bench_http_reqs_total{testid=~\"$testid\", outcome=~\"ok|rpc_null\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
           "legendFormat": "http_req_s_success - {{scenario}} - {{req_name}}",
@@ -1507,7 +1507,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(rpc_method, req_name, status, scenario) (k6_http_req_duration_min{testid=~\"$testid\"})",
+          "expr": "avg by(rpc_method, req_name, status, scenario) (bench_http_req_duration_min{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1521,7 +1521,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(rpc_method, req_name, status, scenario) (k6_http_req_duration_max{testid=~\"$testid\"})",
+          "expr": "avg by(rpc_method, req_name, status, scenario) (bench_http_req_duration_max{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1535,7 +1535,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(rpc_method, req_name, status, scenario) (k6_http_req_duration_p95{testid=~\"$testid\"})",
+          "expr": "avg by(rpc_method, req_name, status, scenario) (bench_http_req_duration_p95{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1549,7 +1549,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg by(rpc_method, req_name, status, scenario) (k6_http_req_duration_p99{testid=~\"$testid\"})",
+          "expr": "avg by(rpc_method, req_name, status, scenario) (bench_http_req_duration_p99{testid=~\"$testid\"})",
           "format": "table",
           "hide": false,
           "instant": false,
@@ -1664,7 +1664,7 @@
       },
       "id": 11,
       "panels": [],
-      "title": "Checks",
+      "title": "JSON-RPC outcomes",
       "type": "row"
     },
     {
@@ -1672,184 +1672,6 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Success Rate"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": false
-              },
-              {
-                "id": "unit",
-                "value": "%"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value (mean)"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "check"
-            },
-            "properties": [
-              {
-                "id": "filterable",
-                "value": false
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 80
-      },
-      "id": 12,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "enablePagination": true,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "frameIndex": 2,
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Value (count)"
-          }
-        ]
-      },
-      "pluginVersion": "10.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "round(k6_checks_rate{testid=~\"$testid\"}, 0.1)",
-          "format": "table",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Checks list",
-      "transformations": [
-        {
-          "id": "labelsToFields",
-          "options": {
-            "keepLabels": [
-              "__name__",
-              "check"
-            ],
-            "mode": "columns"
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "Value": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "check": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "k6_checks_rate": {
-                "aggregations": [
-                  "sum",
-                  "count"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "Success Rate",
-            "binary": {
-              "left": "Value (mean)",
-              "operator": "*",
-              "reducer": "sum",
-              "right": "100"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "convertFieldType",
-          "options": {
-            "conversions": [],
-            "fields": {}
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "description": "Filter by check name to query a particular check",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1861,9 +1683,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "axisSoftMax": 100,
-            "axisSoftMin": 0,
-            "barAlignment": -1,
+            "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1874,7 +1694,7 @@
             },
             "insertNulls": false,
             "lineInterpolation": "linear",
-            "lineWidth": 2,
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
@@ -1899,17 +1719,17 @@
               }
             ]
           },
-          "unit": "%"
+          "unit": "reqps"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
+        "x": 0,
         "y": 80
       },
-      "id": 13,
+      "id": 100,
       "options": {
         "legend": {
           "calcs": [],
@@ -1929,15 +1749,728 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg(round(k6_checks_rate{testid=~\"$testid\"}, 0.1)*100)",
-          "instant": false,
-          "legendFormat": "k6_checks_rate",
+          "expr": "sum by (scenario, outcome) (irate(bench_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
+          "legendFormat": "{{scenario}} {{outcome}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Checks Success Rate (aggregate individual checks)",
-      "type": "timeseries"
+      "title": "Outcome mix",
+      "type": "timeseries",
+      "description": "Every response resolved to exactly one class. rpc_error is an HTTP 200 carrying a JSON-RPC error object, which the HTTP-only failure rate cannot see; rpc_null is a call that succeeded and returned nothing."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 80
+      },
+      "id": 101,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario, rpc_method) (bench_rpc_error_rate{testid=~\"$testid\"}) * 100",
+          "legendFormat": "{{scenario}} {{rpc_method}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "JSON-RPC error rate by method",
+      "type": "timeseries",
+      "description": "Share of a method's calls that came back with a JSON-RPC error object. Reported per method rather than per status, because a rate inside one status bucket is only ever 0 or 1."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 88
+      },
+      "id": 102,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (scenario, rpc_code) (bench_rpc_errors_total{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} {{rpc_code}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "JSON-RPC error codes",
+      "type": "timeseries",
+      "description": "The codes the node itself returned, kept as labels rather than folded into a generic error counter."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 88
+      },
+      "id": 103,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario, rpc_method) (bench_resp_bytes_avg{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} {{rpc_method}} avg",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario, rpc_method) (bench_resp_bytes_max{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} {{rpc_method}} max",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Response size by method",
+      "type": "timeseries",
+      "description": "Payload size distribution per method. The missing axis when comparing eth_getLogs across clients: a faster client returning less data is not a faster client."
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 96
+      },
+      "id": 110,
+      "panels": [],
+      "title": "Load delivery",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 97
+      },
+      "id": 111,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario) (bench_requests_scheduled_total{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} scheduled",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (scenario) (bench_http_reqs_total{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} sent",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario) (bench_requests_dropped_total{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} dropped",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario) (bench_requests_late_total{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} late",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Offered vs delivered",
+      "type": "timeseries",
+      "description": "What the generator scheduled against what it actually sent. A gap means the run never offered the requested load, and the latency panels above describe only the requests that went out."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 97
+      },
+      "id": 112,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario) (bench_achieved_rate{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} achieved",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Achieved request rate",
+      "type": "timeseries",
+      "description": "Requests per second the generator actually offered. Compare against the configured rps: a shortfall means the endpoint, not the target rate, set the pace."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 105
+      },
+      "id": 113,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario) (bench_queue_delay_$quantile_stat{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} $quantile_stat",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Dispatch delay",
+      "type": "timeseries",
+      "description": "How far behind schedule requests went out. This is the coordinated-omission error: while it is above zero the reported latencies describe a slower offered rate than the one configured."
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 105
+      },
+      "id": 114,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario) (bench_inflight{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} in flight",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "max by (scenario) (bench_inflight_peak{testid=~\"$testid\"})",
+          "legendFormat": "{{scenario}} peak",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Requests in flight",
+      "type": "timeseries",
+      "description": "Concurrent requests, and the peak reached. At the configured vus ceiling the generator is the limiter."
     },
     {
       "datasource": {
@@ -1948,7 +2481,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 88
+        "y": 113
       },
       "id": 23,
       "options": {
@@ -1957,7 +2490,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "### Visualize other k6 results  \n\nAt the top of the dashboard, click `Add` and select `Visualization` from the dropdown menu. Choose the visualization type and input the PromQL queries for the `k6_` metric(s).\n\nAlternatively, click on the `Explore` icon on the menu bar and input the queries for the `k6_` metric(s). From `Explore`, you can add new Panels to this dashboard. \n\nNote that all <a href=\"https://k6.io/docs/using-k6/metrics/\" target=\"_blank\">k6 metrics</a> are prefixed with the `k6_` namespace when sent to Prometheus.",
+        "content": "### About these metrics\n\nEvery series is prefixed `bench_` and written by the runner over Prometheus remote write. **Trend values are cumulative from the start of a run**, so a latency panel reads \"p99 so far\" rather than p99 within the window \u2014 the same semantics k6 had.\n\n`metrics/METRICS.md` lists every series with its labels and meaning, and maps each old `k6_*` name to its replacement. The previous dashboard is kept as **k6 Prometheus (archived)**.\n\nFilter with the `testid` variable, which carries the `test_name` from the benchmark config.",
         "mode": "markdown"
       },
       "pluginVersion": "10.2.0",
@@ -1967,8 +2500,8 @@
   "refresh": false,
   "schemaVersion": 38,
   "tags": [
-    "prometheus",
-    "k6"
+    "jsonrpc-bench",
+    "benchmark"
   ],
   "templating": {
     "list": [
@@ -2007,7 +2540,7 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(testid)",
-        "description": "Filter by \"testid\" tag. Define it by tagging: k6 run --tag testid=xyz",
+        "description": "Filter by test_name from the benchmark config, which the runner sends as the testid label.",
         "hide": 0,
         "includeAll": true,
         "label": "Test ID",
@@ -2034,7 +2567,7 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "metrics(k6_http_req_duration_)",
+        "definition": "metrics(bench_http_req_duration_)",
         "description": "Statistic for Trend Metrics Queries. The available options depend on the values of the K6_PROMETHEUS_RW_TREND_STATS setting.",
         "hide": 0,
         "includeAll": false,
@@ -2043,7 +2576,7 @@
         "name": "quantile_stat",
         "options": [],
         "query": {
-          "query": "metrics(k6_http_req_duration_)",
+          "query": "metrics(bench_http_req_duration_)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2073,8 +2606,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "k6 Prometheus",
-  "uid": "ccbb2351-2ae2-462f-ae0e-f2c893ad1028",
+  "title": "JSON-RPC Benchmark",
+  "uid": "bench-jsonrpc-native",
   "version": 4,
   "weekStart": ""
 }

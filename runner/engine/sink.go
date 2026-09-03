@@ -88,11 +88,15 @@ func BuildSeries(snap Snapshot) []promrw.Series {
 			base["client_type"] = client.ClientType
 		}
 
+		// Distributions and counters carry the outcome, so the latency of the
+		// calls that succeeded can be asked for separately from the calls that
+		// failed. Mixing them understates a client that fails fast.
 		for _, series := range client.Series {
 			labels := withLabels(base, map[string]string{
 				"req_name":   series.Name,
 				"rpc_method": series.Method,
 				"status":     strconv.Itoa(series.Status),
+				"outcome":    string(series.Outcome),
 			})
 
 			for _, phase := range PhaseNames {
@@ -106,22 +110,23 @@ func BuildSeries(snap Snapshot) []promrw.Series {
 				add("resp_bytes_"+stat.suffix, labels, stat.value(series.RespBytes))
 			}
 
-			// The outcome label is what makes an RPC error visible in a query.
-			// It sits on the counters rather than the trends: the trends are
-			// already split by status, and a second splitting label would
-			// multiply series without a consumer.
-			for _, outcome := range Outcomes {
-				if n := series.Outcomes[outcome]; n > 0 {
-					add("http_reqs_total", withLabels(labels, map[string]string{"outcome": string(outcome)}), float64(n))
-				}
-			}
+			add("http_reqs_total", labels, float64(series.Count))
+		}
 
-			// Preserved with k6's meaning: HTTP-level failure only, so the
-			// panel written against it keeps reporting what it always did.
-			add("http_req_failed_rate", labels, ratio(series.HTTPFails, series.Count))
-			add("rpc_error_rate", labels, ratio(series.RPCErrors, series.Count))
+		// The ratio families are per method, merged across status and outcome.
+		// A failure rate inside one status bucket is 0 or 1, so k6's
+		// per-status http_req_failed could not be averaged into anything
+		// meaningful — which is what its dashboard panel tried to do.
+		for _, totals := range client.Totals {
+			labels := withLabels(base, map[string]string{
+				"req_name":   totals.Name,
+				"rpc_method": totals.Method,
+			})
 
-			for code, n := range series.RPCCodes {
+			add("http_req_failed_rate", labels, ratio(totals.HTTPFails, totals.Count))
+			add("rpc_error_rate", labels, ratio(totals.RPCErrors, totals.Count))
+
+			for code, n := range totals.RPCCodes {
 				add("rpc_errors_total",
 					withLabels(labels, map[string]string{"rpc_code": strconv.Itoa(code)}),
 					float64(n))
@@ -145,7 +150,7 @@ func BuildSeries(snap Snapshot) []promrw.Series {
 		add("requests_dropped_total", base, float64(client.Delivery.Dropped))
 		add("achieved_rate", base, client.Delivery.AchievedRate())
 		add("inflight", base, float64(client.Delivery.Inflight))
-		add("inflight_max", base, float64(client.Delivery.InflightPeak))
+		add("inflight_peak", base, float64(client.Delivery.InflightPeak))
 	}
 
 	return out

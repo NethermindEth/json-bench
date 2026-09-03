@@ -47,20 +47,18 @@ func fullSnapshot() Snapshot {
 				Inflight: 1, InflightPeak: 5,
 				Started: time.Unix(1730000000, 0), Finished: time.Unix(1730000010, 0),
 			},
-			Series: []MethodSeries{{
-				Name:      "eth_call",
-				Method:    "eth_call",
-				Status:    200,
-				Phases:    phases,
-				RespBytes: summary,
-				Count:     10,
-				Errors:    3,
-				HTTPFails: 1,
-				RPCErrors: 2,
-				RPCCodes:  map[int]int64{-32000: 2},
-				Outcomes: map[Outcome]int64{
-					OutcomeOK: 7, OutcomeRPCError: 2, OutcomeHTTPError: 1,
-				},
+			Series: []MethodSeries{
+				{Name: "eth_call", Method: "eth_call", Status: 200, Outcome: OutcomeOK,
+					Phases: phases, RespBytes: summary, Count: 7},
+				{Name: "eth_call", Method: "eth_call", Status: 200, Outcome: OutcomeRPCError,
+					Phases: phases, RespBytes: summary, Count: 2},
+				{Name: "eth_call", Method: "eth_call", Status: 500, Outcome: OutcomeHTTPError,
+					Phases: phases, RespBytes: summary, Count: 1},
+			},
+			Totals: []MethodTotals{{
+				Name: "eth_call", Method: "eth_call",
+				Count: 10, Errors: 3, HTTPFails: 1, RPCErrors: 2,
+				RPCCodes: map[int]int64{-32000: 2},
 			}},
 		}},
 	}
@@ -122,10 +120,10 @@ func TestEmittedSeriesMatchTheGolden(t *testing.T) {
 // new ones.
 func TestSeriesLabelKeysDoNotDependOnOutcomes(t *testing.T) {
 	healthy := fullSnapshot()
-	healthy.Clients[0].Series[0].Outcomes = map[Outcome]int64{OutcomeOK: 10}
-	healthy.Clients[0].Series[0].RPCCodes = nil
-	healthy.Clients[0].Series[0].RPCErrors = 0
-	healthy.Clients[0].Series[0].HTTPFails = 0
+	healthy.Clients[0].Series = healthy.Clients[0].Series[:1]
+	healthy.Clients[0].Totals[0].RPCCodes = nil
+	healthy.Clients[0].Totals[0].RPCErrors = 0
+	healthy.Clients[0].Totals[0].HTTPFails = 0
 
 	keysOf := func(snap Snapshot) map[string][]string {
 		out := map[string][]string{}

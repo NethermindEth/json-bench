@@ -123,6 +123,21 @@ datasources:
 
 ## Dashboards
 
+Two of these read Prometheus, two read PostgreSQL. Which one a panel uses
+decides what it can show and when it has data.
+
+| Dashboard | Source | Purpose |
+|---|---|---|
+| `benchmark-dashboard.json` | Prometheus (`bench_*`) | Live view of a run: latency, outcomes, JSON-RPC errors, load delivery. |
+| `archive/k6-dashboard.json` | Prometheus (`k6_*`) | The k6-era dashboard, kept for reference. Nothing writes `k6_*` any more, so its panels render empty. Provisioned into an "archive" folder. |
+| `jsonrpc-benchmark-enhanced.json` | Runner API over PostgreSQL | Historic runs across time. Needs `--historic`. |
+| `baseline-comparison.json` | PostgreSQL | Current runs against a stored baseline. |
+
+**[METRICS.md](METRICS.md) is the reference for every `bench_*` series**: its
+labels, its units, what it means, and how each old `k6_*` name maps onto it.
+Read it before writing a panel — the trend families are cumulative from the
+start of a run, which is not what a Prometheus user assumes.
+
 ### Main Dashboard (jsonrpc-benchmark-enhanced.json)
 
 - **Overall Latency Metrics**: Average, P95, P99 latency trends
@@ -246,6 +261,32 @@ SELECT cleanup_old_data(90); -- Keep 90 days of data
 - Grafana health endpoint: `http://localhost:3000/api/health`
 - PostgreSQL connection monitoring
 - Alert delivery verification
+
+## Known issues
+
+These are defects found while replacing the load engine, in parts of the stack
+that work was deliberately not touching. They are recorded here so they are
+found by whoever picks them up rather than rediscovered.
+
+- **The simplejson datasource points at the wrong port.** `datasource.yml` sets
+  `http://runner:8080/api/grafana` while the runner's API binds `:8081`, so the
+  targets in `jsonrpc-benchmark-enhanced.json` cannot resolve as provisioned.
+
+- **The provisioned alert rules cannot fire.** They query bare targets such as
+  `avg_latency`, but the API's `parseMetricTarget` requires at least three
+  dot-separated segments (`test_name.client.metric`) and returns nil for
+  anything shorter. All four rules are affected.
+
+- **Baseline comparisons across the engine change will report a false
+  regression.** The error rate now counts JSON-RPC errors, which the k6-era
+  pipeline could not see, so the same node measured before and after looks
+  worse. Runs record their engine and error-rate semantics; the regression
+  detector does not yet refuse to compare across them. Worth fixing before the
+  first cross-cutover baseline comparison.
+
+- **`EnvironmentInfo.K6Version` is dead.** Nothing writes it, and the dashboard
+  UI reads `environment.k6Version` while the JSON tag is `k6_version`. It should
+  become an engine version.
 
 ## Troubleshooting
 

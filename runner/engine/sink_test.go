@@ -162,13 +162,20 @@ func TestPromSinkPublishesRPCErrorsAndSaturation(t *testing.T) {
 	}
 	assert.Greater(t, dropped, 0.0, "one VU at 60ms cannot offer 60 rps")
 
-	// http_req_failed keeps k6's HTTP-only meaning, so the existing panel does
-	// not silently change what it reports.
+	// http_req_failed keeps k6's HTTP-only meaning, so the panel written
+	// against it does not silently change what it reports. Unlike k6 it is a
+	// per-method ratio, so the value is a real rate rather than 0-or-1.
 	require.NotEmpty(t, byName["bench_http_req_failed_rate"])
 	for _, series := range byName["bench_http_req_failed_rate"] {
 		if series.Labels["rpc_method"] == "eth_call" {
 			assert.Zero(t, series.Values[len(series.Values)-1],
 				"a JSON-RPC error is not an HTTP failure")
+		}
+	}
+	for _, series := range byName["bench_rpc_error_rate"] {
+		if series.Labels["rpc_method"] == "eth_call" {
+			assert.InDelta(t, 1.0, series.Values[len(series.Values)-1], 0.001,
+				"every eth_call returned a JSON-RPC error")
 		}
 	}
 }
@@ -180,8 +187,13 @@ func TestPromSinkLabels(t *testing.T) {
 	}, nil)
 
 	required := map[string][]string{
-		"bench_http_req_duration_p99":  {"testid", "scenario", "client_type", "req_name", "rpc_method", "status"},
+		// Distributions carry the outcome so "p99 of the calls that succeeded"
+		// is answerable; the ratio families are per method instead, because a
+		// failure rate within one status bucket is 0 or 1.
+		"bench_http_req_duration_p99":  {"testid", "scenario", "client_type", "req_name", "rpc_method", "status", "outcome"},
 		"bench_http_reqs_total":        {"testid", "scenario", "client_type", "req_name", "rpc_method", "status", "outcome"},
+		"bench_http_req_failed_rate":   {"testid", "scenario", "client_type", "req_name", "rpc_method"},
+		"bench_rpc_error_rate":         {"testid", "scenario", "client_type", "req_name", "rpc_method"},
 		"bench_iterations_total":       {"testid", "scenario", "client_type"},
 		"bench_requests_dropped_total": {"testid", "scenario", "client_type"},
 	}
@@ -215,7 +227,7 @@ func TestMigrationCoversEveryK6Family(t *testing.T) {
 		"k6_group_duration": "k6 groups have no counterpart; no dashboard panel read this family",
 		"k6_checks_rate":    "superseded by the outcome label, which carries strictly more and is read by the exports too",
 		"k6_vus":            "renamed: bench_inflight counts requests in flight, which is the real quantity",
-		"k6_vus_max":        "renamed: bench_inflight_max",
+		"k6_vus_max":        "renamed: bench_inflight_peak",
 	}
 	renamed := map[string]string{
 		"k6_http_req_duration":        "bench_http_req_duration",
@@ -272,7 +284,7 @@ func TestEmittedFamiliesIncludeTheNewSignals(t *testing.T) {
 		"bench_achieved_rate",
 		"bench_resp_bytes",
 		"bench_inflight",
-		"bench_inflight_max",
+		"bench_inflight_peak",
 	} {
 		assert.True(t, emitted[family], "%s is not emitted", family)
 	}
