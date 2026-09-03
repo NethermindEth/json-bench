@@ -9,11 +9,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/jsonrpc-bench/runner/analyzer"
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/engine"
+	"github.com/jsonrpc-bench/runner/engine/promrw"
 	"github.com/jsonrpc-bench/runner/exporter"
 	"github.com/jsonrpc-bench/runner/generator"
 	"github.com/jsonrpc-bench/runner/metrics"
@@ -37,6 +39,9 @@ var (
 	benchmarkHTTP2             bool
 	benchmarkNoSamples         bool
 	benchmarkFailOnThreshold   bool
+	benchmarkPrometheusBearer  string
+	benchmarkPrometheusHeaders []string
+	benchmarkPushInterval      time.Duration
 )
 
 var benchmarkCmd = &cobra.Command{
@@ -48,7 +53,7 @@ var benchmarkCmd = &cobra.Command{
 func init() {
 	benchmarkCmd.Flags().StringVar(&benchmarkConfigPath, "config", "", "Path to YAML configuration file")
 	benchmarkCmd.Flags().StringVar(&benchmarkClientsPath, "clients", "", "Path to clients configuration file (optional)")
-	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusURL, "prometheus", "", "Prometheus base URL (optional; used directly for queries, remote-write path is appended)")
+	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusURL, "prometheus", "", "Prometheus base URL (optional; the remote-write path is appended for publishing, and the base URL is probed before the run)")
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPath, "prometheus-rw-path", "/api/v1/write", "Path appended to --prometheus to form the remote-write target")
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWUser, "prometheus-rw-user", "", "Prometheus basic-auth username (optional)")
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusRWPass, "prometheus-rw-pass", "", "Prometheus basic-auth password (optional)")
@@ -62,6 +67,9 @@ func init() {
 	benchmarkCmd.Flags().BoolVar(&benchmarkHTTP2, "http2", false, "Allow an HTTP/2 upgrade over TLS")
 	benchmarkCmd.Flags().BoolVar(&benchmarkNoSamples, "no-samples", false, "Skip writing the per-request sample file")
 	benchmarkCmd.Flags().BoolVar(&benchmarkFailOnThreshold, "fail-on-threshold", false, "Exit non-zero when a configured threshold is breached")
+	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusBearer, "prometheus-rw-bearer", "", "Prometheus bearer token (optional; mutually exclusive with basic auth)")
+	benchmarkCmd.Flags().StringArrayVar(&benchmarkPrometheusHeaders, "prometheus-rw-header", nil, "Extra remote-write header as Name=Value, repeatable (e.g. X-Scope-OrgID=team for Mimir)")
+	benchmarkCmd.Flags().DurationVar(&benchmarkPushInterval, "prometheus-push-interval", promrw.DefaultPushInterval, "How often to publish metrics during the run")
 }
 
 func runBenchmark(cmd *cobra.Command, args []string) error {
@@ -140,8 +148,15 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	sink, err := buildMetricsSink(cfg)
+	if err != nil {
+		return err
+	}
+
 	opts := engine.DefaultOptions()
 	opts.OutputDir = outputDir
+	opts.Sink = sink
+	opts.PushInterval = benchmarkPushInterval
 	opts.Saturation = saturation
 	opts.WriteSamples = !benchmarkNoSamples
 	opts.Logger = logger
@@ -213,6 +228,54 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 
 	logger.Info("Benchmark completed")
 	return nil
+}
+
+// buildMetricsSink wires remote write when --prometheus was given. It returns a
+// nil sink otherwise, which disables export rather than pointing it at nothing.
+func buildMetricsSink(cfg *config.Config) (engine.Sink, error) {
+	if cfg.Outputs == nil || cfg.Outputs.PrometheusRW == nil {
+		return nil, nil
+	}
+
+	headers, err := parseHeaderFlags(benchmarkPrometheusHeaders)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := promrw.New(promrw.Config{
+		Endpoint:    cfg.Outputs.PrometheusRW.Endpoint,
+		Username:    cfg.Outputs.PrometheusRW.BasicAuth.Username,
+		Password:    cfg.Outputs.PrometheusRW.BasicAuth.Password,
+		BearerToken: benchmarkPrometheusBearer,
+		Headers:     headers,
+		UserAgent:   "jsonrpc-bench/" + engine.Version,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure remote write: %w", err)
+	}
+
+	logger.WithFields(logrus.Fields{
+		"endpoint": cfg.Outputs.PrometheusRW.Endpoint,
+		"interval": benchmarkPushInterval,
+	}).Infof("Publishing %s_* metrics to Prometheus", engine.Namespace)
+
+	return engine.NewPromSink(client), nil
+}
+
+func parseHeaderFlags(values []string) (map[string]string, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]string, len(values))
+	for _, raw := range values {
+		name, value, ok := strings.Cut(raw, "=")
+		name = strings.TrimSpace(name)
+		if !ok || name == "" {
+			return nil, fmt.Errorf("invalid --prometheus-rw-header %q (want Name=Value)", raw)
+		}
+		out[name] = strings.TrimSpace(value)
+	}
+	return out, nil
 }
 
 // logOutcomes prints the per-client outcome breakdown. It is the answer to "did

@@ -18,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/jsonrpc-bench/runner/config"
+	"github.com/jsonrpc-bench/runner/engine/promrw"
 	"github.com/jsonrpc-bench/runner/types"
 )
 
@@ -29,6 +30,13 @@ type Options struct {
 	OutputDir  string
 	Saturation Saturation
 	Transport  TransportOptions
+
+	// Sink receives cumulative metric snapshots during the run. Nil disables
+	// metric export; a failing sink warns and never fails the benchmark.
+	Sink Sink
+
+	// PushInterval is how often Sink is given a snapshot.
+	PushInterval time.Duration
 
 	// WriteSamples persists the per-request records. On by default because
 	// offline re-aggregation and any later comparison depend on them.
@@ -42,6 +50,7 @@ func DefaultOptions() Options {
 		Saturation:   SaturationQueue,
 		Transport:    DefaultTransportOptions(),
 		WriteSamples: true,
+		PushInterval: promrw.DefaultPushInterval,
 		Logger:       logrus.New(),
 	}
 }
@@ -111,12 +120,16 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 	}).Info("Running benchmark")
 
 	start := time.Now()
-	samples, deliveries, runErr := dispatch(ctx, targets, requests, sched, concurrency, opts, writer)
+	run := newRunState(cfg.TestName, targets)
+	stopPusher := run.startPusher(ctx, opts, log)
+	runErr := dispatch(ctx, targets, requests, sched, concurrency, opts, run, writer)
+	stopPusher()
 	end := time.Now()
+	deliveries := run.Deliveries()
 
 	clients := make(map[string]*types.ClientMetrics, len(targets))
 	for _, tgt := range targets {
-		clients[tgt.name] = clientMetrics(tgt, samples[tgt.name], deliveries[tgt.name])
+		clients[tgt.name] = run.accum.ClientMetrics(tgt.name, deliveries[tgt.name])
 	}
 
 	for _, tgt := range targets {
@@ -152,19 +165,14 @@ func dispatch(
 	sched schedule,
 	concurrency int,
 	opts Options,
+	run *runState,
 	writer *SampleWriter,
-) (map[string][]Sample, map[string]Delivery, error) {
+) error {
 	var (
-		mu         sync.Mutex
-		samples    = make(map[string][]Sample, len(targets))
-		deliveries = make(map[string]Delivery, len(targets))
-		errs       []error
-		wg         sync.WaitGroup
+		mu   sync.Mutex
+		errs []error
+		wg   sync.WaitGroup
 	)
-
-	for _, tgt := range targets {
-		samples[tgt.name] = make([]Sample, 0, sched.total)
-	}
 
 	// Every client starts from one instant, so the same request ordinal is due
 	// at the same moment everywhere and the clients stay comparable.
@@ -174,10 +182,10 @@ func dispatch(
 		wg.Add(1)
 		go func(tgt *target) {
 			defer wg.Done()
-			delivery, err := runClient(ctx, tgt, requests, sched, concurrency, opts.Saturation, start,
+			err := runClient(ctx, tgt, requests, sched, concurrency, opts.Saturation, start, run,
 				func(s Sample) {
+					run.observe(s)
 					mu.Lock()
-					samples[s.Client] = append(samples[s.Client], s)
 					if writer != nil {
 						if writeErr := writer.Write(s); writeErr != nil {
 							errs = append(errs, writeErr)
@@ -186,21 +194,20 @@ func dispatch(
 					mu.Unlock()
 				})
 
-			mu.Lock()
-			deliveries[tgt.name] = delivery
 			if err != nil {
+				mu.Lock()
 				errs = append(errs, fmt.Errorf("client %s: %w", tgt.name, err))
+				mu.Unlock()
 			}
-			mu.Unlock()
 		}(tgt)
 	}
 
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return samples, deliveries, errs[0]
+		return errs[0]
 	}
-	return samples, deliveries, nil
+	return nil
 }
 
 // reportDelivery states what load was actually offered. A run that delivered a
@@ -227,7 +234,7 @@ func reportDelivery(log *logrus.Logger, client string, cfg *config.Config, sched
 			client, d.Sent, d.Scheduled, d.Dropped, cfg.VUs)
 	case d.Late > 0:
 		entry.Warnf("%s sent every request but %d went out more than one arrival interval late (worst %s); the endpoint was slower than the requested rate",
-			client, d.Late, maxDuration(d.QueueDelays).Round(time.Millisecond))
+			client, d.Late, d.MaxQueueDelay().Round(time.Millisecond))
 	default:
 		entry.Infof("%s delivered the requested load", client)
 	}
@@ -243,7 +250,8 @@ func runSummary(cfg *config.Config, sched schedule, deliveries map[string]Delive
 			"dropped":            d.Dropped,
 			"achieved_rps":       d.AchievedRate(),
 			"elapsed_seconds":    d.Elapsed().Seconds(),
-			"max_queue_delay_ms": msOf(maxDuration(d.QueueDelays)),
+			"max_queue_delay_ms": msOf(d.MaxQueueDelay()),
+			"inflight_peak":      d.InflightPeak,
 		}
 	}
 
@@ -284,12 +292,6 @@ func collectConfigThresholds(cfg *config.Config) ([]Threshold, error) {
 	return CollectThresholds(calls)
 }
 
-func maxDuration(values []time.Duration) time.Duration {
-	var out time.Duration
-	for _, v := range values {
-		if v > out {
-			out = v
-		}
-	}
-	return out
-}
+// Version identifies the engine in run provenance and in the remote-write
+// User-Agent, so a stored run can be traced to what produced it.
+const Version = "1"

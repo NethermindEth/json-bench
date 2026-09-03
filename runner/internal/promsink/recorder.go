@@ -35,9 +35,20 @@ type Series struct {
 }
 
 // Key identifies a series by name and label names, which is the granularity a
-// dashboard query binds to.
+// dashboard query binds to and what a golden capture pins. Several distinct
+// series share one Key when they differ only in label values.
 func (s Series) Key() string {
 	return s.Name + "{" + strings.Join(s.LabelKeys, ",") + "}"
+}
+
+// identity distinguishes series that share a Key but carry different label
+// values, so their value sequences do not interleave.
+func (s Series) identity() string {
+	pairs := make([]string, 0, len(s.LabelKeys))
+	for _, key := range s.LabelKeys {
+		pairs = append(pairs, key+"="+s.Labels[key])
+	}
+	return s.Name + "{" + strings.Join(pairs, ",") + "}"
 }
 
 // Recorder accumulates what a remote-write client pushed at it.
@@ -112,10 +123,10 @@ func (rec *Recorder) observe(r *http.Request, series []TimeSeries) {
 			continue
 		}
 		s := &Series{Name: name, LabelKeys: ts.LabelKeys(), Labels: ts.Labels}
-		key := s.Key()
-		existing, ok := rec.series[key]
+		id := s.identity()
+		existing, ok := rec.series[id]
 		if !ok {
-			rec.series[key] = s
+			rec.series[id] = s
 			existing = s
 		}
 		for _, sample := range ts.Samples {
@@ -164,18 +175,26 @@ func (rec *Recorder) Series() []Series {
 		copied.Values = append([]float64(nil), s.Values...)
 		out = append(out, copied)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Key() < out[j].Key() })
+	sort.Slice(out, func(i, j int) bool { return out[i].identity() < out[j].identity() })
 	return out
 }
 
-// Keys returns every recorded series key, sorted. This is the set a golden file
-// pins and the granularity at which two engines' Prometheus output is compared.
+// Keys returns the distinct series keys, sorted. This is the set a golden file
+// pins and the granularity at which two engines' Prometheus output is compared;
+// series differing only in label values collapse to one key.
 func (rec *Recorder) Keys() []string {
 	series := rec.Series()
+	seen := make(map[string]struct{}, len(series))
 	out := make([]string, 0, len(series))
 	for _, s := range series {
-		out = append(out, s.Key())
+		key := s.Key()
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
 	}
+	sort.Strings(out)
 	return out
 }
 

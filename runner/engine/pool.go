@@ -21,8 +21,11 @@ type Delivery struct {
 	Dropped   int
 
 	// QueueDelays holds the dispatch delay of every request that went out late,
-	// so the shortfall has a distribution rather than just a count.
+	// so the shortfall has a distribution rather than only a count.
 	QueueDelays []time.Duration
+
+	Inflight     int
+	InflightPeak int
 
 	Started  time.Time
 	Finished time.Time
@@ -30,10 +33,14 @@ type Delivery struct {
 
 // Elapsed is how long the run actually took, which is what throughput divides by.
 func (d Delivery) Elapsed() time.Duration {
-	if d.Started.IsZero() || d.Finished.IsZero() {
+	if d.Started.IsZero() {
 		return 0
 	}
-	return d.Finished.Sub(d.Started)
+	end := d.Finished
+	if end.IsZero() {
+		end = time.Now()
+	}
+	return end.Sub(d.Started)
 }
 
 // AchievedRate is the requests per second the generator actually offered.
@@ -44,8 +51,20 @@ func (d Delivery) AchievedRate() float64 {
 	return 0
 }
 
-// runClient dispatches the sequence against one target and returns its samples
-// alongside what was actually delivered.
+// MaxQueueDelay is the worst dispatch delay observed.
+func (d Delivery) MaxQueueDelay() time.Duration {
+	var out time.Duration
+	for _, v := range d.QueueDelays {
+		if v > out {
+			out = v
+		}
+	}
+	return out
+}
+
+// runClient dispatches the sequence against one target, recording what it
+// delivered into the shared run state so a snapshot taken mid-run sees the
+// shortfall as it develops rather than only at the end.
 func runClient(
 	ctx context.Context,
 	tgt *target,
@@ -54,57 +73,47 @@ func runClient(
 	concurrency int,
 	policy Saturation,
 	start time.Time,
+	rs *runState,
 	onSample func(Sample),
-) (Delivery, error) {
+) error {
 	if concurrency < 1 {
 		concurrency = 1
 	}
 
 	var (
-		slots    = make(chan struct{}, concurrency)
-		wg       sync.WaitGroup
-		mu       sync.Mutex
-		delivery = Delivery{Started: start}
-		aborted  bool
+		slots   = make(chan struct{}, concurrency)
+		wg      sync.WaitGroup
+		aborted bool
 	)
 
+	rs.begin(tgt.name, start)
 	deadline := start.Add(sched.duration)
 	lateAfter := sched.lateThreshold()
 
 	for i := 0; i < sched.total; i++ {
 		due := sched.due(start, i)
-		if sched.paced() {
-			if !sleepUntil(ctx, due) {
-				break
-			}
+		if sched.paced() && !sleepUntil(ctx, due) {
+			break
 		}
 
 		// Requests still unsent when the run's window closes are dropped rather
 		// than extending the run, so the measured window matches the configured
 		// one and a shortfall shows up as drops instead of a longer duration.
 		if time.Now().After(deadline) {
-			mu.Lock()
-			delivery.Scheduled++
-			delivery.Dropped++
-			mu.Unlock()
+			rs.scheduled(tgt.name)
+			rs.dropped(tgt.name)
 			continue
 		}
 
-		mu.Lock()
-		delivery.Scheduled++
-		mu.Unlock()
+		rs.scheduled(tgt.name)
 
 		acquired, fatal := acquireSlot(ctx, slots, policy)
 		if fatal {
-			mu.Lock()
 			aborted = true
-			mu.Unlock()
 			break
 		}
 		if !acquired {
-			mu.Lock()
-			delivery.Dropped++
-			mu.Unlock()
+			rs.dropped(tgt.name)
 			continue
 		}
 
@@ -116,31 +125,27 @@ func runClient(
 		}
 
 		wg.Add(1)
+		rs.enter(tgt.name)
 		go func() {
 			defer wg.Done()
-			defer func() { <-slots }()
+			defer func() {
+				rs.leave(tgt.name)
+				<-slots
+			}()
 
 			sample := issue(ctx, tgt, req, due, dispatched, queue)
-
-			mu.Lock()
-			delivery.Sent++
-			if lateAfter > 0 && queue > lateAfter {
-				delivery.Late++
-				delivery.QueueDelays = append(delivery.QueueDelays, queue)
-			}
-			mu.Unlock()
-
+			rs.sent(tgt.name, queue, lateAfter)
 			onSample(sample)
 		}()
 	}
 
 	wg.Wait()
-	delivery.Finished = time.Now()
+	rs.end(tgt.name, time.Now())
 
 	if aborted {
-		return delivery, ErrSaturated
+		return ErrSaturated
 	}
-	return delivery, ctx.Err()
+	return ctx.Err()
 }
 
 // acquireSlot takes an in-flight slot under the configured policy. It reports
