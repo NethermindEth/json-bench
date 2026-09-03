@@ -1,0 +1,11 @@
+{"method":"eth_call","params":[{"data":"0x07a2d13a0000000000000000000000000000000000000000000000000de0b6b3a7640000","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x70a082310000000000000000000000007a5c3860a77a8dc1b225bd46d0fb2ac1c6d191bc","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x01e1d114","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x06fdde03","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0xc6e6f5920000000000000000000000000000000000000000000000000de0b6b3a7640000","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x18160ddd","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x95d89b41","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0xce96cb770000000000000000000000007a5c3860a77a8dc1b225bd46d0fb2ac1c6d191bc","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x313ce567","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x38d52e0f","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}
+{"method":"eth_call","params":[{"data":"0x4cdad5060000000000000000000000000000000000000000000000000de0b6b3a7640000","to":"0xaf204776c7245bF4147c2612BF6e5972Ee483701"},"latest"]}

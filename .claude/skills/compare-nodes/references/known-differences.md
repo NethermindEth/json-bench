@@ -110,25 +110,50 @@ Anything not in the categories above. Before reporting:
    divergence (wrong error code, uncaught exception, leaked stack trace in
    `error.data`) is itself the finding.
 
-## Tooling trap — `--skip-above-head` drops hash-addressed calls
+## Tooling trap (FIXED) — `--skip-above-head` dropped hash-addressed calls
 
-`pinnedBlock` claims hash-addressed calls return `ok=false`, but `hexBlock`
-(`runner/comparator/block_override.go:95`) accepts any `0x` string and returns
-`b.Uint64()`. Methods that take *either* a number or a hash at a `blockArgIndex`
-position — notably **`eth_getBlockReceipts`** — therefore have a 32-byte hash
-read as a huge integer truncated to its low 64 bits, which always exceeds the
-head, and the call is silently skipped:
+`hexBlock` used to accept any `0x` string, so methods taking *either* a number
+or a hash at a `blockArgIndex` position — notably **`eth_getBlockReceipts`** —
+had a 32-byte hash read as a huge integer, which always exceeds the head, and
+the call was silently skipped.
 
-```
-eth_getBlockReceipts_...-by-hash  skipped: "pinned block above lowest client
-head", block 0x5db9f1cd715a1bdd     ← tail of the block hash, not a block number
-```
+**Fixed:** `maxQuantityHexLen` (`runner/comparator/block_override.go`) now caps
+the accepted length at `0x` + 16 hex digits, so a 66-char hash returns
+`ok=false` and the call is compared instead of skipped. Verified 2026-08-31 on a
+Gnosis run containing 76 `eth_getBlockByHash` and 150 `eth_getBlockReceipts`
+fixtures: `comparison-provenance.json` → `skipped: null`.
 
-Symptom: a suspiciously round number of skipped calls, all `*-by-hash`. Always
-read `comparison-provenance.json` → `skipped` and sanity-check the `block`
-values; anything near 2^63 is a hash, not a block. Workaround: omit
-`--skip-above-head` when the call set contains hash-addressed
-`eth_getBlockReceipts` and all blocks are known to be below the lower head.
+Still worth the habit: read `skipped` in the provenance and sanity-check the
+`block` values; anything near 2^63 would be a hash, not a block.
+
+## Tooling trap (FIXED) — a truncated body silently dropped the call
+
+Symptom: `transport-error` counts in the hundreds, all
+`failed to parse response: unexpected end of JSON input`, classed as `other`,
+concentrated on the methods with the largest responses (`trace_*`). Replaying
+the same calls serially succeeds, and the responses turn out to be *small*
+(hundreds of bytes) — so it is neither a bad fixture nor a size limit.
+
+Cause was two bugs compounding in `runner/comparator/transport.go`:
+
+1. The client used `http.DefaultTransport`, whose 90s `IdleConnTimeout` hands
+   out keep-alive connections the node has already half-closed. Go does not
+   silently retry a POST the way it retries idempotent methods, so the read
+   comes back cut short mid-JSON.
+2. The `json.Unmarshal` failure `return`ed immediately instead of `continue`-ing
+   the retry loop the way transport errors, read errors and 5xx/429 do — so the
+   call spent **none** of its attempt budget and was dropped from the comparison.
+
+**Fixed 2026-08-31:** idle connections are retired after 5s
+(`freshConnTransport`), and an unparseable 200 is now retried and classified as
+`TransportTruncated` (`truncated_body`) rather than the anonymous `other`.
+Observed before/after on the same 1354-call Gnosis run at `--concurrency 3`:
+192 lost calls (64% of all `trace_*`) → 0.
+
+**The general lesson survives the fix:** always read the transport-error count
+before the diffs, and always pass `--fail-on-transport-error`. Without that flag
+a run that lost an arbitrary fraction of its calls still exits 0 and reports a
+clean "0 differ".
 
 ## Real defect seen — derived receipts failing consensus validation (Nethermind)
 
@@ -198,6 +223,78 @@ Nethermind served the identical queries. Distinct from the *block-range* cap
 already documented above — this one is on the **response size**. Around the Merge
 a single block can emit >10,000 logs (block 15,537,392 → 10,058), so even a
 10-block range trips it. Class: `range_cap`, config delta, not a defect.
+
+## Real defect seen — Nethermind emits malformed JSON for concurrent `trace_*`
+
+Under concurrent load a `trace_*` request returns **HTTP 200 with a body that is
+not valid JSON** — `Content-Length` matches what arrives, so this is the node
+emitting a bad response, not a truncated read:
+
+```
+HTTP/1.1 200 OK
+Content-Length: 28
+
+{"jsonrpc":"2.0","result":[]        ← no closing brace, no "id"
+```
+
+A successful response uses `Transfer-Encoding: chunked`; the failing one
+switches to a buffered `Content-Length` path, so the serializer appears to bail
+out after writing the `result` array opening.
+
+Observed 2026-08-31 on Gnosis, in **both** Nethermind v2.0.0-rc and
+v1.40.0-unstable at identical rates, so it is neither a regression nor a
+cross-node difference:
+
+| condition | truncated |
+| --- | --- |
+| `trace_block` conc 1 / 4 / 8 | 0/1, 2/4, 6/8 |
+| `eth_getBlockByNumber` (full txs), same block, conc 8 | 0/8 |
+| `eth_getBlockReceipts`, same block, conc 8 | 0/8 |
+
+Trace-namespace-specific — other methods returning comparably large payloads for
+the same block are clean at the same concurrency. Distinguish it from the fixed
+tooling trap above by the byte count in the error message (a fixed, small,
+repeating size) and by `Content-Length` agreeing with the delivered body.
+Workaround while it stands: compare `trace_*` at `--concurrency 1`.
+
+## Expected — `eth_call` without `gas` inherits the node's default cap
+
+An `eth_call` whose params omit a `gas` field is executed with whatever cap the
+node is configured with, so any contract that observes `gasleft()` — routers,
+aggregators and anything doing a gas-budgeted sub-call — returns a **different
+answer per node**. It reads as a real correctness difference and it is not.
+
+Seen 2026-08-31 comparing two Nethermind versions on Gnosis: 2 of 1304 replayed
+`eth_call` fixtures differed, in the final 32-byte word only, with the first
+words identical:
+
+```
+trie_archive (v2.0.0-rc)        0x23bd7860 = 598,738,528   (cap ~600M)
+flat_history (v1.40.0-unstable) 0x05f01360 =  99,881,824   (cap ~100M)
+```
+
+Diagnostic: re-issue the call with an explicit `gas`. If both nodes then agree,
+it is the cap, not the execution. In the case above, adding `"gas":"0x1c9c380"`
+made both return `0x01c3f5e0` identically.
+
+Fix it in the corpus rather than suppressing it with a rule — a fixture whose
+result depends on node configuration is not a stable comparison input.
+`generate-from-chain` pins each replayed transaction's own gas limit for exactly
+this reason. If you cannot regenerate, scope an `ignore` rule to the affected
+path, never to `result` wholesale.
+
+## Expected — head-relative calls race with block production
+
+`eth_getProof` at `latest` (and any other head-targeted call) compares two nodes
+against whatever block each is on. A run that straddles a block change reports
+differences in `result.accountProof[0]` — the proof **root**, i.e. two different
+state roots, not different data. Storage values, balance and nonce still match.
+
+Do not "fix" this with `--block-override`: rewriting `latest` to a pinned height
+turns every call into a *historical* proof, which a flat-state archive cannot
+serve at all. Instead read both heads immediately before and after the run and
+re-run until it lands inside one block; confirm by replaying a differing call
+directly against both nodes while their heads agree.
 
 ## Repro snippet template
 

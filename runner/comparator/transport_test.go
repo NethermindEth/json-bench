@@ -258,3 +258,84 @@ func newTestComparator(t *testing.T, clients []*types.ClientConfig) *Comparator 
 	}
 	return comp
 }
+
+// TestCompareIntegration_RetryTruncatedBody covers a 200 whose body is cut
+// short mid-JSON — what a reused half-closed keep-alive connection produces.
+// The parse failure used to return immediately, spending none of the attempt
+// budget, so the call was dropped from the comparison entirely.
+func TestCompareIntegration_RetryTruncatedBody(t *testing.T) {
+	var mu sync.Mutex
+	attempts := 0
+	flaky := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req := decodeRPC(t, r)
+		if req.Method == "eth_chainId" {
+			writeRPCResult(w, req.ID, "0x1")
+			return
+		}
+		mu.Lock()
+		attempts++
+		n := attempts
+		mu.Unlock()
+		if n < 3 {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":[`))
+			return
+		}
+		writeRPCResult(w, req.ID, "0x123")
+	}))
+	t.Cleanup(flaky.Close)
+
+	stable := newRPCFake(t, "0x1", func(req rpcRequest) interface{} { return "0x123" })
+
+	comp := newTestComparator(t, []*types.ClientConfig{
+		{Name: "flaky", URL: flaky.URL},
+		{Name: "stable", URL: stable.URL},
+	})
+	if _, err := comp.Run(); err != nil {
+		t.Fatalf("Run should recover after retrying the truncated body, got: %v", err)
+	}
+	res := comp.GetResults()[0]
+	if len(res.TransportErrors) != 0 {
+		t.Errorf("a truncated body should be retried, got transport errors %v", res.TransportErrors)
+	}
+	s := comp.Summarize()
+	if s.Identical != 1 || s.TransportError != 0 {
+		t.Errorf("summary = %+v, want 1 identical and no transport errors", s)
+	}
+}
+
+// TestCompareIntegration_TruncatedBodyExhaustedIsClassified pins the reporting
+// side: a body that never parses is reported as a truncated read rather than an
+// anonymous "other" failure, so the operator can tell it from a broken node.
+func TestCompareIntegration_TruncatedBodyExhaustedIsClassified(t *testing.T) {
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req := decodeRPC(t, r)
+		if req.Method == "eth_chainId" {
+			writeRPCResult(w, req.ID, "0x1")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":[`))
+	}))
+	t.Cleanup(broken.Close)
+
+	stable := newRPCFake(t, "0x1", func(req rpcRequest) interface{} { return "0x123" })
+
+	comp := newTestComparator(t, []*types.ClientConfig{
+		{Name: "broken", URL: broken.URL},
+		{Name: "stable", URL: stable.URL},
+	})
+	if _, err := comp.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	res := comp.GetResults()[0]
+	if res.TransportErrorClass["broken"] != TransportTruncated {
+		t.Errorf("transport error class = %v, want %s", res.TransportErrorClass, TransportTruncated)
+	}
+	if len(res.Differences) != 0 {
+		t.Errorf("a call that lost a client must not be compared, got %v", res.Differences)
+	}
+	if !comp.HasTransportErrors() {
+		t.Error("HasTransportErrors should report the lost call")
+	}
+}

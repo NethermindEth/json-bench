@@ -1,0 +1,93 @@
+test_name: "Realistic Gnosis traffic mix"
+description: "The realistic-mix.yaml shape retargeted to Gnosis Chain (chain_id 100). eth_call dominates, with a tail of block, receipt, transaction, log, trace and historical-state reads drawn from rpc-calls/*-gnosis.jsonl. Two deliberate departures from the mainnet mix: there is no debug_traceCall slice (the Debug namespace is off on the archive this was built against, and trace_* covers the same ground), and eth_getProof is head-only because a flat-state archive cannot serve historical proofs. The clients listed here must point at Gnosis endpoints."
+clients:
+  - geth
+  - nethermind
+  - reth
+  - erigon
+  - besu
+duration: "2m"
+rps: 100
+vus: 20
+calls:
+  - name: "eth_call (curated contracts)"
+    file: "./rpc-calls/contracts/wxdai-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 120
+  - name: "eth_call (Aave v3)"
+    file: "./rpc-calls/contracts/aave-v3-pool-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 90
+  - name: "eth_call (Balancer Gyroscope ECLP)"
+    file: "./rpc-calls/contracts/gyroscope-eclp-wsteth-weth-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 90
+  - name: "eth_call (Curve 3pool)"
+    file: "./rpc-calls/contracts/curve-3pool-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 60
+  - name: "eth_call (sDAI)"
+    file: "./rpc-calls/contracts/sdai-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 60
+  - name: "eth_getBlockByNumber (latest)"
+    method: "eth_getBlockByNumber"
+    params:
+      - "latest"
+      - false
+    weight: 103
+  - name: "blocks (historical)"
+    file: "./rpc-calls/historical-blocks-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 60
+  - name: "eth_getBalance (latest)"
+    method: "eth_getBalance"
+    params:
+      - "0xaf204776c7245bF4147c2612BF6e5972Ee483701"
+      - "latest"
+    weight: 69
+  - name: "eth_chainId"
+    method: "eth_chainId"
+    params: []
+    weight: 57
+  - name: "eth_getBlockReceipts (latest)"
+    method: "eth_getBlockReceipts"
+    params:
+      - "latest"
+    weight: 56
+  - name: "eth_getBlockReceipts (historical)"
+    file: "./rpc-calls/eth_getBlockReceipts-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 30
+  - name: "eth_blockNumber"
+    method: "eth_blockNumber"
+    params: []
+    weight: 50
+  - name: "eth_getLogs (historical)"
+    file: "./rpc-calls/get-logs-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 50
+  - name: "transactions (historical)"
+    file: "./rpc-calls/transactions-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 40
+  - name: "eth_getProof (head)"
+    file: "./rpc-calls/proofs/eth_getProof-gnosis-latest.jsonl"
+    file_type: "jsonl"
+    weight: 20
+  - name: "eth_getCode (historical)"
+    file: "./rpc-calls/eth_getCode-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 15
+  - name: "eth_getStorageAt (historical)"
+    file: "./rpc-calls/eth_getStorageAt-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 15
+  - name: "eth_getTransactionCount (historical)"
+    file: "./rpc-calls/eth_getTransactionCount-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 15
+  - name: "traces (historical)"
+    file: "./rpc-calls/traces-gnosis.jsonl"
+    file_type: "jsonl"
+    weight: 12

@@ -10,8 +10,13 @@ runner/cmd/*/*
 !runner/cmd/*/*.go
 !runner/cmd/*/*.sh
 !runner/cmd/*/README.md
-benchmark
+/benchmark
 build/
+
+# `go build ./rpc-calls/scripts/<tool>` drops its binary in the working directory
+/generate-from-chain
+/generate-from-contracts
+/verify-calls
 
 # Environment files
 .env
@@ -56,3 +61,6 @@ json-bench-data/
 
 # Vendored upstream corpora (downloaded by rpc-calls/scripts/generate-from-*/init.sh)
 rpc-calls/sources/
+
+# Out-of-tree datasets staged for the generators
+external-data/

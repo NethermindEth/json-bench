@@ -26,6 +26,9 @@ const (
 	TransportRateLimited = "rate_limited"
 	// TransportTimeout means the request timed out or was cancelled.
 	TransportTimeout = "timeout"
+	// TransportTruncated means a 200 response carried a body that is not valid
+	// JSON, which in practice means it was cut short in transit.
+	TransportTruncated = "truncated_body"
 	// TransportOther covers every other transport failure.
 	TransportOther = "other"
 )
@@ -70,9 +73,12 @@ type rpcTransport struct {
 // client's own rate_limit block in clients.yaml; an unset limit means no cap.
 func newRPCTransport(cfg *ComparisonConfig, client *types.ClientConfig, attempts int, baseDelay time.Duration) *rpcTransport {
 	t := &rpcTransport{
-		name:      client.Name,
-		url:       client.URL,
-		http:      &http.Client{Timeout: time.Duration(cfg.TimeoutSeconds) * time.Second},
+		name: client.Name,
+		url:  client.URL,
+		http: &http.Client{
+			Timeout:   time.Duration(cfg.TimeoutSeconds) * time.Second,
+			Transport: freshConnTransport(),
+		},
 		attempts:  attempts,
 		baseDelay: baseDelay,
 		verbose:   cfg.Verbose,
@@ -89,6 +95,18 @@ func newRPCTransport(cfg *ComparisonConfig, client *types.ClientConfig, attempts
 	if rps > 0 {
 		t.limiter = rate.NewLimiter(rate.Limit(rps), burst)
 	}
+	return t
+}
+
+// freshConnTransport keeps pooled connections short-lived. A node closes idle
+// keep-alive connections on its own schedule; the default 90s IdleConnTimeout
+// will happily hand a half-closed one to the next request, and Go does not
+// silently retry a POST the way it retries idempotent methods. The result is a
+// body cut short mid-JSON, which looks like a broken endpoint rather than a
+// stale socket. Retiring idle connections quickly removes the class.
+func freshConnTransport() *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.IdleConnTimeout = 5 * time.Second
 	return t
 }
 
@@ -168,7 +186,16 @@ func (t *rpcTransport) call(method string, params []interface{}) (map[string]int
 
 		var rawResponse map[string]interface{}
 		if err := json.Unmarshal(body, &rawResponse); err != nil {
-			return nil, fmt.Errorf("failed to parse response: %w", err)
+			// A 200 whose body will not parse is a truncated read, not a node
+			// that disagrees. Retry it like any other transport fault — returning
+			// here would spend none of the attempt budget and silently drop the
+			// call from the comparison.
+			lastErr = &transportError{
+				class:   TransportTruncated,
+				message: fmt.Sprintf("failed to parse response (%d bytes): %v", len(body), err),
+			}
+			delay = backoffDelay(t.baseDelay, attempt+1)
+			continue
 		}
 		return rawResponse, nil
 	}

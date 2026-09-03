@@ -1,10 +1,12 @@
 # Findings in usr/bin/k6 — the load generator binary that grafana/k6 ships
-# prebuilt. Nine are Go stdlib issues, one is golang.org/x/text and one is
-# google.golang.org/grpc, all vendored into that binary. Most need Go 1.26.6;
-# k6 2.1.0 is built with Go 1.26.4 and 2.2.0, the newest release, with 1.26.5,
-# so no available tag clears the set and nothing in this repo rebuilds that
-# binary. They stay suppressed until Grafana publishes a k6 built on a patched
-# toolchain.
+# prebuilt. Nine are Go stdlib issues, one is golang.org/x/text, one is
+# golang.org/x/crypto and two are google.golang.org/grpc, all vendored into that
+# binary. The stdlib set needs Go 1.26.6; k6 2.1.0 is built with Go 1.26.4 and
+# 2.2.0, the newest release, with 1.26.5, and 2.2.0 also still ships
+# x/crypto 0.54.0 and grpc 1.83.0 against fixes in 0.55.0 and 1.83.1 — so no
+# available tag clears the set and nothing in this repo rebuilds that binary.
+# They stay suppressed until Grafana publishes a k6 built on patched
+# dependencies.
 #
 # Scoped by purl, not by path: Trivy leaves PkgPath empty for Go-binary findings,
 # so a path scope silently matches nothing. The purl pins each entry to the exact
@@ -59,6 +61,23 @@ vulnerabilities:
   - id: CVE-2026-39822
     purls: ["pkg:golang/stdlib@v1.26.4"]
     statement: "os.Root symlink traversal in the Go stdlib of the prebuilt k6 binary; needs Go 1.26.5."
+    expired_at: 2026-12-01
+  - id: CVE-2026-56854
+    purls: ["pkg:golang/golang.org/x/crypto@v0.53.0"]
+    statement: >-
+      golang.org/x/crypto/ssh source-address restrictions unenforced for the
+      password, keyboard-interactive, no-client-auth and GSSAPI callbacks,
+      vendored into the prebuilt k6 binary; needs x/crypto 0.55.0. Only reachable
+      in an SSH server built on that package — the image runs no SSH server and
+      neither k6 nor our runner serves SSH.
+    expired_at: 2026-12-01
+  - id: CVE-2026-84304
+    purls: ["pkg:golang/google.golang.org/grpc@v1.81.1"]
+    statement: >-
+      gRPC-Go heap exhaustion from fragmented HTTP/2 DATA frames vendored into
+      the prebuilt k6 binary; needs grpc 1.83.1. Server-side only, driven by an
+      attacker's inbound streams — k6's gRPC module is a client and this suite
+      benchmarks JSON-RPC over HTTP, so no gRPC server is ever listening.
     expired_at: 2026-12-01
   - id: GHSA-hrxh-6v49-42gf
     purls: ["pkg:golang/google.golang.org/grpc@v1.81.1"]
