@@ -131,6 +131,44 @@ a fraction of its target rate reads exactly like one that met it.
 the latencies above describe a slower offered rate than the one configured, and
 the run understates what the node would do at the requested load.
 
+### What the node said about itself
+
+When a client declares a `metrics_url`, the runner reads that endpoint during
+the run and republishes the selected families as `bench_target_<name>`, keeping
+the node's own labels and adding `testid`, `scenario` and `client_type`. Node
+CPU therefore sits on the same timeline as the latency it produced — the
+correlation this exists for.
+
+```yaml
+clients:
+  - name: nethermind
+    url: http://127.0.0.1:8545
+    metrics_url: http://127.0.0.1:9091/metrics
+```
+
+Two things to know:
+
+- **These counters count from when the node started**, not from the start of the
+  run, unlike every other `bench_*` counter. `rate()` and `increase()` behave
+  normally; the absolute value does not describe the benchmark. The CSV and
+  `results.json` report a counter as its delta over the run for that reason.
+- **The name is prefixed rather than passed through**, so a series that reached
+  Prometheus by way of a benchmark is distinguishable from one scraped directly
+  and cannot collide with it. The run's own labels are applied last, so a node
+  publishing a label called `scenario` cannot overwrite which client a sample
+  came from.
+
+Which families are read is chosen by `--target-metric`, repeatable, with a
+trailing `*` matching by prefix. The default set covers generic process and
+runtime families (`process_cpu_seconds_total`,
+`process_resident_memory_bytes`, `go_*`, `dotnet_*`); client-specific ones have
+to be named, because a built-in list of them would rot as each client renames
+its own:
+
+```bash
+--target-metric "process_*" --target-metric "nethermind_*"
+```
+
 ### Run totals
 
 | Series | Type | Meaning |

@@ -77,6 +77,14 @@ type Node struct {
 	// check flaky.
 	ProbeError bool `json:"probe_error,omitempty"`
 
+	// Metrics makes the stub publish a Prometheus endpoint at /metrics, so a
+	// run can be pointed at it the way it would be pointed at a real node's.
+	// CPUSecondsPerRequest and BytesPerRequest make the published figures move
+	// with the load, which is what makes a correlation worth checking.
+	Metrics              bool    `json:"metrics,omitempty"`
+	CPUSecondsPerRequest float64 `json:"cpu_seconds_per_request,omitempty"`
+	BytesPerRequest      float64 `json:"bytes_per_request,omitempty"`
+
 	// ConcurrencyLimit is how many requests the node serves at once, as
 	// Nethermind's JsonRpc.EthModuleConcurrentInstances does. Beyond it
 	// requests queue, so latency degrades with offered load and the node has a
@@ -246,8 +254,43 @@ func (s *Stub) Handler() http.Handler {
 		enc.SetIndent("", "  ")
 		_ = enc.Encode(s.Stats())
 	})
+	if s.cfg.Node.Metrics {
+		mux.HandleFunc("/metrics", s.serveMetrics)
+	}
 	mux.HandleFunc("/", s.serveRPC)
 	return mux
+}
+
+// serveMetrics publishes the shape a node's own metrics endpoint has, with
+// figures that move with the load so a correlation can be checked rather than
+// merely plumbed.
+func (s *Stub) serveMetrics(w http.ResponseWriter, r *http.Request) {
+	stats := s.Stats()
+
+	cpu := float64(stats.Total) * s.cfg.Node.CPUSecondsPerRequest
+	resident := 128 << 20
+	if s.cfg.Node.BytesPerRequest > 0 {
+		resident += int(float64(stats.Total) * s.cfg.Node.BytesPerRequest)
+	}
+
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	fmt.Fprintf(w, `# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total %.6f
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes %d
+# HELP dotnet_collection_count_total GC collection count.
+# TYPE dotnet_collection_count_total counter
+dotnet_collection_count_total{generation="0"} %d
+dotnet_collection_count_total{generation="1"} %d
+# HELP stub_requests_total Requests the stub has served.
+# TYPE stub_requests_total counter
+stub_requests_total %d
+# HELP stub_head_block The head block the stub reports.
+# TYPE stub_head_block gauge
+stub_head_block %d
+`, cpu, resident, stats.Total/10, stats.Total/100, stats.Total, s.cfg.Node.HeadBlock)
 }
 
 type rpcRequest struct {

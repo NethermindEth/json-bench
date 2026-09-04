@@ -575,13 +575,29 @@ For advanced time-series analysis and alerting, you can use Grafana:
 
 5. **Set up alerting** for performance regressions and system issues
 
-#### Scraping node-side metrics
+#### Reading the node's own metrics
 
-When Prometheus is enabled, this tool only ships its own client-side metrics
-(`bench_*`) to it. It does **not** scrape the Geth/Nethermind/etc.
-clients under test — bring
-your own observability for server-side metrics. To add them, point your own
-Prometheus at the node's metrics endpoint (each EL client publishes one):
+Give a client a `metrics_url` and the runner reads that endpoint during the run,
+reporting what the node said about itself beside the latency it produced:
+
+```yaml
+clients:
+  - name: nethermind
+    url: http://127.0.0.1:8545
+    metrics_url: http://127.0.0.1:9091/metrics
+```
+
+Counters are reported as their change over the run, gauges as their range, and
+the selected families are republished to Prometheus as `bench_target_*` so both
+sides sit on one timeline. Choose the families with `--target-metric`
+(repeatable, trailing `*` matches by prefix); the default set is generic process
+and runtime families, so client-specific ones need naming:
+`--target-metric "nethermind_*"`.
+
+This is a point-in-time read taken by the benchmark, not a substitute for
+scraping your nodes continuously. For that, bring
+your own Prometheus and point it at the node's metrics endpoint (each EL client
+publishes one):
 
 ```yaml
 # prometheus.yml — example for a local Geth instance

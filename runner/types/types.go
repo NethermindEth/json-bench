@@ -1,5 +1,10 @@
 package types
 
+import (
+	"sort"
+	"strings"
+)
+
 // ResponseDiff represents a difference between client responses
 type ResponseDiff struct {
 	Method       string                 `json:"method"`
@@ -44,6 +49,67 @@ type MetricSummary struct {
 	SuccessCount     int64   `json:"success_count"`
 	TimeoutRate      float64 `json:"timeout_rate"`
 	ConnectionErrors int64   `json:"connection_errors"`
+}
+
+// TargetMetric summarises one metric family read from the node's own metrics
+// endpoint during a run.
+//
+// A counter's absolute value counts from when the node started and says nothing
+// about this benchmark, so Delta and PerSecond are the fields to read for one;
+// Min, Max and Mean are the fields to read for a gauge.
+type TargetMetric struct {
+	Name   string            `json:"name"`
+	Kind   string            `json:"kind"`
+	Labels map[string]string `json:"labels,omitempty"`
+
+	Scrapes int `json:"scrapes"`
+
+	Min   float64 `json:"min"`
+	Max   float64 `json:"max"`
+	Mean  float64 `json:"mean"`
+	First float64 `json:"first"`
+	Last  float64 `json:"last"`
+
+	Delta     float64 `json:"delta,omitempty"`
+	PerSecond float64 `json:"per_second,omitempty"`
+}
+
+// Label renders the metric's identity as name{k=v,...}, for a report line.
+func (m TargetMetric) Label() string {
+	if len(m.Labels) == 0 {
+		return m.Name
+	}
+	names := make([]string, 0, len(m.Labels))
+	for name := range m.Labels {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		parts = append(parts, name+"="+m.Labels[name])
+	}
+	return m.Name + "{" + strings.Join(parts, ",") + "}"
+}
+
+// TargetMetricPoint is one scraped value, for republishing.
+type TargetMetricPoint struct {
+	Name   string
+	Kind   string
+	Labels map[string]string
+	Value  float64
+}
+
+// TargetMetrics is what a node reported about itself during a run.
+type TargetMetrics struct {
+	Endpoint string         `json:"endpoint"`
+	Metrics  []TargetMetric `json:"metrics,omitempty"`
+
+	// ScrapeErrors counts reads that failed. A non-zero count means the
+	// node-side figures cover only part of the run, which is different from
+	// the node having been idle.
+	ScrapeErrors int    `json:"scrape_errors,omitempty"`
+	LastError    string `json:"last_error,omitempty"`
 }
 
 // TimeSeriesPoint represents a single data point in time series
@@ -122,9 +188,17 @@ type ClientMetrics struct {
 	// Advanced metrics
 	ConnectionMetrics ConnectionMetrics            `json:"connection_metrics"`
 	TimeSeries        map[string][]TimeSeriesPoint `json:"time_series"`
-	SystemMetrics     []SystemMetrics              `json:"system_metrics"`
-	ErrorTypes        map[string]int64             `json:"error_types"`
-	StatusCodes       map[int]int64                `json:"status_codes"`
+
+	// SystemMetrics describes the host the load generator ran on, not the node
+	// under test. Those differ whenever the run is remote, and are the same
+	// machine competing with itself when it is not.
+	SystemMetrics []SystemMetrics `json:"system_metrics"`
+
+	// TargetMetrics is what the node said about itself, read from its own
+	// metrics endpoint while the load ran.
+	TargetMetrics *TargetMetrics   `json:"target_metrics,omitempty"`
+	ErrorTypes    map[string]int64 `json:"error_types"`
+	StatusCodes   map[int]int64    `json:"status_codes"`
 }
 
 // ConnectionMetrics represents connection-related metrics

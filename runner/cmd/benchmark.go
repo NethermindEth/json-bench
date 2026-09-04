@@ -45,6 +45,9 @@ var (
 	benchmarkPushInterval       time.Duration
 	benchmarkSkipPreflight      bool
 	benchmarkAllowChainMismatch bool
+	benchmarkTargetMetrics      []string
+	benchmarkTargetInterval     time.Duration
+	benchmarkNoTargetMetrics    bool
 )
 
 var benchmarkCmd = &cobra.Command{
@@ -75,6 +78,11 @@ func init() {
 	benchmarkCmd.Flags().DurationVar(&benchmarkPushInterval, "prometheus-push-interval", promrw.DefaultPushInterval, "How often to publish metrics during the run")
 	benchmarkCmd.Flags().BoolVar(&benchmarkSkipPreflight, "skip-preflight", false, "Do not identify the targets before running (version, chain, head and sync state go unrecorded)")
 	benchmarkCmd.Flags().BoolVar(&benchmarkAllowChainMismatch, "allow-chain-mismatch", false, "Benchmark targets that are on different chains, which otherwise fails preflight")
+	benchmarkCmd.Flags().StringArrayVar(&benchmarkTargetMetrics, "target-metric", nil,
+		"Metric family to read from a client's metrics_url, repeatable, trailing * matches by prefix (e.g. nethermind_*). Replaces the default set.")
+	benchmarkCmd.Flags().DurationVar(&benchmarkTargetInterval, "target-metric-interval", engine.DefaultTargetMetricsOptions().Interval,
+		"How often to read each client's metrics_url")
+	benchmarkCmd.Flags().BoolVar(&benchmarkNoTargetMetrics, "no-target-metrics", false, "Do not read the clients' own metrics endpoints")
 }
 
 func runBenchmark(cmd *cobra.Command, args []string) error {
@@ -170,6 +178,13 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	opts.Transport.HTTP2 = benchmarkHTTP2
 	opts.SkipPreflight = benchmarkSkipPreflight
 	opts.Preflight.AllowChainMismatch = benchmarkAllowChainMismatch
+	opts.TargetMetrics.Interval = benchmarkTargetInterval
+	if len(benchmarkTargetMetrics) > 0 {
+		opts.TargetMetrics.Patterns = benchmarkTargetMetrics
+	}
+	if benchmarkNoTargetMetrics {
+		opts.TargetMetrics.Patterns = nil
+	}
 
 	benchmarkResults, breaches, runErr := engine.Run(ctx, cfg, opts)
 	if benchmarkResults == nil {
@@ -218,6 +233,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	}
 
 	logOutcomes(benchmarkResults)
+	logTargetMetrics(benchmarkResults)
 	logComparisons(benchmarkResults)
 
 	for _, breach := range breaches {
@@ -296,6 +312,31 @@ func writeManifest(dir string, result *types.BenchmarkResult) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "manifest.json"), append(data, '\n'), 0o644)
+}
+
+// logTargetMetrics reports what each node said about itself. A counter is
+// reported as its change over the run, since its absolute value counts from
+// when the node started.
+func logTargetMetrics(result *types.BenchmarkResult) {
+	for name, client := range result.ClientMetrics {
+		target := client.TargetMetrics
+		if target == nil || len(target.Metrics) == 0 {
+			continue
+		}
+
+		logger.Infof("%s reported about itself (%s):", name, target.Endpoint)
+		for _, metric := range target.Metrics {
+			label := metric.Label()
+			if metric.Kind == "counter" {
+				logger.Infof("  %-52s +%.3f over the run (%.3f/s)", label, metric.Delta, metric.PerSecond)
+				continue
+			}
+			logger.Infof("  %-52s min %.3f  mean %.3f  max %.3f", label, metric.Min, metric.Mean, metric.Max)
+		}
+		if target.ScrapeErrors > 0 {
+			logger.Warnf("  %d scrape(s) failed, so these cover only part of the run: %s", target.ScrapeErrors, target.LastError)
+		}
+	}
 }
 
 // logComparisons reports the pairwise test between clients. The shift comes

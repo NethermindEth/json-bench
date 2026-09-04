@@ -151,6 +151,18 @@ func BuildSeries(snap Snapshot) []promrw.Series {
 		add("achieved_rate", base, client.Delivery.AchievedRate())
 		add("inflight", base, float64(client.Delivery.Inflight))
 		add("inflight_peak", base, float64(client.Delivery.InflightPeak))
+
+		// The node's own metrics, republished under this namespace so they sit
+		// on the same timeline as the latency above. The names are prefixed
+		// rather than passed through, so a series that reached Prometheus by
+		// way of a benchmark is distinguishable from one scraped directly, and
+		// cannot collide with it.
+		for _, point := range client.Target {
+			// The run's identity labels are applied last, so a node metric
+			// that happens to carry a label called scenario or testid cannot
+			// overwrite which client the sample came from.
+			add("target_"+point.Name, withLabels(point.Labels, base), point.Value)
+		}
 	}
 
 	return out

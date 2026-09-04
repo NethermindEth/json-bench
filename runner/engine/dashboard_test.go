@@ -239,6 +239,11 @@ func TestMetricsDocCoversEveryFamily(t *testing.T) {
 		if _, ok := emitted[name]; ok || families[name] {
 			continue
 		}
+		// The republished node metrics are a prefix whose suffix comes from the
+		// node, so they cannot be enumerated from a capture.
+		if name == Namespace+"_target" || strings.HasPrefix(name, Namespace+"_target_") {
+			continue
+		}
 		// A family plus a stat suffix, e.g. bench_http_req_duration_p99.
 		assert.True(t, families[trimTrendStat(name)],
 			"METRICS.md documents %s, which is not emitted", name)

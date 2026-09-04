@@ -395,6 +395,11 @@ type ClientSeries struct {
 	Series     []MethodSeries
 	Totals     []MethodTotals
 
+	// Target holds what the node said about itself, read from its own metrics
+	// endpoint. Republishing it here puts the node's resource use on the same
+	// timeline as the latency it produced, which is the point of reading it.
+	Target []types.TargetMetricPoint
+
 	Duration   types.MetricSummary
 	QueueDelay types.MetricSummary
 	Count      int64

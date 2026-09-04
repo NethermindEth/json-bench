@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/jsonrpc-bench/runner/config"
+	"github.com/jsonrpc-bench/runner/types"
 )
 
 // Sink receives cumulative metric snapshots while the run is in progress.
@@ -24,6 +27,7 @@ type runState struct {
 	sentBytes  map[string]float64
 	recvBytes  map[string]float64
 	deliveries map[string]*Delivery
+	scrapers   map[string]*TargetScraper
 }
 
 func newRunState(testName string, targets []*target) *runState {
@@ -33,6 +37,7 @@ func newRunState(testName string, targets []*target) *runState {
 		sentBytes:  make(map[string]float64, len(targets)),
 		recvBytes:  make(map[string]float64, len(targets)),
 		deliveries: make(map[string]*Delivery, len(targets)),
+		scrapers:   make(map[string]*TargetScraper),
 	}
 	for _, tgt := range targets {
 		rs.sentBytes[tgt.name] = 0
@@ -146,7 +151,14 @@ func (rs *runState) byteTotals() (sent, recv map[string]float64) {
 // snapshot builds the cumulative state to publish.
 func (rs *runState) snapshot(at time.Time) Snapshot {
 	sent, recv := rs.byteTotals()
-	return rs.accum.Snapshot(rs.testName, at, rs.Deliveries(), sent, recv)
+	snap := rs.accum.Snapshot(rs.testName, at, rs.Deliveries(), sent, recv)
+
+	if target := rs.targetSeries(); len(target) > 0 {
+		for i := range snap.Clients {
+			snap.Clients[i].Target = target[snap.Clients[i].Name]
+		}
+	}
+	return snap
 }
 
 // startPusher publishes a snapshot on the configured interval and returns a
@@ -200,4 +212,95 @@ func (rs *runState) startPusher(ctx context.Context, opts Options, log *logrus.L
 			log.WithError(err).Warn("Failed to close the metrics sink")
 		}
 	}
+}
+
+// startTargetScrapers reads each node's own metrics endpoint alongside the
+// load, and returns a function that stops them. Only clients declaring a
+// metrics_url are scraped; the rest simply report nothing, which is
+// distinguishable from reporting zero.
+func (rs *runState) startTargetScrapers(ctx context.Context, cfg *config.Config, opts Options, log *logrus.Logger) func() {
+	scrapers := make(map[string]*TargetScraper)
+	for _, client := range cfg.ResolvedClients {
+		if client.MetricsURL == "" {
+			continue
+		}
+		scrapers[client.Name] = NewTargetScraper(client.Name, client.MetricsURL, opts.TargetMetrics, log)
+	}
+	if len(scrapers) == 0 {
+		return func() {}
+	}
+
+	// The scrapers outlive ctx so a cancelled run still takes its closing
+	// sample, which is what a counter's delta is measured against.
+	scrapeCtx, stop := context.WithCancel(context.WithoutCancel(ctx))
+
+	var wg sync.WaitGroup
+	for name, scraper := range scrapers {
+		log.WithFields(logrus.Fields{"client": name, "endpoint": scraper.url, "interval": opts.TargetMetrics.Interval}).
+			Info("Reading the node's own metrics during the run")
+		wg.Add(1)
+		go func(scraper *TargetScraper) {
+			defer wg.Done()
+			scraper.Run(scrapeCtx)
+		}(scraper)
+	}
+
+	rs.mu.Lock()
+	rs.scrapers = scrapers
+	rs.mu.Unlock()
+
+	return func() {
+		stop()
+		wg.Wait()
+
+		for name, scraper := range scrapers {
+			if errs, err := scraper.Err(); errs > 0 {
+				log.WithError(err).WithField("client", name).
+					Warnf("%d scrape(s) of %s failed, so its node-side figures cover only part of the run", errs, name)
+			}
+		}
+	}
+}
+
+// targetMetrics returns what a node reported about itself, or nil when it was
+// not scraped.
+func (rs *runState) targetMetrics(client string) *types.TargetMetrics {
+	rs.mu.Lock()
+	scraper := rs.scrapers[client]
+	rs.mu.Unlock()
+
+	if scraper == nil {
+		return nil
+	}
+
+	errs, lastErr := scraper.Err()
+	out := &types.TargetMetrics{
+		Endpoint:     scraper.url,
+		Metrics:      scraper.Summarize(),
+		ScrapeErrors: errs,
+	}
+	if lastErr != nil {
+		out.LastError = lastErr.Error()
+	}
+	return out
+}
+
+// targetSeries returns the latest scraped value of every selected family, for
+// republishing beside the client-side metrics.
+func (rs *runState) targetSeries() map[string][]types.TargetMetricPoint {
+	rs.mu.Lock()
+	scrapers := make(map[string]*TargetScraper, len(rs.scrapers))
+	for name, scraper := range rs.scrapers {
+		scrapers[name] = scraper
+	}
+	rs.mu.Unlock()
+
+	if len(scrapers) == 0 {
+		return nil
+	}
+	out := make(map[string][]types.TargetMetricPoint, len(scrapers))
+	for name, scraper := range scrapers {
+		out[name] = scraper.Series()
+	}
+	return out
 }

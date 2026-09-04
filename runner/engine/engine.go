@@ -39,6 +39,10 @@ type Options struct {
 	// PushInterval is how often Sink is given a snapshot.
 	PushInterval time.Duration
 
+	// TargetMetrics controls reading each node's own metrics endpoint during
+	// the run. Scraping happens only for clients that declare a metrics_url.
+	TargetMetrics TargetMetricsOptions
+
 	// WriteSamples persists the per-request records. On by default because
 	// offline re-aggregation and any later comparison depend on them.
 	WriteSamples bool
@@ -54,11 +58,12 @@ type Options struct {
 
 func DefaultOptions() Options {
 	return Options{
-		Saturation:   SaturationQueue,
-		Transport:    DefaultTransportOptions(),
-		WriteSamples: true,
-		PushInterval: promrw.DefaultPushInterval,
-		Logger:       logrus.New(),
+		Saturation:    SaturationQueue,
+		Transport:     DefaultTransportOptions(),
+		WriteSamples:  true,
+		PushInterval:  promrw.DefaultPushInterval,
+		TargetMetrics: DefaultTargetMetricsOptions(),
+		Logger:        logrus.New(),
 	}
 }
 
@@ -133,8 +138,12 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 
 	start := time.Now()
 	run := newRunState(cfg.TestName, targets)
+	stopScrapers := run.startTargetScrapers(ctx, cfg, opts, log)
 	stopPusher := run.startPusher(ctx, opts, log)
 	runErr := dispatch(ctx, targets, requests, sched, concurrency, opts, run, writer)
+	// The scrapers stop before the final push, so its snapshot carries the
+	// node-side figures for the whole run.
+	stopScrapers()
 	stopPusher()
 	end := time.Now()
 	deliveries := run.Deliveries()
@@ -143,6 +152,7 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 	for _, tgt := range targets {
 		cm := run.accum.ClientMetrics(tgt.name, deliveries[tgt.name])
 		cm.Delivery.TargetRPS = float64(cfg.RPS)
+		cm.TargetMetrics = run.targetMetrics(tgt.name)
 		clients[tgt.name] = cm
 	}
 
