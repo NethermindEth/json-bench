@@ -75,6 +75,19 @@ Things that bite if missed:
 Ready-made profiles live in `config/benchmark/`; reuse one before writing a new
 file.
 
+To keep start-up out of the numbers, add `warmup: "30s"` — those requests are
+issued and then excluded from every reported statistic. To move the rate instead
+of holding it, replace `duration` with `stages`:
+
+```yaml
+rps: 10            # the rate the first stage ramps from
+stages:
+  - duration: "1m"
+    target: 500    # ramp 10 -> 500
+  - duration: "3m"
+    target: 500    # hold there
+```
+
 ## 4. Run
 
 ```bash

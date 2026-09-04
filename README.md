@@ -209,6 +209,46 @@ Either way the exports and the report carry `scheduled`, `sent`, `late`,
 `dropped` and the achieved rate, because a run that offered a fraction of its
 requested load must not read like one that met it.
 
+#### Warmup and ramps
+
+The first seconds of a run measure cold caches, an empty connection pool and a
+runtime that has not compiled anything yet. `warmup` applies load for a period
+before the measured window opens and excludes those requests from every reported
+statistic:
+
+```yaml
+duration: "5m"
+warmup: "30s"
+rps: 200
+vus: 40
+```
+
+The warmup requests are still written to the sample file, marked `warmup`, so
+nothing is thrown away — only the report's percentiles, error rate, throughput
+and delivery accounting describe the measured window alone.
+
+To move the rate rather than hold it, use `stages`. Each stage ramps linearly
+from wherever the previous one left off to its `target`, with `rps` as the
+starting rate; a stage whose target equals the previous one holds. Stages set
+the run's length, so `duration` is omitted:
+
+```yaml
+rps: 10
+vus: 200
+stages:
+  - duration: "1m"
+    target: 500      # ramp 10 -> 500
+  - duration: "3m"
+    target: 500      # hold
+  - duration: "30s"
+    target: 0        # ramp down
+```
+
+This follows k6's `ramping-arrival-rate` shape. Warmup is the addition: k6 has
+no way to discard a period from its statistics, and for a benchmark that is the
+difference between reporting steady state and reporting the average of steady
+state and start-up.
+
 #### Errors
 
 A JSON-RPC error arrives as HTTP 200, so every response is classified into one

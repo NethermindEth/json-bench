@@ -59,6 +59,14 @@ func (rs *runState) end(client string, at time.Time) {
 	rs.delivery(client).Finished = at
 }
 
+// dispatched records when a request went out, which bounds the window the
+// offered rate is measured over.
+func (rs *runState) dispatched(client string, at time.Time) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	rs.delivery(client).LastDispatch = at
+}
+
 func (rs *runState) scheduled(client string) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
@@ -71,10 +79,14 @@ func (rs *runState) dropped(client string) {
 	rs.delivery(client).Dropped++
 }
 
-func (rs *runState) sent(client string, queue, lateAfter time.Duration) {
+func (rs *runState) sent(client string, queue, lateAfter time.Duration, warmup bool) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	d := rs.delivery(client)
+	if warmup {
+		d.WarmupSent++
+		return
+	}
 	d.Sent++
 	if lateAfter > 0 && queue > lateAfter {
 		d.Late++
@@ -106,6 +118,13 @@ func (rs *runState) Deliveries() map[string]Delivery {
 }
 
 func (rs *runState) observe(s Sample) {
+	// A warmup request was issued but is not part of what the run reports: its
+	// latency describes cold caches and an empty connection pool, which is the
+	// thing warmup exists to keep out of the steady-state percentiles.
+	if s.Warmup {
+		return
+	}
+
 	rs.accum.Add(s)
 
 	rs.mu.Lock()

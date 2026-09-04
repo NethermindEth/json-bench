@@ -129,12 +129,19 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 		}()
 	}
 
-	log.WithFields(logrus.Fields{
+	fields := logrus.Fields{
 		"clients":     len(targets),
 		"requests":    sched.total,
 		"concurrency": concurrency,
 		"saturation":  opts.Saturation,
-	}).Info("Running benchmark")
+	}
+	if sched.warmup > 0 {
+		fields["warmup"] = sched.warmup.String()
+	}
+	if len(cfg.Stages) > 0 {
+		fields["stages"] = len(cfg.Stages)
+	}
+	log.WithFields(fields).Info("Running benchmark")
 
 	start := time.Now()
 	run := newRunState(cfg.TestName, targets)
@@ -256,6 +263,12 @@ func reportDelivery(log *logrus.Logger, client string, cfg *config.Config, sched
 		fields["target_rps"] = cfg.RPS
 	}
 
+	if d.WarmupSent > 0 {
+		entry := log.WithField("client", client)
+		entry.Infof("%s discarded %d warmup request(s); everything reported below describes the measured window only",
+			client, d.WarmupSent)
+	}
+
 	entry := log.WithFields(fields)
 	switch {
 	case d.Dropped > 0:
@@ -281,6 +294,7 @@ func runSummary(cfg *config.Config, sched schedule, deliveries map[string]Delive
 			"elapsed_seconds":    d.Elapsed().Seconds(),
 			"max_queue_delay_ms": msOf(d.MaxQueueDelay()),
 			"inflight_peak":      d.InflightPeak,
+			"warmup_sent":        d.WarmupSent,
 		}
 	}
 
@@ -296,7 +310,9 @@ func runSummary(cfg *config.Config, sched schedule, deliveries map[string]Delive
 			"target_rps":  cfg.RPS,
 			"iterations":  cfg.Iterations,
 			"concurrency": cfg.VUs,
-			"duration":    cfg.Duration,
+			"duration":    sched.duration.String(),
+			"warmup":      sched.warmup.String(),
+			"stages":      len(cfg.Stages),
 			"seed":        cfg.Seed,
 			"requests":    sched.total,
 		},

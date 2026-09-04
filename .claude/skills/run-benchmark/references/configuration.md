@@ -30,7 +30,14 @@ test_name: "my-benchmark"        # required
 description: "..."               # optional
 clients:                         # required: names from the clients registry
   - nethermind_local
-duration: "1m"                   # required, Go duration syntax ("30s", "5m", ...)
+duration: "1m"                   # required unless `stages` is used, Go duration syntax
+warmup: "10s"                    # optional; load applied before the measured window,
+                                 #   excluded from every reported statistic
+stages:                          # optional; ramps the rate instead of holding it.
+  - duration: "30s"              #   Sets the run's length, so `duration` must be omitted.
+    target: 200                  #   Each stage ramps linearly from the previous rate
+  - duration: "1m"               #   (`rps` for the first) to its target.
+    target: 200
 rps: 300                         # constant-arrival-rate executor...
 iterations: 1000                 # ...OR shared-iterations executor (pick one)
 vus: 20                          # ALWAYS set explicitly: loader requires vus > 0 and

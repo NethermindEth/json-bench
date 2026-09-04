@@ -11,6 +11,16 @@ import (
 // policy, meaning the generator could not offer the requested load.
 var ErrSaturated = errors.New("generator could not sustain the requested rate")
 
+// dispatchGrace is how far past the run's window a request may still be sent.
+//
+// Without it the last arrival of a ramped run — placed within a millisecond of
+// the window's end — is dropped whenever the scheduler wakes a moment late,
+// reporting a shortfall the generator did not have. A run that is genuinely
+// behind is behind by far more than this, so the "stop rather than overrun"
+// property is kept, and a hundred milliseconds of overrun on a run's length is
+// immaterial.
+const dispatchGrace = 100 * time.Millisecond
+
 // Delivery is the load actually offered, as distinct from the load requested.
 // Every field here is absent from the k6 pipeline, which is how a run that
 // delivered a fraction of its target could read as a clean result.
@@ -27,8 +37,20 @@ type Delivery struct {
 	Inflight     int
 	InflightPeak int
 
+	// WarmupSent counts requests issued before the measured window opened.
+	// They are excluded from every field above, which all describe the measured
+	// window only.
+	WarmupSent int
+
 	Started  time.Time
 	Finished time.Time
+
+	// LastDispatch is when the final request went out. The offered rate is
+	// measured against this rather than against Finished, which also covers
+	// draining the requests still in flight — seconds of it when the endpoint
+	// is queueing, which would understate the rate the generator managed to
+	// offer.
+	LastDispatch time.Time
 }
 
 // Elapsed is how long the run actually took, which is what throughput divides by.
@@ -43,10 +65,19 @@ func (d Delivery) Elapsed() time.Duration {
 	return end.Sub(d.Started)
 }
 
+// OfferedWindow is how long the generator spent dispatching, which is the
+// period the offered rate is a rate over.
+func (d Delivery) OfferedWindow() time.Duration {
+	if d.Started.IsZero() || d.LastDispatch.IsZero() || !d.LastDispatch.After(d.Started) {
+		return d.Elapsed()
+	}
+	return d.LastDispatch.Sub(d.Started)
+}
+
 // AchievedRate is the requests per second the generator actually offered.
 func (d Delivery) AchievedRate() float64 {
-	if elapsed := d.Elapsed().Seconds(); elapsed > 0 {
-		return float64(d.Sent) / elapsed
+	if window := d.OfferedWindow().Seconds(); window > 0 {
+		return float64(d.Sent) / window
 	}
 	return 0
 }
@@ -86,8 +117,8 @@ func runClient(
 		aborted bool
 	)
 
-	rs.begin(tgt.name, start)
-	deadline := start.Add(sched.duration)
+	rs.begin(tgt.name, sched.measureFrom(start))
+	deadline := start.Add(sched.duration + dispatchGrace)
 	lateAfter := sched.lateThreshold()
 
 	for i := 0; i < sched.total; i++ {
@@ -96,16 +127,22 @@ func runClient(
 			break
 		}
 
+		warmup := sched.isWarmup(start, due)
+
 		// Requests still unsent when the run's window closes are dropped rather
 		// than extending the run, so the measured window matches the configured
 		// one and a shortfall shows up as drops instead of a longer duration.
 		if time.Now().After(deadline) {
-			rs.scheduled(tgt.name)
-			rs.dropped(tgt.name)
+			if !warmup {
+				rs.scheduled(tgt.name)
+				rs.dropped(tgt.name)
+			}
 			continue
 		}
 
-		rs.scheduled(tgt.name)
+		if !warmup {
+			rs.scheduled(tgt.name)
+		}
 
 		acquired, fatal := acquireSlot(ctx, slots, policy)
 		if fatal {
@@ -113,12 +150,17 @@ func runClient(
 			break
 		}
 		if !acquired {
-			rs.dropped(tgt.name)
+			if !warmup {
+				rs.dropped(tgt.name)
+			}
 			continue
 		}
 
 		req := requests[i]
 		dispatched := time.Now()
+		if !warmup {
+			rs.dispatched(tgt.name, dispatched)
+		}
 		queue := time.Duration(0)
 		if sched.paced() && dispatched.After(due) {
 			queue = dispatched.Sub(due)
@@ -134,7 +176,8 @@ func runClient(
 			}()
 
 			sample := issue(ctx, tgt, req, due, dispatched, queue)
-			rs.sent(tgt.name, queue, lateAfter)
+			sample.Warmup = warmup
+			rs.sent(tgt.name, queue, lateAfter, warmup)
 			onSample(sample)
 		}()
 	}

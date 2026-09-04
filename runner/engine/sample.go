@@ -81,6 +81,11 @@ type Sample struct {
 	ResponseBytes    int
 	ConnectionReused bool
 	Error            string
+
+	// Warmup marks a request issued before the measured window opened. It is
+	// written to the sample file so nothing is lost, and excluded from every
+	// reported statistic.
+	Warmup bool
 }
 
 // Service is the time the endpoint took: send to last byte.
@@ -113,6 +118,7 @@ type sampleRecord struct {
 	RequestBytes     int     `json:"req_bytes"`
 	ResponseBytes    int     `json:"resp_bytes"`
 	ConnectionReused bool    `json:"conn_reused"`
+	Warmup           bool    `json:"warmup,omitempty"`
 	Error            string  `json:"error,omitempty"`
 }
 
@@ -167,6 +173,7 @@ func (w *SampleWriter) Write(s Sample) error {
 		RequestBytes:     s.RequestBytes,
 		ResponseBytes:    s.ResponseBytes,
 		ConnectionReused: s.ConnectionReused,
+		Warmup:           s.Warmup,
 		Error:            s.Error,
 	})
 }
@@ -233,6 +240,7 @@ func ReadSamples(r io.Reader) ([]Sample, error) {
 			RequestBytes:     rec.RequestBytes,
 			ResponseBytes:    rec.ResponseBytes,
 			ConnectionReused: rec.ConnectionReused,
+			Warmup:           rec.Warmup,
 			Error:            rec.Error,
 		})
 	}

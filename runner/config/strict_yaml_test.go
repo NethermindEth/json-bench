@@ -137,3 +137,77 @@ func TestUnmarshalStrictTreatsEmptyDocumentAsZeroValue(t *testing.T) {
 	require.NoError(t, UnmarshalStrict([]byte("# only a comment\n"), &cfg))
 	assert.Empty(t, cfg.TestName)
 }
+
+func TestLoadShapeValidation(t *testing.T) {
+	base := `
+test_name: "shape"
+clients: ["geth"]
+vus: 10
+calls:
+  - name: "eth_call"
+    method: "eth_call"
+    params: []
+    weight: 1
+`
+	cases := map[string]struct {
+		extra string
+		error string
+	}{
+		"a rate for a duration":        {extra: "duration: \"1m\"\nrps: 100\n"},
+		"a fixed number of iterations": {extra: "duration: \"1m\"\niterations: 500\n"},
+		"a ramp through stages":        {extra: "rps: 10\nstages:\n  - duration: \"30s\"\n    target: 100\n"},
+		"a ramp with a warmup":         {extra: "rps: 10\nwarmup: \"5s\"\nstages:\n  - duration: \"30s\"\n    target: 100\n"},
+
+		// The run's length must be stated once.
+		"stages and duration together": {
+			extra: "duration: \"1m\"\nrps: 10\nstages:\n  - duration: \"30s\"\n    target: 100\n",
+			error: "duration must be omitted",
+		},
+		"stages and iterations together": {
+			extra: "iterations: 100\nstages:\n  - duration: \"30s\"\n    target: 100\n",
+			error: "cannot be combined with iterations",
+		},
+		// Warmup discards a period, which needs the load paced by time.
+		"warmup with iterations": {
+			extra: "duration: \"1m\"\niterations: 100\nwarmup: \"5s\"\n",
+			error: "cannot be combined with iterations",
+		},
+		"negative stage target": {
+			extra: "rps: 10\nstages:\n  - duration: \"30s\"\n    target: -1\n",
+			error: "negative target",
+		},
+		"zero-length stage": {
+			extra: "rps: 10\nstages:\n  - duration: \"0s\"\n    target: 10\n",
+			error: "positive duration",
+		},
+		"unparseable stage duration": {
+			extra: "rps: 10\nstages:\n  - duration: \"soon\"\n    target: 10\n",
+			error: "invalid duration",
+		},
+		"unparseable warmup": {
+			extra: "duration: \"1m\"\nrps: 10\nwarmup: \"soon\"\n",
+			error: "invalid warmup",
+		},
+		"neither rate nor iterations": {
+			extra: "duration: \"1m\"\n",
+			error: "either iterations or rps",
+		},
+		"no length at all": {
+			extra: "rps: 100\n",
+			error: "duration is required",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeTemp(t, "config.yaml", base+tc.extra)
+			_, err := NewConfigLoader(registryWith(t, "geth")).LoadTestConfig(path)
+			if tc.error == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.error)
+		})
+	}
+}

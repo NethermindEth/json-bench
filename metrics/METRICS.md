@@ -27,6 +27,10 @@ the Prometheus base unit and what k6 wrote. `0.0429` is a 42.9 ms call.
 **Counters are cumulative in the ordinary Prometheus sense**, so `irate()` and
 `increase()` behave normally on the `_total` families.
 
+**A run's `warmup` period is absent from all of it.** Warmup requests are
+issued but excluded from every series here, so a latency panel shows steady
+state rather than the average of steady state and start-up.
+
 ## Labels
 
 | Label | On | Meaning |

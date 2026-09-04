@@ -157,6 +157,17 @@ type DeliveryMetrics struct {
 	MaxDispatchDelayMs float64 `json:"max_dispatch_delay_ms"`
 	InflightPeak       int     `json:"inflight_peak"`
 	ElapsedSeconds     float64 `json:"elapsed_seconds"`
+
+	// OfferedSeconds is how long the generator spent dispatching. It is shorter
+	// than ElapsedSeconds when the endpoint was still draining in-flight work
+	// after the last request went out, and it is the window AchievedRPS is a
+	// rate over.
+	OfferedSeconds float64 `json:"offered_seconds"`
+
+	// WarmupSent counts requests issued before the measured window opened.
+	// Every other field here, and every latency figure in the report, describes
+	// the measured window only.
+	WarmupSent int64 `json:"warmup_sent,omitempty"`
 }
 
 // Complete reports whether every scheduled request was sent on schedule.

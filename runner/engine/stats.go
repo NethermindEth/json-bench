@@ -308,6 +308,8 @@ func (a *Accumulator) ClientMetrics(name string, delivery Delivery) *types.Clien
 		MaxDispatchDelayMs: msOf(delivery.MaxQueueDelay()),
 		InflightPeak:       delivery.InflightPeak,
 		ElapsedSeconds:     elapsed,
+		OfferedSeconds:     delivery.OfferedWindow().Seconds(),
+		WarmupSent:         int64(delivery.WarmupSent),
 	}
 
 	for method, g := range byMethod {

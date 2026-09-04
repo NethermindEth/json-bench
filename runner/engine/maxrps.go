@@ -199,6 +199,7 @@ func FindMaxRPS(ctx context.Context, cfg *config.Config, opts Options, search Se
 		searchCfg := *cfg
 		searchCfg.RPS = 0
 		searchCfg.Iterations = 0
+		searchCfg.Stages = nil
 		searchCfg.Duration = search.ProbeDuration.String()
 		probeOpts := opts
 		probeOpts.Saturation = SaturationDrop
@@ -210,6 +211,7 @@ func FindMaxRPS(ctx context.Context, cfg *config.Config, opts Options, search Se
 		probeCfg := *cfg
 		probeCfg.RPS = rps
 		probeCfg.Iterations = 0
+		probeCfg.Stages = nil
 		probeCfg.Duration = search.ProbeDuration.String()
 
 		probeOpts := opts
