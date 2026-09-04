@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,10 +138,10 @@ func TestOutcomeClasses(t *testing.T) {
 		cfg.Faults = Faults{HTTP500Rate: 1}
 		srv, stub := serve(t, cfg)
 
-		r := call(t, srv.URL, "eth_blockNumber", 1)
+		r := call(t, srv.URL, "eth_call", 1)
 		require.NoError(t, r.err)
 		assert.Equal(t, http.StatusInternalServerError, r.status)
-		assert.EqualValues(t, 1, stub.Stats().ByMethod["eth_blockNumber"][OutcomeHTTPError])
+		assert.EqualValues(t, 1, stub.Stats().ByMethod["eth_call"][OutcomeHTTPError])
 	})
 
 	t.Run("rate limited fault sets Retry-After", func(t *testing.T) {
@@ -220,4 +221,49 @@ func TestInvalidConfigIsRejected(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+// A pre-flight check reads these to establish what a node is, so they answer
+// immediately and are not subject to the configured latency or faults: an
+// unrelated fault rate must not make a pre-flight check flaky.
+func TestIdentityProbesAreExemptFromLatencyAndFaults(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Node = Node{ClientVersion: "Nethermind/v1.31.0", ChainID: 100, HeadBlock: 0x2000}
+	cfg.Default.Latency = &Latency{Kind: LatencyFixed, MS: 500}
+	cfg.Faults = Faults{HTTP500Rate: 1}
+	srv, _ := serve(t, cfg)
+
+	start := time.Now()
+	for method, want := range map[string]string{
+		"web3_clientVersion": `"Nethermind/v1.31.0"`,
+		"eth_chainId":        `"0x64"`,
+		"eth_blockNumber":    `"0x2000"`,
+		"eth_syncing":        `false`,
+	} {
+		r := call(t, srv.URL, method, 1)
+		require.NoError(t, r.err, method)
+		assert.Equal(t, http.StatusOK, r.status, method)
+		assert.Contains(t, r.body, want, method)
+	}
+	assert.Less(t, time.Since(start), 400*time.Millisecond, "probes must not pay the configured latency")
+}
+
+func TestSyncingNodeReportsProgress(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Node.Syncing = true
+	srv, _ := serve(t, cfg)
+
+	r := call(t, srv.URL, "eth_syncing", 1)
+	require.NoError(t, r.err)
+	assert.Contains(t, r.body, "highestBlock")
+}
+
+func TestProbeErrorModelsAnUnanswerableNode(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Node.ProbeError = true
+	srv, _ := serve(t, cfg)
+
+	r := call(t, srv.URL, "eth_chainId", 1)
+	require.NoError(t, r.err)
+	assert.Equal(t, http.StatusInternalServerError, r.status)
 }

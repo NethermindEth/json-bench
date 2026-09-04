@@ -240,12 +240,29 @@ type RunManifest struct {
 	StartTime string `json:"start_time"`
 	EndTime   string `json:"end_time"`
 
+	// PreflightSkipped records that the targets were never identified, so a
+	// reader knows the provenance below is only what the config claimed.
+	PreflightSkipped bool `json:"preflight_skipped,omitempty"`
+
 	Clients []ClientProvenance `json:"clients"`
 }
 
-// ClientProvenance identifies what a client actually was during the run.
+// ClientProvenance identifies what a client actually was during the run. A
+// measurement is not citable without it: "slower on eth_getLogs" says nothing
+// without the version, the chain, and whether the node was synced when asked.
 type ClientProvenance struct {
 	Name string `json:"name"`
 	Type string `json:"type,omitempty"`
 	URL  string `json:"url"`
+
+	ClientVersion  string  `json:"client_version,omitempty"`
+	ChainID        string  `json:"chain_id,omitempty"`
+	HeadBlock      uint64  `json:"head_block,omitempty"`
+	HeadTimestamp  string  `json:"head_timestamp,omitempty"`
+	HeadAgeSeconds float64 `json:"head_age_seconds,omitempty"`
+	Syncing        bool    `json:"syncing,omitempty"`
+
+	// ProbeErrors records identity probes that failed, so a partially answered
+	// target is visible rather than silently blank.
+	ProbeErrors []string `json:"probe_errors,omitempty"`
 }

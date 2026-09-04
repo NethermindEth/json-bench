@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +42,12 @@ type Options struct {
 	// WriteSamples persists the per-request records. On by default because
 	// offline re-aggregation and any later comparison depend on them.
 	WriteSamples bool
+
+	// SkipPreflight runs without identifying the targets first. The manifest
+	// records that it was skipped, since the provenance is then only what the
+	// config claimed rather than what answered.
+	SkipPreflight bool
+	Preflight     PreflightOptions
 
 	Logger *logrus.Logger
 }
@@ -99,6 +106,11 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 		targets = append(targets, tgt)
 	}
 
+	provenance, preflightErr := runPreflight(ctx, targets, opts, log)
+	if preflightErr != nil {
+		return nil, nil, preflightErr
+	}
+
 	var writer *SampleWriter
 	if opts.WriteSamples && opts.OutputDir != "" {
 		writer, err = NewSampleWriter(filepath.Join(opts.OutputDir, SampleFilename))
@@ -146,7 +158,7 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 		EndTime:       end.Format(time.DateTime),
 		Duration:      end.Sub(start).String(),
 		ResponsesDir:  opts.OutputDir,
-		Manifest:      buildManifest(cfg, opts, start, end),
+		Manifest:      buildManifest(cfg, opts, provenance, start, end),
 	}
 
 	if comparisons := run.accum.CompareClients(); len(comparisons) > 0 {
@@ -309,14 +321,52 @@ const Version = "1"
 // could not see them, so the same node measured both ways looks worse.
 const ErrorRateSemanticsRPCAware = "http_and_jsonrpc_errors"
 
-func buildManifest(cfg *config.Config, opts Options, start, end time.Time) types.RunManifest {
-	clients := make([]types.ClientProvenance, 0, len(cfg.ResolvedClients))
-	for _, client := range cfg.ResolvedClients {
-		clients = append(clients, types.ClientProvenance{
-			Name: client.Name,
-			Type: client.Type,
-			URL:  client.URL,
-		})
+// runPreflight identifies the targets and refuses the run when the answer makes
+// it meaningless. An unhealthy target is a warning rather than a refusal: a
+// syncing node is still a legitimate thing to measure as long as the report says
+// that is what was measured.
+func runPreflight(ctx context.Context, targets []*target, opts Options, log *logrus.Logger) ([]types.ClientProvenance, error) {
+	if opts.SkipPreflight {
+		log.Warn("Skipping preflight: the run will not record what the targets actually were")
+		return nil, nil
+	}
+
+	provenance, err := Preflight(ctx, targets, opts.Preflight)
+	if err != nil {
+		return provenance, err
+	}
+
+	for _, info := range provenance {
+		fields := logrus.Fields{
+			"client":  info.Name,
+			"version": info.ClientVersion,
+			"chain":   info.ChainID,
+			"head":    info.HeadBlock,
+		}
+		if len(info.ProbeErrors) > 0 {
+			log.WithFields(fields).Warnf("%s did not answer every identity probe, so its provenance is incomplete: %s",
+				info.Name, strings.Join(info.ProbeErrors, "; "))
+		}
+		if healthy, reason := TargetHealth(info); !healthy {
+			log.WithFields(fields).Warnf("%s may not be fit to measure: %s", info.Name, reason)
+			continue
+		}
+		log.WithFields(fields).Infof("%s is ready", info.Name)
+	}
+	return provenance, nil
+}
+
+func buildManifest(cfg *config.Config, opts Options, provenance []types.ClientProvenance, start, end time.Time) types.RunManifest {
+	clients := provenance
+	if len(clients) == 0 {
+		clients = make([]types.ClientProvenance, 0, len(cfg.ResolvedClients))
+		for _, client := range cfg.ResolvedClients {
+			clients = append(clients, types.ClientProvenance{
+				Name: client.Name,
+				Type: client.Type,
+				URL:  client.URL,
+			})
+		}
 	}
 
 	return types.RunManifest{
@@ -335,6 +385,7 @@ func buildManifest(cfg *config.Config, opts Options, start, end time.Time) types
 		HTTP2:              opts.Transport.HTTP2,
 		StartTime:          start.Format(time.RFC3339),
 		EndTime:            end.Format(time.RFC3339),
+		PreflightSkipped:   opts.SkipPreflight,
 		Clients:            clients,
 	}
 }

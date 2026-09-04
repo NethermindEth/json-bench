@@ -18,6 +18,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,9 +58,30 @@ type Faults struct {
 	TimeoutMS    float64 `json:"timeout_ms,omitempty"`
 }
 
+// Node is what the stub answers the identity probes with, so a pre-flight
+// check has something realistic to read.
+type Node struct {
+	ClientVersion string `json:"client_version,omitempty"`
+	ChainID       int64  `json:"chain_id,omitempty"`
+	HeadBlock     int64  `json:"head_block,omitempty"`
+
+	// HeadAgeSeconds ages the head block's timestamp, which is how a stale or
+	// stalled node is modelled.
+	HeadAgeSeconds int64 `json:"head_age_seconds,omitempty"`
+
+	Syncing bool `json:"syncing,omitempty"`
+
+	// ProbeError makes the identity probes fail, which models a node that is
+	// up but not answerable. The general fault rates deliberately do not apply
+	// to those methods, so an unrelated fault rate cannot make a pre-flight
+	// check flaky.
+	ProbeError bool `json:"probe_error,omitempty"`
+}
+
 // Config is the whole stub definition, loadable from JSON.
 type Config struct {
 	Seed    int64             `json:"seed"`
+	Node    Node              `json:"node,omitempty"`
 	Default Method            `json:"default"`
 	Methods map[string]Method `json:"methods,omitempty"`
 	Faults  Faults            `json:"faults,omitempty"`
@@ -98,7 +120,12 @@ type Stub struct {
 // DefaultConfig is a fast, failure-free node.
 func DefaultConfig() Config {
 	return Config{
-		Seed:    1,
+		Seed: 1,
+		Node: Node{
+			ClientVersion: "stubnode/v1.0.0",
+			ChainID:       1,
+			HeadBlock:     21000000,
+		},
 		Default: Method{Latency: &Latency{Kind: LatencyUniform, MinMS: 2, MaxMS: 8}},
 	}
 }
@@ -106,6 +133,16 @@ func DefaultConfig() Config {
 func New(cfg Config) (*Stub, error) {
 	if cfg.Default.Latency == nil {
 		cfg.Default.Latency = DefaultConfig().Default.Latency
+	}
+	defaults := DefaultConfig().Node
+	if cfg.Node.ClientVersion == "" {
+		cfg.Node.ClientVersion = defaults.ClientVersion
+	}
+	if cfg.Node.ChainID == 0 {
+		cfg.Node.ChainID = defaults.ChainID
+	}
+	if cfg.Node.HeadBlock == 0 {
+		cfg.Node.HeadBlock = defaults.HeadBlock
 	}
 	if err := validate(cfg); err != nil {
 		return nil, err
@@ -239,6 +276,21 @@ func (s *Stub) serveRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Identity probes answer immediately and are exempt from the configured
+	// latency and faults: a pre-flight check is not part of the measured load.
+	if result, ok := s.identity(req.Method); ok {
+		if s.cfg.Node.ProbeError {
+			s.record(req.Method, OutcomeHTTPError)
+			http.Error(w, "node is not answerable", http.StatusInternalServerError)
+			return
+		}
+		s.record(req.Method, OutcomeOK)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": result,
+		})
+		return
+	}
+
 	key := requestKey(req.ID, body)
 	method := s.methodConfig(req.Method)
 
@@ -287,8 +339,22 @@ func (s *Stub) serveRPC(w http.ResponseWriter, r *http.Request) {
 
 	s.record(req.Method, OutcomeOK)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": s.result(method.ResultBytes),
+		"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": s.resultFor(req.Method, method),
 	})
+}
+
+// resultFor answers with a shape the method's callers expect. Only
+// eth_getBlockByNumber needs one: a pre-flight check reads its timestamp to
+// tell whether the head is still moving.
+func (s *Stub) resultFor(method string, cfg Method) any {
+	if method == "eth_getBlockByNumber" {
+		return map[string]any{
+			"number":    hexUint(s.cfg.Node.HeadBlock),
+			"hash":      "0x" + strings.Repeat("ab", 32),
+			"timestamp": hexUint(time.Now().Unix() - s.cfg.Node.HeadAgeSeconds),
+		}
+	}
+	return s.result(cfg.ResultBytes)
 }
 
 func (s *Stub) serveHTTPFault(w http.ResponseWriter, method string, key uint64) {
@@ -441,4 +507,31 @@ func firstNonSpace(b []byte) byte {
 		}
 	}
 	return 0
+}
+
+// identity answers the methods a pre-flight check uses to establish what a node
+// is. The second return reports whether the method was one of them.
+func (s *Stub) identity(method string) (any, bool) {
+	switch method {
+	case "web3_clientVersion":
+		return s.cfg.Node.ClientVersion, true
+	case "eth_chainId":
+		return hexUint(s.cfg.Node.ChainID), true
+	case "eth_blockNumber":
+		return hexUint(s.cfg.Node.HeadBlock), true
+	case "eth_syncing":
+		if !s.cfg.Node.Syncing {
+			return false, true
+		}
+		return map[string]any{
+			"startingBlock": hexUint(0),
+			"currentBlock":  hexUint(s.cfg.Node.HeadBlock),
+			"highestBlock":  hexUint(s.cfg.Node.HeadBlock + 1000),
+		}, true
+	}
+	return nil, false
+}
+
+func hexUint(v int64) string {
+	return "0x" + strconv.FormatInt(v, 16)
 }

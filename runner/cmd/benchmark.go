@@ -25,24 +25,26 @@ import (
 )
 
 var (
-	benchmarkConfigPath        string
-	benchmarkClientsPath       string
-	benchmarkPrometheusURL     string
-	benchmarkPrometheusRWPath  string
-	benchmarkPrometheusRWUser  string
-	benchmarkPrometheusRWPass  string
-	benchmarkEnableHistoric    bool
-	benchmarkStorageConfigPath string
-	benchmarkHTMLReport        bool
-	benchmarkSaturation        string
-	benchmarkCompression       bool
-	benchmarkNoConnReuse       bool
-	benchmarkHTTP2             bool
-	benchmarkNoSamples         bool
-	benchmarkFailOnThreshold   bool
-	benchmarkPrometheusBearer  string
-	benchmarkPrometheusHeaders []string
-	benchmarkPushInterval      time.Duration
+	benchmarkConfigPath         string
+	benchmarkClientsPath        string
+	benchmarkPrometheusURL      string
+	benchmarkPrometheusRWPath   string
+	benchmarkPrometheusRWUser   string
+	benchmarkPrometheusRWPass   string
+	benchmarkEnableHistoric     bool
+	benchmarkStorageConfigPath  string
+	benchmarkHTMLReport         bool
+	benchmarkSaturation         string
+	benchmarkCompression        bool
+	benchmarkNoConnReuse        bool
+	benchmarkHTTP2              bool
+	benchmarkNoSamples          bool
+	benchmarkFailOnThreshold    bool
+	benchmarkPrometheusBearer   string
+	benchmarkPrometheusHeaders  []string
+	benchmarkPushInterval       time.Duration
+	benchmarkSkipPreflight      bool
+	benchmarkAllowChainMismatch bool
 )
 
 var benchmarkCmd = &cobra.Command{
@@ -71,6 +73,8 @@ func init() {
 	benchmarkCmd.Flags().StringVar(&benchmarkPrometheusBearer, "prometheus-rw-bearer", "", "Prometheus bearer token (optional; mutually exclusive with basic auth)")
 	benchmarkCmd.Flags().StringArrayVar(&benchmarkPrometheusHeaders, "prometheus-rw-header", nil, "Extra remote-write header as Name=Value, repeatable (e.g. X-Scope-OrgID=team for Mimir)")
 	benchmarkCmd.Flags().DurationVar(&benchmarkPushInterval, "prometheus-push-interval", promrw.DefaultPushInterval, "How often to publish metrics during the run")
+	benchmarkCmd.Flags().BoolVar(&benchmarkSkipPreflight, "skip-preflight", false, "Do not identify the targets before running (version, chain, head and sync state go unrecorded)")
+	benchmarkCmd.Flags().BoolVar(&benchmarkAllowChainMismatch, "allow-chain-mismatch", false, "Benchmark targets that are on different chains, which otherwise fails preflight")
 }
 
 func runBenchmark(cmd *cobra.Command, args []string) error {
@@ -164,6 +168,8 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	opts.Transport.AcceptCompression = benchmarkCompression
 	opts.Transport.ReuseConnections = !benchmarkNoConnReuse
 	opts.Transport.HTTP2 = benchmarkHTTP2
+	opts.SkipPreflight = benchmarkSkipPreflight
+	opts.Preflight.AllowChainMismatch = benchmarkAllowChainMismatch
 
 	benchmarkResults, breaches, runErr := engine.Run(ctx, cfg, opts)
 	if benchmarkResults == nil {
