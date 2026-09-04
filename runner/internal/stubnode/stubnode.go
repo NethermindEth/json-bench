@@ -77,6 +77,11 @@ type Node struct {
 	// check flaky.
 	ProbeError bool `json:"probe_error,omitempty"`
 
+	// MaxBatchSize refuses a batch larger than this with a single error object
+	// rather than an array, which is how a node with a batch limit answers.
+	// Zero accepts any size.
+	MaxBatchSize int `json:"max_batch_size,omitempty"`
+
 	// Metrics makes the stub publish a Prometheus endpoint at /metrics, so a
 	// run can be pointed at it the way it would be pointed at a real node's.
 	// CPUSecondsPerRequest and BytesPerRequest make the published figures move
@@ -313,14 +318,8 @@ func (s *Stub) serveRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Batches are not modelled yet. Answering with an explicit JSON-RPC error
-	// beats a parse failure that looks like a truncated response.
 	if firstNonSpace(body) == '[' {
-		s.record("batch", OutcomeBadInput)
-		writeJSON(w, http.StatusOK, map[string]any{
-			"jsonrpc": "2.0", "id": nil,
-			"error": map[string]any{"code": -32600, "message": "stubnode: batch requests are not supported"},
-		})
+		s.serveBatch(w, r, body)
 		return
 	}
 
@@ -617,5 +616,115 @@ func (s *Stub) acquireWorker(r *http.Request) bool {
 func (s *Stub) releaseWorker() {
 	if s.workers != nil {
 		<-s.workers
+	}
+}
+
+// serveBatch answers a JSON-RPC array. Each member is resolved independently,
+// so a batch can come back partly successful — which is the case a client-side
+// error rate has to attribute correctly.
+//
+// The responses are returned in reverse order on purpose: the spec does not
+// promise an order, and a client that matches by position rather than by id
+// should fail against this stub rather than in production.
+func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
+	var requests []rpcRequest
+	if err := json.Unmarshal(body, &requests); err != nil {
+		s.record("batch", OutcomeBadInput)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": nil,
+			"error": map[string]any{"code": -32700, "message": "stubnode: parse error"},
+		})
+		return
+	}
+
+	if len(requests) == 0 {
+		s.record("batch", OutcomeBadInput)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": nil,
+			"error": map[string]any{"code": -32600, "message": "stubnode: empty batch"},
+		})
+		return
+	}
+
+	// A node with a batch limit rejects the whole array with one error object,
+	// not with an array of them.
+	if s.cfg.Node.MaxBatchSize > 0 && len(requests) > s.cfg.Node.MaxBatchSize {
+		s.record("batch", OutcomeBadInput)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"jsonrpc": "2.0", "id": nil,
+			"error": map[string]any{
+				"code":    -32600,
+				"message": fmt.Sprintf("stubnode: batch of %d exceeds the limit of %d", len(requests), s.cfg.Node.MaxBatchSize),
+			},
+		})
+		return
+	}
+
+	if !s.acquireWorker(r) {
+		s.record("batch", OutcomeTimeout)
+		return
+	}
+	defer s.releaseWorker()
+
+	// One service time for the whole round trip, taken from the slowest member,
+	// which is what a node processing a batch actually costs its caller.
+	var slowest time.Duration
+	responses := make([]map[string]any, 0, len(requests))
+	for _, req := range requests {
+		method := s.methodConfig(req.Method)
+		key := requestKey(req.ID, body)
+		if d := s.latency(method.Latency, req.Method, key); d > slowest {
+			slowest = d
+		}
+		responses = append(responses, s.batchMember(req, method, key))
+	}
+
+	if slowest > 0 {
+		timer := time.NewTimer(slowest)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-r.Context().Done():
+			return
+		}
+	}
+
+	for i, j := 0, len(responses)-1; i < j; i, j = i+1, j-1 {
+		responses[i], responses[j] = responses[j], responses[i]
+	}
+	writeJSON(w, http.StatusOK, responses)
+}
+
+// batchMember resolves one call inside a batch and records its outcome.
+func (s *Stub) batchMember(req rpcRequest, method Method, key uint64) map[string]any {
+	if result, ok := s.identity(req.Method); ok {
+		s.record(req.Method, OutcomeOK)
+		return map[string]any{"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": result}
+	}
+
+	if s.draw(req.Method, key, "rpcerr") < method.RPCErrorRate {
+		code := method.RPCErrorCode
+		if code == 0 {
+			code = -32000
+		}
+		message := method.RPCErrorMessage
+		if message == "" {
+			message = "execution reverted"
+		}
+		s.record(req.Method, OutcomeRPCError)
+		return map[string]any{
+			"jsonrpc": "2.0", "id": rawOrNull(req.ID),
+			"error": map[string]any{"code": code, "message": message},
+		}
+	}
+
+	if s.draw(req.Method, key, "null") < method.NullResultRate {
+		s.record(req.Method, OutcomeRPCNull)
+		return map[string]any{"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": nil}
+	}
+
+	s.record(req.Method, OutcomeOK)
+	return map[string]any{
+		"jsonrpc": "2.0", "id": rawOrNull(req.ID), "result": s.resultFor(req.Method, method),
 	}
 }

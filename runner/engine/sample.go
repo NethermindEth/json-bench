@@ -86,6 +86,14 @@ type Sample struct {
 	// written to the sample file so nothing is lost, and excluded from every
 	// reported statistic.
 	Warmup bool
+
+	// BatchSize is how many calls shared this request's HTTP round trip, and
+	// therefore its timings. One means it had the round trip to itself.
+	BatchSize int
+
+	// BatchLeader marks one member of each batch, so the batch's own timing is
+	// counted once rather than once per member.
+	BatchLeader bool
 }
 
 // Service is the time the endpoint took: send to last byte.
@@ -118,6 +126,7 @@ type sampleRecord struct {
 	RequestBytes     int     `json:"req_bytes"`
 	ResponseBytes    int     `json:"resp_bytes"`
 	ConnectionReused bool    `json:"conn_reused"`
+	BatchSize        int     `json:"batch_size,omitempty"`
 	Warmup           bool    `json:"warmup,omitempty"`
 	Error            string  `json:"error,omitempty"`
 }
@@ -173,6 +182,7 @@ func (w *SampleWriter) Write(s Sample) error {
 		RequestBytes:     s.RequestBytes,
 		ResponseBytes:    s.ResponseBytes,
 		ConnectionReused: s.ConnectionReused,
+		BatchSize:        s.BatchSize,
 		Warmup:           s.Warmup,
 		Error:            s.Error,
 	})
@@ -240,6 +250,7 @@ func ReadSamples(r io.Reader) ([]Sample, error) {
 			RequestBytes:     rec.RequestBytes,
 			ResponseBytes:    rec.ResponseBytes,
 			ConnectionReused: rec.ConnectionReused,
+			BatchSize:        rec.BatchSize,
 			Warmup:           rec.Warmup,
 			Error:            rec.Error,
 		})

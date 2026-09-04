@@ -27,7 +27,7 @@ func countIn(offsets []time.Duration, from, to time.Duration) int {
 }
 
 func TestRampOffsetsHoldAConstantRate(t *testing.T) {
-	offsets, total, err := RampOffsets(100, []config.Stage{{Duration: "2s", Target: 100}})
+	offsets, total, err := RampOffsets(100, []config.Stage{{Duration: "2s", Target: 100}}, 1)
 	require.NoError(t, err)
 
 	assert.Equal(t, 2*time.Second, total)
@@ -39,7 +39,7 @@ func TestRampOffsetsHoldAConstantRate(t *testing.T) {
 // The area under a line from 0 to R over D is R*D/2, so a ramp issues half what
 // holding the target would.
 func TestRampOffsetsFollowALinearRamp(t *testing.T) {
-	offsets, total, err := RampOffsets(0, []config.Stage{{Duration: "4s", Target: 100}})
+	offsets, total, err := RampOffsets(0, []config.Stage{{Duration: "4s", Target: 100}}, 1)
 	require.NoError(t, err)
 
 	assert.Equal(t, 4*time.Second, total)
@@ -65,7 +65,7 @@ func TestRampOffsetsClimbAStaircase(t *testing.T) {
 		{Duration: "1s", Target: 50},
 		{Duration: "1s", Target: 100},
 		{Duration: "1s", Target: 100},
-	})
+	}, 1)
 	require.NoError(t, err)
 
 	assert.Equal(t, 3*time.Second, total)
@@ -78,7 +78,7 @@ func TestRampOffsetsRampDownToZero(t *testing.T) {
 	offsets, _, err := RampOffsets(100, []config.Stage{
 		{Duration: "1s", Target: 100},
 		{Duration: "1s", Target: 0},
-	})
+	}, 1)
 	require.NoError(t, err)
 
 	assert.Greater(t, countIn(offsets, 0, time.Second), countIn(offsets, time.Second, 2*time.Second))
@@ -89,7 +89,7 @@ func TestRampOffsetsAreOrdered(t *testing.T) {
 	offsets, _, err := RampOffsets(10, []config.Stage{
 		{Duration: "500ms", Target: 200},
 		{Duration: "500ms", Target: 10},
-	})
+	}, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, offsets)
 
@@ -99,7 +99,7 @@ func TestRampOffsetsAreOrdered(t *testing.T) {
 }
 
 func TestScheduleRejectsAWarmupThatSwallowsTheRun(t *testing.T) {
-	_, err := newSchedule(&config.Config{Duration: "10s", RPS: 10, Warmup: "10s"}, 1000)
+	_, err := newSchedule(&config.Config{Duration: "10s", RPS: 10, Warmup: "10s"}, 1000, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no measured window")
 
@@ -107,13 +107,13 @@ func TestScheduleRejectsAWarmupThatSwallowsTheRun(t *testing.T) {
 		RPS:    10,
 		Warmup: "5s",
 		Stages: []config.Stage{{Duration: "2s", Target: 10}},
-	}, 1000)
+	}, 1000, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no measured window")
 }
 
 func TestScheduleMarksWarmupRequests(t *testing.T) {
-	sched, err := newSchedule(&config.Config{Duration: "10s", RPS: 100, Warmup: "2s"}, 10_000)
+	sched, err := newSchedule(&config.Config{Duration: "10s", RPS: 100, Warmup: "2s"}, 10_000, 1)
 	require.NoError(t, err)
 
 	start := time.Now()
@@ -124,7 +124,7 @@ func TestScheduleMarksWarmupRequests(t *testing.T) {
 }
 
 func TestScheduleWithoutWarmupMarksNothing(t *testing.T) {
-	sched, err := newSchedule(&config.Config{Duration: "5s", RPS: 10}, 1000)
+	sched, err := newSchedule(&config.Config{Duration: "5s", RPS: 10}, 1000, 1)
 	require.NoError(t, err)
 
 	start := time.Now()

@@ -86,15 +86,24 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 		return nil, nil, fmt.Errorf("the request sequence is empty")
 	}
 
-	sched, err := newSchedule(cfg, len(requests))
+	batchSize := cfg.BatchSize
+	if batchSize < 1 {
+		batchSize = 1
+	}
+	batches, err := BuildBatches(requests, batchSize)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sched, err := newSchedule(cfg, len(batches), batchSize)
 	if err != nil {
 		return nil, nil, err
 	}
 	if sched.total <= 0 {
 		return nil, nil, fmt.Errorf("the load configuration schedules no requests")
 	}
-	if sched.total < len(requests) {
-		requests = requests[:sched.total]
+	if sched.total < len(batches) {
+		batches = batches[:sched.total]
 	}
 
 	concurrency := cfg.VUs
@@ -141,13 +150,18 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 	if len(cfg.Stages) > 0 {
 		fields["stages"] = len(cfg.Stages)
 	}
+	if batchSize > 1 {
+		fields["batch_size"] = batchSize
+		fields["requests"] = sched.total * batchSize
+		fields["batches"] = sched.total
+	}
 	log.WithFields(fields).Info("Running benchmark")
 
 	start := time.Now()
 	run := newRunState(cfg.TestName, targets)
 	stopScrapers := run.startTargetScrapers(ctx, cfg, opts, log)
 	stopPusher := run.startPusher(ctx, opts, log)
-	runErr := dispatch(ctx, targets, requests, sched, concurrency, opts, run, writer)
+	runErr := dispatch(ctx, targets, batches, sched, concurrency, opts, run, writer)
 	// The scrapers stop before the final push, so its snapshot carries the
 	// node-side figures for the whole run.
 	stopScrapers()
@@ -168,7 +182,7 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 	}
 
 	result := &types.BenchmarkResult{
-		Summary:       runSummary(cfg, sched, deliveries, opts),
+		Summary:       runSummary(cfg, sched, deliveries, opts, batchSize),
 		ClientMetrics: clients,
 		Timestamp:     time.Now().Format(time.DateTime),
 		StartTime:     start.Format(time.DateTime),
@@ -197,7 +211,7 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 func dispatch(
 	ctx context.Context,
 	targets []*target,
-	requests []Request,
+	batches []Batch,
 	sched schedule,
 	concurrency int,
 	opts Options,
@@ -218,7 +232,7 @@ func dispatch(
 		wg.Add(1)
 		go func(tgt *target) {
 			defer wg.Done()
-			err := runClient(ctx, tgt, requests, sched, concurrency, opts.Saturation, start, run,
+			err := runClient(ctx, tgt, batches, sched, concurrency, opts.Saturation, start, run,
 				func(s Sample) {
 					run.observe(s)
 					mu.Lock()
@@ -282,7 +296,7 @@ func reportDelivery(log *logrus.Logger, client string, cfg *config.Config, sched
 	}
 }
 
-func runSummary(cfg *config.Config, sched schedule, deliveries map[string]Delivery, opts Options) map[string]any {
+func runSummary(cfg *config.Config, sched schedule, deliveries map[string]Delivery, opts Options, batchSize int) map[string]any {
 	clients := make(map[string]any, len(deliveries))
 	for name, d := range deliveries {
 		clients[name] = map[string]any{
@@ -310,6 +324,7 @@ func runSummary(cfg *config.Config, sched schedule, deliveries map[string]Delive
 			"target_rps":  cfg.RPS,
 			"iterations":  cfg.Iterations,
 			"concurrency": cfg.VUs,
+			"batch_size":  batchSize,
 			"duration":    sched.duration.String(),
 			"warmup":      sched.warmup.String(),
 			"stages":      len(cfg.Stages),
@@ -428,6 +443,7 @@ func buildManifest(cfg *config.Config, opts Options, provenance []types.ClientPr
 		TargetRPS:          cfg.RPS,
 		Iterations:         cfg.Iterations,
 		Concurrency:        cfg.VUs,
+		BatchSize:          cfg.BatchSize,
 		Duration:           cfg.Duration,
 		AcceptCompression:  opts.Transport.AcceptCompression,
 		ReuseConnections:   opts.Transport.ReuseConnections,

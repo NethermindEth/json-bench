@@ -99,7 +99,7 @@ func (d Delivery) MaxQueueDelay() time.Duration {
 func runClient(
 	ctx context.Context,
 	tgt *target,
-	requests []Request,
+	batches []Batch,
 	sched schedule,
 	concurrency int,
 	policy Saturation,
@@ -156,7 +156,7 @@ func runClient(
 			continue
 		}
 
-		req := requests[i]
+		batch := batches[i]
 		dispatched := time.Now()
 		if !warmup {
 			rs.dispatched(tgt.name, dispatched)
@@ -175,10 +175,12 @@ func runClient(
 				<-slots
 			}()
 
-			sample := issue(ctx, tgt, req, due, dispatched, queue)
-			sample.Warmup = warmup
+			samples := issue(ctx, tgt, batch, due, dispatched, queue)
 			rs.sent(tgt.name, queue, lateAfter, warmup)
-			onSample(sample)
+			for _, sample := range samples {
+				sample.Warmup = warmup
+				onSample(sample)
+			}
 		}()
 	}
 
@@ -212,34 +214,47 @@ func acquireSlot(ctx context.Context, slots chan struct{}, policy Saturation) (a
 	}
 }
 
-func issue(ctx context.Context, tgt *target, req Request, due, dispatched time.Time, queue time.Duration) Sample {
-	res := tgt.do(ctx, req.Payload)
-	outcome, rpcCode := classify(res.status, res.body, res.err)
+// issue sends one round trip and returns a sample per JSON-RPC call it carried.
+//
+// Every member shares the round trip's timings, because every member's caller
+// waited the whole round trip for its answer. The request bytes are shared too,
+// so they are attributed to the first member rather than counted once per call.
+func issue(ctx context.Context, tgt *target, batch Batch, due, dispatched time.Time, queue time.Duration) []Sample {
+	res := tgt.do(ctx, batch.Payload)
+	outcomes := classifyBatch(batch, res.status, res.body, res.err)
 
-	sample := Sample{
-		Client:           tgt.name,
-		ClientType:       tgt.clientType,
-		Name:             req.Name,
-		Method:           req.Method,
-		RequestID:        req.ID,
-		Scheduled:        due,
-		Start:            dispatched,
-		Queue:            queue,
-		Phases:           res.phases,
-		Status:           res.status,
-		Outcome:          outcome,
-		RPCCode:          rpcCode,
-		RequestBytes:     res.sentBytes,
-		ResponseBytes:    len(res.body),
-		ConnectionReused: res.reused,
+	samples := make([]Sample, 0, batch.Size())
+	for i, req := range batch.Requests {
+		sample := Sample{
+			Client:           tgt.name,
+			ClientType:       tgt.clientType,
+			Name:             req.Name,
+			Method:           req.Method,
+			RequestID:        req.ID,
+			Scheduled:        due,
+			Start:            dispatched,
+			Queue:            queue,
+			Phases:           res.phases,
+			Status:           res.status,
+			Outcome:          outcomes[i].outcome,
+			RPCCode:          outcomes[i].rpcCode,
+			ResponseBytes:    outcomes[i].respSize,
+			ConnectionReused: res.reused,
+			BatchSize:        batch.Size(),
+			BatchLeader:      i == 0,
+		}
+		if i == 0 {
+			sample.RequestBytes = res.sentBytes
+		}
+		if res.err != nil {
+			sample.Error = res.err.Error()
+		}
+		if sample.Name == "" {
+			sample.Name = req.Method
+		}
+		samples = append(samples, sample)
 	}
-	if res.err != nil {
-		sample.Error = res.err.Error()
-	}
-	if sample.Name == "" {
-		sample.Name = req.Method
-	}
-	return sample
+	return samples
 }
 
 // sleepUntil waits for the request's scheduled moment, reporting false if the

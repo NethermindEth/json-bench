@@ -211,3 +211,37 @@ calls:
 		})
 	}
 }
+
+// Iterations counts requests and batching groups them, so a single number
+// would be ambiguous about which it meant.
+func TestBatchSizeValidation(t *testing.T) {
+	base := `
+test_name: "batch"
+clients: ["geth"]
+vus: 10
+calls:
+  - name: "eth_call"
+    method: "eth_call"
+    params: []
+    weight: 1
+`
+	cases := map[string]string{
+		"duration: \"1m\"\nrps: 100\nbatch_size: 10\n":       "",
+		"duration: \"1m\"\nrps: 100\nbatch_size: 1\n":        "",
+		"duration: \"1m\"\nrps: 100\nbatch_size: -1\n":       "cannot be negative",
+		"duration: \"1m\"\niterations: 100\nbatch_size: 5\n": "cannot be combined with iterations",
+	}
+
+	for extra, wantErr := range cases {
+		t.Run(extra, func(t *testing.T) {
+			path := writeTemp(t, "config.yaml", base+extra)
+			_, err := NewConfigLoader(registryWith(t, "geth")).LoadTestConfig(path)
+			if wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), wantErr)
+		})
+	}
+}

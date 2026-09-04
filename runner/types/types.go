@@ -316,6 +316,7 @@ type RunManifest struct {
 	TargetRPS   int    `json:"target_rps,omitempty"`
 	Iterations  int    `json:"iterations,omitempty"`
 	Concurrency int    `json:"concurrency"`
+	BatchSize   int    `json:"batch_size,omitempty"`
 	Duration    string `json:"duration"`
 
 	AcceptCompression bool `json:"accept_compression"`

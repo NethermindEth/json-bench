@@ -65,14 +65,21 @@ type schedule struct {
 // newSchedule derives the plan from the load config. A positive rps gives an
 // open model with a fixed interval; stages ramp that rate over time; iterations
 // mode dispatches as fast as the pool allows, bounded by the duration.
-func newSchedule(cfg *config.Config, available int) (schedule, error) {
+// newSchedule takes the number of arrivals available and how many requests each
+// carries. Batching does not change the offered request rate: `rps` stays a
+// rate of requests, so batches go out at rps/batchSize and two runs at
+// different batch sizes offer the node the same work.
+func newSchedule(cfg *config.Config, available, batchSize int) (schedule, error) {
+	if batchSize < 1 {
+		batchSize = 1
+	}
 	warmup, err := parseOptionalDuration(cfg.Warmup)
 	if err != nil {
 		return schedule{}, fmt.Errorf("failed to parse warmup: %w", err)
 	}
 
 	if len(cfg.Stages) > 0 {
-		return newRampSchedule(cfg, warmup, available)
+		return newRampSchedule(cfg, warmup, available, batchSize)
 	}
 
 	duration, err := time.ParseDuration(cfg.Duration)
@@ -84,13 +91,14 @@ func newSchedule(cfg *config.Config, available int) (schedule, error) {
 	}
 
 	if cfg.RPS > 0 {
-		total := int(float64(cfg.RPS) * duration.Seconds())
+		arrivalRate := float64(cfg.RPS) / float64(batchSize)
+		total := int(arrivalRate * duration.Seconds())
 		if total > available {
 			total = available
 		}
 		return schedule{
 			total:    total,
-			interval: time.Duration(float64(time.Second) / float64(cfg.RPS)),
+			interval: time.Duration(float64(time.Second) / arrivalRate),
 			duration: duration,
 			warmup:   warmup,
 		}, nil
@@ -104,8 +112,8 @@ func newSchedule(cfg *config.Config, available int) (schedule, error) {
 }
 
 // newRampSchedule places arrivals under a piecewise-linear rate curve.
-func newRampSchedule(cfg *config.Config, warmup time.Duration, available int) (schedule, error) {
-	offsets, duration, err := RampOffsets(cfg.RPS, cfg.Stages)
+func newRampSchedule(cfg *config.Config, warmup time.Duration, available, batchSize int) (schedule, error) {
+	offsets, duration, err := RampOffsets(cfg.RPS, cfg.Stages, batchSize)
 	if err != nil {
 		return schedule{}, err
 	}
@@ -130,8 +138,12 @@ func newRampSchedule(cfg *config.Config, warmup time.Duration, available int) (s
 // time are the area under that line. Accumulating the area and emitting an
 // arrival whenever a whole request has built up places them at the right
 // density without needing to invert the curve.
-func RampOffsets(startRPS int, stages []config.Stage) ([]time.Duration, time.Duration, error) {
-	rate := float64(startRPS)
+// batchSize divides the rate, since one arrival carries that many requests.
+func RampOffsets(startRPS int, stages []config.Stage, batchSize int) ([]time.Duration, time.Duration, error) {
+	if batchSize < 1 {
+		batchSize = 1
+	}
+	rate := float64(startRPS) / float64(batchSize)
 	var elapsed time.Duration
 	var pending float64
 	var offsets []time.Duration
@@ -142,7 +154,7 @@ func RampOffsets(startRPS int, stages []config.Stage) ([]time.Duration, time.Dur
 			return nil, 0, fmt.Errorf("stage %d has an invalid duration %q: %w", i+1, stage.Duration, err)
 		}
 
-		target := float64(stage.Target)
+		target := float64(stage.Target) / float64(batchSize)
 		steps := int(stageDuration / rampStep)
 		if steps < 1 {
 			steps = 1

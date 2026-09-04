@@ -89,7 +89,7 @@ func BuildSequence(cfg *config.Config) ([]Request, error) {
 
 func sequenceLength(cfg *config.Config) (int, error) {
 	if len(cfg.Stages) > 0 {
-		offsets, _, err := RampOffsets(cfg.RPS, cfg.Stages)
+		offsets, _, err := RampOffsets(cfg.RPS, cfg.Stages, 1)
 		if err != nil {
 			return 0, err
 		}

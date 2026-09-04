@@ -171,14 +171,16 @@ func TestOutcomeClasses(t *testing.T) {
 		assert.EqualValues(t, 1, stub.Stats().ByMethod["eth_call"][OutcomeTruncated])
 	})
 
-	t.Run("batches are refused explicitly", func(t *testing.T) {
+	t.Run("a batch is answered as an array", func(t *testing.T) {
 		srv, _ := serve(t, DefaultConfig())
 		resp, err := http.Post(srv.URL, "application/json",
-			strings.NewReader(`[{"jsonrpc":"2.0","id":1,"method":"eth_call"}]`))
+			strings.NewReader(`[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_call"}]`))
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		assert.Contains(t, string(body), "batch requests are not supported")
+
+		var responses []map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&responses))
+		assert.Len(t, responses, 2)
 	})
 }
 
@@ -266,4 +268,67 @@ func TestProbeErrorModelsAnUnanswerableNode(t *testing.T) {
 	r := call(t, srv.URL, "eth_chainId", 1)
 	require.NoError(t, r.err)
 	assert.Equal(t, http.StatusInternalServerError, r.status)
+}
+
+func TestBatchResponses(t *testing.T) {
+	postBatch := func(t *testing.T, url, body string) (int, []byte) {
+		t.Helper()
+		resp, err := http.Post(url, "application/json", strings.NewReader(body))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		out, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		return resp.StatusCode, out
+	}
+
+	// The spec does not promise an order, so the stub returns them reversed: a
+	// client matching by position rather than by id fails here rather than in
+	// production.
+	t.Run("responses are not in request order", func(t *testing.T) {
+		srv, _ := serve(t, DefaultConfig())
+		_, body := postBatch(t, srv.URL,
+			`[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_call"},{"jsonrpc":"2.0","id":3,"method":"eth_call"}]`)
+
+		var responses []struct {
+			ID int `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal(body, &responses))
+		require.Len(t, responses, 3)
+		assert.Equal(t, []int{3, 2, 1}, []int{responses[0].ID, responses[1].ID, responses[2].ID})
+	})
+
+	t.Run("a batch can be partly successful", func(t *testing.T) {
+		cfg := DefaultConfig()
+		cfg.Methods = map[string]Method{"eth_call": {RPCErrorRate: 1, RPCErrorCode: -32000}}
+		srv, stub := serve(t, cfg)
+
+		_, body := postBatch(t, srv.URL,
+			`[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_blockNumber"}]`)
+
+		assert.Contains(t, string(body), `"code":-32000`)
+		assert.Contains(t, string(body), `"result"`)
+		assert.EqualValues(t, 1, stub.Stats().ByMethod["eth_call"][OutcomeRPCError])
+		assert.EqualValues(t, 1, stub.Stats().ByMethod["eth_blockNumber"][OutcomeOK])
+	})
+
+	// A node with a batch limit rejects the whole array with one error object,
+	// not with an array of them.
+	t.Run("a batch over the limit is refused as a whole", func(t *testing.T) {
+		cfg := DefaultConfig()
+		cfg.Node.MaxBatchSize = 2
+		srv, _ := serve(t, cfg)
+
+		status, body := postBatch(t, srv.URL,
+			`[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_call"},{"jsonrpc":"2.0","id":3,"method":"eth_call"}]`)
+
+		assert.Equal(t, http.StatusOK, status)
+		assert.Equal(t, byte('{'), body[0], "a rejected batch answers with an object, not an array")
+		assert.Contains(t, string(body), "exceeds the limit of 2")
+	})
+
+	t.Run("an empty batch is refused", func(t *testing.T) {
+		srv, _ := serve(t, DefaultConfig())
+		_, body := postBatch(t, srv.URL, `[]`)
+		assert.Contains(t, string(body), "empty batch")
+	})
 }

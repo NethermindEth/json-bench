@@ -208,6 +208,11 @@ type clientAccum struct {
 	overall    *group
 	keyed      map[seriesKey]*group
 	queue      []float64
+
+	// iterations holds one duration per HTTP round trip. It differs from the
+	// per-request view whenever requests are batched: a batch of ten records
+	// ten equal request latencies but one iteration.
+	iterations []float64
 }
 
 // Accumulator is the run's single aggregation point: the report and every
@@ -244,6 +249,9 @@ func (a *Accumulator) Add(s Sample) {
 	g.add(s)
 	client.overall.add(s)
 	client.queue = append(client.queue, msOf(s.Queue))
+	if s.BatchLeader || s.BatchSize <= 1 {
+		client.iterations = append(client.iterations, msOf(s.Service()))
+	}
 }
 
 // ClientMetrics projects one client's observations onto the report type. The
@@ -402,9 +410,15 @@ type ClientSeries struct {
 	// timeline as the latency it produced, which is the point of reading it.
 	Target []types.TargetMetricPoint
 
+	// Duration is the latency of one HTTP round trip. With batching that is
+	// the batch's latency, which is what each of its callers waited.
 	Duration   types.MetricSummary
 	QueueDelay types.MetricSummary
 	Count      int64
+
+	// Iterations counts HTTP round trips, which is batches when batching and
+	// requests otherwise.
+	Iterations int64
 	Errors     int64
 	RespBytes  float64
 	ReqBytes   float64
@@ -443,9 +457,10 @@ func (a *Accumulator) Snapshot(testName string, at time.Time, deliveries map[str
 		cs := ClientSeries{
 			Name:       name,
 			ClientType: client.clientType,
-			Duration:   summarizeValues(client.overall.phases[PhaseDuration]),
+			Duration:   summarizeValues(client.iterations),
 			QueueDelay: summarizeValues(client.queue),
 			Count:      client.overall.count(),
+			Iterations: int64(len(client.iterations)),
 			Errors:     client.overall.errors(),
 			ReqBytes:   sentBytes[name],
 			RespBytes:  recvBytes[name],
@@ -535,6 +550,7 @@ func (c *clientAccum) snapshotLocked() *clientAccum {
 		overall:    c.overall.clone(),
 		keyed:      make(map[seriesKey]*group, len(c.keyed)),
 		queue:      append([]float64(nil), c.queue...),
+		iterations: append([]float64(nil), c.iterations...),
 	}
 	for key, g := range c.keyed {
 		out.keyed[key] = g.clone()

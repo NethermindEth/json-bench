@@ -48,6 +48,7 @@ var (
 	benchmarkTargetMetrics      []string
 	benchmarkTargetInterval     time.Duration
 	benchmarkNoTargetMetrics    bool
+	benchmarkBatchSize          int
 )
 
 var benchmarkCmd = &cobra.Command{
@@ -83,6 +84,8 @@ func init() {
 	benchmarkCmd.Flags().DurationVar(&benchmarkTargetInterval, "target-metric-interval", engine.DefaultTargetMetricsOptions().Interval,
 		"How often to read each client's metrics_url")
 	benchmarkCmd.Flags().BoolVar(&benchmarkNoTargetMetrics, "no-target-metrics", false, "Do not read the clients' own metrics endpoints")
+	benchmarkCmd.Flags().IntVar(&benchmarkBatchSize, "batch-size", 0,
+		"Group requests into JSON-RPC batches of this size, overriding batch_size in the config. rps stays a rate of requests, so batches go out at rps/batch-size")
 }
 
 func runBenchmark(cmd *cobra.Command, args []string) error {
@@ -108,6 +111,10 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	cfg, err := loadBenchmarkConfig(benchmarkConfigPath, benchmarkClientsPath, registry)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if benchmarkBatchSize > 0 {
+		cfg.BatchSize = benchmarkBatchSize
 	}
 
 	if cfg.UsesCallsFile() {

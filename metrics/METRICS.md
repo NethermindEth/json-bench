@@ -177,8 +177,8 @@ its own:
 
 | Series | Type | Meaning |
 |---|---|---|
-| `bench_iterations_total` | counter | Completed requests for a client. |
-| `bench_iteration_duration_*` | gauge | Duration of one unit of scheduled work, full stat ladder. One request today; a batch once batching lands. |
+| `bench_iterations_total` | counter | Completed HTTP round trips: batches when batching, requests otherwise. `bench_http_reqs_total` counts the calls inside them. |
+| `bench_iteration_duration_*` | gauge | Duration of one HTTP round trip, full stat ladder. With `batch_size` that is the batch's latency, recorded once per round trip rather than once per call. |
 | `bench_data_sent_total` | counter | Request bytes, headers included. |
 | `bench_data_received_total` | counter | Response bytes. |
 

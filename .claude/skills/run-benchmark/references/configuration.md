@@ -33,6 +33,11 @@ clients:                         # required: names from the clients registry
 duration: "1m"                   # required unless `stages` is used, Go duration syntax
 warmup: "10s"                    # optional; load applied before the measured window,
                                  #   excluded from every reported statistic
+batch_size: 10                   # optional; group requests into JSON-RPC arrays.
+                                 #   `rps` stays a rate of requests, so batches go
+                                 #   out at rps/batch_size. Each request's latency is
+                                 #   its batch's, so per-method comparison inside a
+                                 #   batched run is not meaningful.
 stages:                          # optional; ramps the rate instead of holding it.
   - duration: "30s"              #   Sets the run's length, so `duration` must be omitted.
     target: 200                  #   Each stage ramps linearly from the previous rate

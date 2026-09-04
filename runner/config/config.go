@@ -33,6 +33,12 @@ type Config struct {
 	// percentiles the run exists to report.
 	Warmup string `yaml:"warmup"`
 
+	// BatchSize groups consecutive requests into JSON-RPC batch arrays, one
+	// HTTP round trip each. `rps` stays a rate of requests, so batches are
+	// issued at rps/BatchSize — which is what makes two runs at different batch
+	// sizes comparable, since both offer the node the same work.
+	BatchSize int `yaml:"batch_size"`
+
 	// Stages ramp the arrival rate rather than holding one. When set, the run's
 	// length is the sum of the stages and `duration` must be omitted, so there
 	// is only ever one statement of how long the run is.
@@ -97,6 +103,15 @@ func validateConfig(cfg *Config) error {
 
 	if cfg.VUs <= 0 {
 		return fmt.Errorf("vus must be greater than 0")
+	}
+
+	if cfg.BatchSize < 0 {
+		return fmt.Errorf("batch_size cannot be negative")
+	}
+	if cfg.BatchSize > 0 && cfg.Iterations > 0 {
+		// Iterations counts requests, batching groups them; which of the two a
+		// number refers to would be ambiguous.
+		return fmt.Errorf("batch_size cannot be combined with iterations")
 	}
 
 	return nil

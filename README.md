@@ -249,6 +249,38 @@ no way to discard a period from its statistics, and for a benchmark that is the
 difference between reporting steady state and reporting the average of steady
 state and start-up.
 
+#### Batching
+
+`batch_size` groups consecutive requests into JSON-RPC arrays, one HTTP round
+trip each — which is how a client library with batching enabled actually talks
+to a node, and what exercises Nethermind's `JsonRpc.MaxBatchSize`:
+
+```yaml
+rps: 500
+batch_size: 10      # 500 requests a second, carried by 50 round trips
+vus: 20
+```
+
+`rps` stays a rate of *requests*, so batches go out at `rps/batch_size` and two
+runs at different batch sizes offer the node the same work. `--batch-size`
+overrides the config, which is the quick way to sweep it.
+
+What the numbers mean changes:
+
+- **Each request's latency is its batch's latency**, because every caller in a
+  batch waited the whole round trip for its answer. That is the latency they
+  saw, but it means comparing methods against each other *within* a batched run
+  is not meaningful — they share a duration.
+- **`bench_iteration_duration_*` is the per-batch latency**, recorded once per
+  round trip, while `bench_http_req_duration_*` records it once per request.
+  `bench_iterations_total` counts round trips and `bench_http_reqs_total` counts
+  calls.
+- **A batch can fail in part.** Each member is matched to its own response by
+  id and classified on its own, so a batch of ten with three reverts reports
+  three `rpc_error`s. A node refusing the batch outright — which is what
+  exceeding a batch limit looks like — answers with one error object instead of
+  an array, and that failure is attributed to every call it carried.
+
 #### Errors
 
 A JSON-RPC error arrives as HTTP 200, so every response is classified into one

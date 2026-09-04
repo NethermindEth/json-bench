@@ -138,7 +138,9 @@ func BuildSeries(snap Snapshot) []promrw.Series {
 			add("queue_delay_"+stat.suffix, base, secondsOf(stat.value(client.QueueDelay)))
 		}
 
-		add("iterations_total", base, float64(client.Count))
+		// One iteration is one HTTP round trip: a batch when batching, a request
+		// otherwise. bench_http_reqs_total counts the calls inside them.
+		add("iterations_total", base, float64(client.Iterations))
 		add("data_sent_total", base, client.ReqBytes)
 		add("data_received_total", base, client.RespBytes)
 
