@@ -8,7 +8,7 @@ This project runs predefined RPC tests derived from the official Ethereum Execut
 
 ## Features
 
-- **Performance Benchmarking**: Benchmark and compare Ethereum clients under realistic load using k6
+- **Performance Benchmarking**: Benchmark and compare Ethereum clients under realistic load with a built-in JSON-RPC load engine
 - **Historic Tracking**: Store and analyze performance trends over time with PostgreSQL + Grafana integration
 - **Real-time Dashboard**: Modern React UI for viewing results, trends, and comparisons
 - **Response Validation**: Validate RPC response compatibility with [ethereum/execution-apis](https://github.com/ethereum/execution-apis)
@@ -40,12 +40,14 @@ json-bench/
 │
 ├── runner/                   # Go benchmark runner with historic tracking
 │   ├── main.go              # Thin entry point - delegates to cmd.Execute()
-│   ├── cmd/                 # Cobra subcommands (benchmark, api, historic,
-│   │                        #                    compare, compare-openrpc)
+│   ├── cmd/                 # Cobra subcommands (benchmark, generate-requests,
+│   │                        #  api, historic, compare, compare-openrpc) plus
+│   │                        #  the stubnode and promsink test fixtures
 │   ├── api/                 # HTTP API server and WebSocket support
 │   ├── storage/             # PostgreSQL integration
 │   ├── analysis/            # Trend analysis and regression detection
-│   └── generator/           # K6 script generation and HTML reports
+│   ├── engine/              # JSON-RPC load engine and Prometheus remote write
+│   └── generator/           # HTML reports
 │
 ├── dashboard/               # React dashboard for historic analysis
 │   ├── src/
@@ -58,7 +60,7 @@ json-bench/
 │   ├── grafana-provisioning/
 │   └── dashboards/         # Pre-built Grafana dashboards
 │
-└── cmd/                     # Legacy debug helpers (not built by default)
+└── rpc-calls/               # Request corpora and the generators that build them
 ```
 
 ## Getting Started
@@ -66,9 +68,8 @@ json-bench/
 ### Prerequisites
 
 - **Docker and Docker Compose** (for client nodes and infrastructure)
-- **Go 1.20+** (for the benchmark runner)
+- **Go 1.25+** (for the benchmark runner)
 - **Node.js 18+** (for the React dashboard)
-- **k6** (for load testing - install from <https://k6.io/>)
 - **PostgreSQL** (for historic tracking - included in Docker Compose)
 
 ### Quick Start
@@ -128,7 +129,7 @@ The `runner` binary exposes its functionality through subcommands. Running
 `runner` with no subcommand prints usage and exits with status 2.
 
 ```text
-runner benchmark        Run a benchmark (k6 -> Prometheus -> reports)
+runner benchmark        Run a load test against one or more JSON-RPC endpoints
 runner compare          One-shot cross-client JSON-RPC response comparison
 runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
 runner api              Start the HTTP API server
@@ -144,7 +145,7 @@ Global flags accepted by every subcommand:
 ### Basic Benchmarking
 
 ```bash
-# Run a mixed workload benchmark (no Prometheus; metrics come from k6's summary.json)
+# Run a mixed workload benchmark (no Prometheus; results land in the exports)
 go run ./runner benchmark --config ./config/benchmark/mixed.yaml --clients ./config/clients/clients.yaml
 
 # Run a read-heavy benchmark
@@ -170,17 +171,51 @@ go run ./runner benchmark \
   --html-report
 ```
 
-`--prometheus` is optional and disabled by default. When it is omitted (or
-empty), k6 remote-write is not enabled and per-client metrics are collected from
-k6's `summary.json` instead. Passing an endpoint opts into remote-write and
-post-run PromQL queries. An endpoint that cannot be reached is reported twice —
-once before the run and once when metrics are collected — and the run falls back
-to `summary.json` rather than producing empty exports; do not point
+`--prometheus` is optional and disabled by default. Omitting it skips the time
+series only: the exports, the sample file and the reports are produced either
+way. Passing an endpoint publishes `bench_*` series over remote write while the
+run is in progress — see [metrics/METRICS.md](metrics/METRICS.md) for every
+series and its meaning. An unreachable endpoint is reported before the run and
+warned about on every push, and the run itself still completes; do not point
 `--prometheus` at an unused port to disable it, just omit the flag.
 
-`benchmark` always writes `outputs/results.json` and `outputs/results.csv`.
-The HTML report at `outputs/report.html` is opt-in via `--html-report`.
+A run writes, under `--output`:
+
+| File | Contents |
+|---|---|
+| `manifest.json` | How the run was produced: engine and version, error-rate semantics, seed, saturation policy, load shape, transport settings, and each client's URL. Read this before comparing two runs. |
+| `samples.jsonl.gz` | One gzipped JSON record per request: timings, phase breakdown, outcome, JSON-RPC code, byte counts. Disable with `--no-samples`. |
+| `exports/results.json` | The whole result, including the manifest and the pairwise client comparison. |
+| `exports/client_comparison.csv` | Per client: load delivery, outcome breakdown, latency percentiles. |
+| `exports/method_metrics.csv` | Per method: full distribution statistics and outcome counts. |
+| `report.html` | Opt-in via `--html-report`. |
+
 `compare` and `compare-openrpc` always produce their HTML report.
+
+#### Load shape and honesty about it
+
+The engine schedules arrivals on a fixed interval and dispatches them through a
+bounded pool sized by `vus`. When the pool is full at a request's scheduled
+moment, `--on-saturation` decides what happens:
+
+| Value | Behaviour |
+|---|---|
+| `queue` (default) | Send as soon as a slot frees, and record how late it went out. The dispatch delay is the coordinated-omission error: while it is above zero the latencies describe a slower offered rate than the one configured. |
+| `drop` | Discard the request and count it. |
+| `abort` | Fail the run, so a CI job cannot publish numbers from a generator that could not offer the load. |
+
+Either way the exports and the report carry `scheduled`, `sent`, `late`,
+`dropped` and the achieved rate, because a run that offered a fraction of its
+requested load must not read like one that met it.
+
+#### Errors
+
+A JSON-RPC error arrives as HTTP 200, so every response is classified into one
+of `ok`, `rpc_null`, `rpc_error`, `http_error`, `truncated`, `timeout` or
+`transport`. The reported error rate counts JSON-RPC errors, and `rpc_null` — a
+call that succeeded and returned nothing — is counted separately rather than
+folded into `ok`. `--fail-on-threshold` turns a breached `thresholds:` entry
+into a non-zero exit.
 
 ### Historic Tracking & Analysis
 
@@ -424,20 +459,18 @@ clear error. The mapping is:
 Additional behaviour changes worth noting:
 
 - `--prometheus` is now optional and disabled by default. Omit it to run
-  without remote-write (metrics are read from k6's `summary.json`); pass an
-  endpoint to opt into Prometheus.
+  without publishing time series; pass an endpoint to opt into Prometheus.
 - The benchmark `report.html` is opt-in via `--html-report`. JSON and CSV
   exports remain on by default.
 - The legacy `endpoints + frequency` YAML schema is no longer accepted.
   Configs using it must be migrated by hand to the `calls:` schema (see
   `config/benchmark/mixed.yaml` for the canonical shape). No migrator is
   provided.
-- The `jsonrpc-benchmark.json` Grafana dashboard has been removed. Its
-  Prometheus queries (`method_calls_*`, `rpc_errors_*`, `rpc_calls_*`)
-  reference custom counters from the pre-refactor k6 template that are
-  no longer emitted. The other three dashboards
-  (`k6-dashboard.json`, `jsonrpc-benchmark-enhanced.json`,
-  `baseline-comparison.json`) remain in place.
+- The Prometheus series are now named `bench_*` rather than `k6_*`, and the
+  dashboard that reads them is `benchmark-dashboard.json`. The previous one is
+  kept at `metrics/dashboards/archive/k6-dashboard.json`.
+  [metrics/METRICS.md](metrics/METRICS.md) maps every old name to its
+  replacement.
 
 **Available API endpoints:**
 
@@ -501,7 +534,6 @@ For advanced time-series analysis and alerting, you can use Grafana:
 
 4. **Provisioned dashboards** from `metrics/dashboards/`
 
-   - K6 Performance
    - Client performance comparison
    - Method-specific latency trends
    - Error rate monitoring
@@ -512,8 +544,8 @@ For advanced time-series analysis and alerting, you can use Grafana:
 
 #### Scraping node-side metrics
 
-When Prometheus is enabled, this tool only ships k6 client-side metrics
-(`k6_http_req_*`) to it. It does **not** scrape the Geth/Nethermind/etc.
+When Prometheus is enabled, this tool only ships its own client-side metrics
+(`bench_*`) to it. It does **not** scrape the Geth/Nethermind/etc.
 clients under test — bring
 your own observability for server-side metrics. To add them, point your own
 Prometheus at the node's metrics endpoint (each EL client publishes one):
@@ -528,8 +560,8 @@ scrape_configs:
 ```
 
 If you compose your own Prometheus alongside this stack, add the scrape
-job to that config; the bundled `metrics/prometheus.yml` only handles k6's
-remote-write target.
+job to that config; the bundled `metrics/prometheus.yml` only handles the
+runner's remote-write target.
 
 ### Storage Configuration
 

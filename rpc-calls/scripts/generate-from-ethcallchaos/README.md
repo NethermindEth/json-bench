@@ -59,7 +59,7 @@ Two files are written into `<output-dir>`:
   `{"name","category","rank","fitness","request"}`, where `request` is the
   reconstructed `eth_call` (Multicall3 subcalls re-encoded via `aggregate3`).
 - `ethcallchaos-percategory.yaml` — a json-bench benchmark config with one named
-  `eth_call` per scenario (per-name k6 metrics). Move it to
+  `eth_call` per scenario (per-name metrics). Move it to
   `config/benchmark/` for use.
 
 Both files are truncated on each run.

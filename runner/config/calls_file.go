@@ -9,7 +9,7 @@ import (
 )
 
 // callsFileColumns is the column count of a requests CSV: id, name, method,
-// payload (see generator.GenerateK6Requests, which writes it).
+// payload (see engine.WriteSequenceCSV, which writes it).
 const callsFileColumns = 4
 
 const (
@@ -19,9 +19,9 @@ const (
 
 // LoadCallsFileMethods reads a pre-generated requests CSV and returns the
 // distinct RPC methods it exercises, in first-seen order. The methods come from
-// the `method` column, which the k6 script tags every request with as
-// `rpc_method`; that is what the per-method breakdown is keyed on, so the `name`
-// column is free to be any label.
+// the `method` column, which every request is tagged with as `rpc_method`; that
+// is what the per-method breakdown is keyed on, so the `name` column is free to
+// be any label.
 func LoadCallsFileMethods(path string) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -66,9 +66,8 @@ func LoadCallsFileMethods(path string) ([]string, error) {
 // not match the declared calls. Otherwise it keys on `req_name` over the
 // declared call names.
 //
-// Both the k6 threshold registration (which is what makes k6 emit the
-// tag-filtered submetrics at all) and the metrics collection must agree on this,
-// or the per-method breakdown comes back empty.
+// Thresholds and the metrics breakdown must agree on this, or a threshold names
+// a target that carries no traffic.
 func (c *Config) MethodKeys() (tag string, identifiers []string) {
 	if c.UsesCallsFile() {
 		return "rpc_method", c.CallsFileMethods

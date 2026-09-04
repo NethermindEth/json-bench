@@ -30,7 +30,7 @@ test_name: "my-benchmark"        # required
 description: "..."               # optional
 clients:                         # required: names from the clients registry
   - nethermind_local
-duration: "1m"                   # required k6 duration ("30s", "5m", ...)
+duration: "1m"                   # required, Go duration syntax ("30s", "5m", ...)
 rps: 300                         # constant-arrival-rate executor...
 iterations: 1000                 # ...OR shared-iterations executor (pick one)
 vus: 20                          # ALWAYS set explicitly: loader requires vus > 0 and
@@ -46,7 +46,7 @@ calls:                           # the workload mix
     weight: 60                   # relative weight -> request frequency
                                  # (ONLY weight is parsed; a "frequency: N%" key in older
                                  # profiles is silently ignored -> zero traffic for that call)
-    thresholds:                  # optional k6 thresholds
+    thresholds:                  # optional pass/fail conditions, e.g. ["p(99)<500"] in ms
       - "p(95) < 500ms"
   - name: "recorded_getlogs"
     file: "./rpc-calls/..."      # ...or a file of recorded calls
@@ -79,7 +79,10 @@ Global flags (before the subcommand):
 |---|---|---|
 | `--config` | (required) | benchmark YAML |
 | `--clients` | — | clients registry YAML |
-| `--prometheus` | unset (Prometheus disabled) | Prometheus base URL (queries + remote-write root). Omit it to skip export entirely — metrics then come from k6's `summary.json`. If the URL is set but unreachable, the run still completes and falls back to `summary.json`, warning twice (once before the run, once after). |
+| `--prometheus` | unset (Prometheus disabled) | Prometheus base URL; the remote-write path is appended. Omitting it skips only the time series. An unreachable endpoint is warned about and the run still completes. See `metrics/METRICS.md` for the series. |
+| `--on-saturation` | `queue` | What to do when the in-flight limit is reached at a request's scheduled time: `queue` (send late, record the delay), `drop` (discard and count), `abort` (fail the run). |
+| `--fail-on-threshold` | off | Exit non-zero when a configured `thresholds:` entry is breached. |
+| `--no-samples` | off | Skip the per-request sample file. |
 | `--prometheus-rw-path` | `/api/v1/write` | remote-write path appended to `--prometheus` |
 | `--prometheus-rw-user` / `--prometheus-rw-pass` | — | remote-write basic auth |
 | `--html-report` | off | also generate `report.html` (JSON/CSV always produced) |
@@ -89,19 +92,20 @@ Global flags (before the subcommand):
 
 ```
 <output-dir>/
-  config.json          # generated k6 options
-  k6-script.js         # generated k6 script
+  manifest.json        # how the run was produced; check before comparing runs
+  samples.jsonl.gz     # one record per request (unless --no-samples)
   requests.csv         # generated RPC requests
-  summary.json         # k6 summary
   report.html          # only with --html-report
   exports/
-    results.json           # full structured result
+    results.json           # full structured result, incl. manifest and client comparison
     method_metrics.csv     # per-method latency/error stats  <- main analysis input
-                           #   Throughput (req/s) is requests over elapsed time (k6's own rate).
-                           #   Columns neither Prometheus nor summary.json can supply read NA,
-                           #   not 0.00: Variance, IQR, MAD, Timeout Rate, Connection Errors.
-                           #   Std Dev and CV are (max-min)/4 estimates, not sample statistics.
+                           #   Every distribution statistic is computed from the samples,
+                           #   including Variance, IQR, MAD and Std Dev.
+                           #   Outcome columns: Null Results, RPC Errors, HTTP Errors.
     client_comparison.csv  # per-client summary              <- main analysis input
+                           #   Load delivery first: Scheduled, Sent, Late, Dropped,
+                           #   Delivered (%), Target/Achieved RPS. Read these before
+                           #   any latency column.
     time_series.csv
     system_metrics.csv
 ```
@@ -116,7 +120,7 @@ Global flags (before the subcommand):
 
 Prints the CSV path (columns: id, name, method, payload). Reference it from every run's benchmark config via `calls_file`. A run with `calls_file` set uses that file verbatim and skips sampling; keep the `calls` section anyway for threshold metadata.
 
-Which column matters: **`method` (column 3) drives the per-method breakdown.** k6 tags every request with it as `rpc_method`, and that is what `method_metrics.csv` rows are keyed on for a `calls_file` run — so the `Method` column holds real RPC methods, and `name` (column 2) is free to be any label. The file is parsed at startup, so a missing path or a malformed row fails immediately instead of surfacing inside k6 minutes later.
+Which column matters: **`method` (column 3) drives the per-method breakdown.** Every request is tagged with it as `rpc_method`, and that is what `method_metrics.csv` rows are keyed on for a `calls_file` run — so the `Method` column holds real RPC methods, and `name` (column 2) is free to be any label. The file is parsed at startup, so a missing path or a malformed row fails immediately rather than minutes into the run.
 
 ## Related subcommands
 

@@ -194,11 +194,8 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 
 	if benchmarkHTMLReport {
 		reportPath := filepath.Join(outputDir, "report.html")
-		if err := generator.GenerateUltimateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
-			logger.Warnf("Ultimate report generation failed, falling back to enhanced report: %v", err)
-			if err := generator.GenerateEnhancedHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
-				return fmt.Errorf("failed to generate HTML report: %w", err)
-			}
+		if err := generator.GenerateHTMLReport(cfg, benchmarkResults, reportPath); err != nil {
+			return fmt.Errorf("failed to generate HTML report: %w", err)
 		}
 		logger.Infof("Generated HTML report at: %s", reportPath)
 	}

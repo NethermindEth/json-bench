@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"os"
+	"sort"
 	"text/template"
 	"time"
 
@@ -10,8 +11,8 @@ import (
 	"github.com/jsonrpc-bench/runner/types"
 )
 
-// UltimateHTMLReportTemplate is the enhanced template with advanced visualizations
-const UltimateHTMLReportTemplate = `
+// htmlReportTemplate is the enhanced template with advanced visualizations
+const htmlReportTemplate = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -390,10 +391,44 @@ const UltimateHTMLReportTemplate = `
             
             <div class="metric-card">
                 <div class="metric-icon">P95</div>
-                <div class="metric-value">{{printf "%.1f" .OverallP95}}ms</div>
-                <div class="metric-label">P95 Latency</div>
-                <div class="metric-trend">95th percentile</div>
+                <div class="metric-value">{{printf "%.1f" .MeanClientP95}}ms</div>
+                <div class="metric-label">Mean client P95</div>
+                <div class="metric-trend">average of per-client p95, not a pooled percentile</div>
             </div>
+        </div>
+
+        <!-- Offered load. A shortfall must be read before the latencies above. -->
+        <div class="table-section">
+            <h2 class="section-title">Load delivery</h2>
+            {{if .AnyShortfall}}
+            <p style="color:#9c3520;font-weight:600;">
+                At least one client was offered less load than requested. The latency figures
+                above describe only the requests that were actually sent.
+            </p>
+            {{end}}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Client</th><th>Scheduled</th><th>Sent</th><th>Late</th><th>Dropped</th>
+                        <th>Delivered</th><th>Target RPS</th><th>Achieved RPS</th><th>Max dispatch delay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {{range .Delivery}}
+                    <tr>
+                        <td>{{.Name}}</td>
+                        <td>{{.Scheduled}}</td>
+                        <td>{{.Sent}}</td>
+                        <td>{{.Late}}</td>
+                        <td>{{.Dropped}}</td>
+                        <td>{{printf "%.2f" .DeliveredPct}}%</td>
+                        <td>{{printf "%.1f" .TargetRPS}}</td>
+                        <td>{{printf "%.1f" .AchievedRPS}}</td>
+                        <td>{{printf "%.2f" .MaxDispatchDelay}}ms</td>
+                    </tr>
+                {{end}}
+                </tbody>
+            </table>
         </div>
         
         <!-- Detailed Results Tabs -->
@@ -583,8 +618,8 @@ const UltimateHTMLReportTemplate = `
 </html>
 `
 
-// UltimateReportData holds all data for the ultimate HTML report
-type UltimateReportData struct {
+// reportData holds all data for the ultimate HTML report
+type reportData struct {
 	// Basic info
 	TestName    string
 	Description string
@@ -597,10 +632,23 @@ type UltimateReportData struct {
 	TotalRequests      int64
 	TotalSuccess       int64
 	OverallSuccessRate float64
-	OverallP95         float64
-	ActualRPS          float64
-	BestClient         string
-	BestScore          float64
+
+	// MeanClientP95 is the mean of the clients' p95 latencies, which is a
+	// summary of the clients rather than a percentile of the requests. A pooled
+	// percentile across clients would need their samples, not their aggregates.
+	MeanClientP95 float64
+
+	// ActualRPS sums the rate each client was actually offered, so with three
+	// clients it is roughly three times the configured rps.
+	ActualRPS float64
+
+	// Delivery is the per-client offered-load accounting. A run that could not
+	// offer its requested rate has to say so here, because the latency figures
+	// beside it describe only the requests that went out.
+	Delivery     []clientDelivery
+	AnyShortfall bool
+	BestClient   string
+	BestScore    float64
 
 	// Environment
 	Environment types.EnvironmentInfo
@@ -622,9 +670,10 @@ type UltimateReportData struct {
 }
 
 // GenerateUltimateHTMLReport generates the ultimate HTML report with all advanced features
-func GenerateUltimateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outputPath string) error {
+// GenerateHTMLReport renders the run's report.
+func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outputPath string) error {
 	// Prepare report data
-	data := prepareUltimateReportData(cfg, result)
+	data := preparereportData(cfg, result)
 
 	// Create template with custom functions
 	funcMap := template.FuncMap{
@@ -634,7 +683,7 @@ func GenerateUltimateHTMLReport(cfg *config.Config, result *types.BenchmarkResul
 		},
 	}
 
-	tmpl, err := template.New("report").Funcs(funcMap).Parse(UltimateHTMLReportTemplate)
+	tmpl, err := template.New("report").Funcs(funcMap).Parse(htmlReportTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -654,8 +703,8 @@ func GenerateUltimateHTMLReport(cfg *config.Config, result *types.BenchmarkResul
 	return nil
 }
 
-func prepareUltimateReportData(cfg *config.Config, result *types.BenchmarkResult) *UltimateReportData {
-	data := &UltimateReportData{
+func preparereportData(cfg *config.Config, result *types.BenchmarkResult) *reportData {
+	data := &reportData{
 		TestName:         cfg.TestName,
 		Description:      cfg.Description,
 		Timestamp:        time.Now().Format("2006-01-02 15:04:05"),
@@ -692,12 +741,33 @@ func prepareUltimateReportData(cfg *config.Config, result *types.BenchmarkResult
 
 	data.TotalRequests = totalRequests
 	data.TotalSuccess = totalSuccess
-	data.OverallSuccessRate = float64(totalSuccess) / float64(totalRequests) * 100
-	data.OverallP95 = totalP95 / float64(clientCount)
+	if totalRequests > 0 {
+		data.OverallSuccessRate = float64(totalSuccess) / float64(totalRequests) * 100
+	}
+	if clientCount > 0 {
+		data.MeanClientP95 = totalP95 / float64(clientCount)
+	}
 
-	// Calculate actual RPS
-	duration, _ := time.ParseDuration(result.Duration)
-	data.ActualRPS = float64(totalRequests) / duration.Seconds()
+	for _, client := range result.ClientMetrics {
+		d := client.Delivery
+		data.ActualRPS += d.AchievedRPS
+		if !d.Complete() {
+			data.AnyShortfall = true
+		}
+		data.Delivery = append(data.Delivery, clientDelivery{
+			Name:             client.Name,
+			Scheduled:        d.Scheduled,
+			Sent:             d.Sent,
+			Late:             d.Late,
+			Dropped:          d.Dropped,
+			DeliveredPct:     d.DeliveryRatio() * 100,
+			TargetRPS:        d.TargetRPS,
+			AchievedRPS:      d.AchievedRPS,
+			MaxDispatchDelay: d.MaxDispatchDelayMs,
+			Complete:         d.Complete(),
+		})
+	}
+	sort.Slice(data.Delivery, func(i, j int) bool { return data.Delivery[i].Name < data.Delivery[j].Name })
 
 	// Find best performer
 	if result.Comparison != nil {
@@ -736,4 +806,18 @@ func prepareUltimateReportData(cfg *config.Config, result *types.BenchmarkResult
 	}
 
 	return data
+}
+
+// clientDelivery is one client's offered-load accounting, for the report table.
+type clientDelivery struct {
+	Name             string
+	Scheduled        int64
+	Sent             int64
+	Late             int64
+	Dropped          int64
+	DeliveredPct     float64
+	TargetRPS        float64
+	AchievedRPS      float64
+	MaxDispatchDelay float64
+	Complete         bool
 }

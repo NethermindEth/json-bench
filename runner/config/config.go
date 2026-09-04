@@ -61,8 +61,8 @@ func validateConfig(cfg *Config) error {
 			}
 		}
 	} else {
-		// Read the file now rather than letting k6 discover a bad path minutes
-		// into the run, and record the methods the per-method export keys on.
+		// Read the file now rather than discovering a bad path minutes into the
+		// run, and record the methods the per-method breakdown keys on.
 		methods, err := LoadCallsFileMethods(cfg.CallsFile)
 		if err != nil {
 			return err
