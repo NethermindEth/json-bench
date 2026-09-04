@@ -321,6 +321,29 @@ const Version = "1"
 // could not see them, so the same node measured both ways looks worse.
 const ErrorRateSemanticsRPCAware = "http_and_jsonrpc_errors"
 
+// IdentifyTargets probes the configured clients without running any load. The
+// rate search uses it to identify the targets once, rather than once per probe.
+func IdentifyTargets(ctx context.Context, cfg *config.Config, opts Options) ([]types.ClientProvenance, error) {
+	if opts.Logger == nil {
+		opts.Logger = logrus.New()
+	}
+
+	concurrency := cfg.VUs
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	targets := make([]*target, 0, len(cfg.ResolvedClients))
+	for _, client := range cfg.ResolvedClients {
+		tgt, err := newTarget(client, concurrency, opts.Transport)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, tgt)
+	}
+
+	return runPreflight(ctx, targets, opts, opts.Logger)
+}
+
 // runPreflight identifies the targets and refuses the run when the answer makes
 // it meaningless. An unhealthy target is a warning rather than a refusal: a
 // syncing node is still a legitimate thing to measure as long as the report says

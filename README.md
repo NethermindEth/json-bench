@@ -130,6 +130,7 @@ The `runner` binary exposes its functionality through subcommands. Running
 
 ```text
 runner benchmark        Run a load test against one or more JSON-RPC endpoints
+runner find-max-rps     Search for the highest rate a target sustains within an SLO
 runner compare          One-shot cross-client JSON-RPC response comparison
 runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
 runner api              Start the HTTP API server
@@ -216,6 +217,38 @@ of `ok`, `rpc_null`, `rpc_error`, `http_error`, `truncated`, `timeout` or
 call that succeeded and returned nothing — is counted separately rather than
 folded into `ok`. `--fail-on-threshold` turns a breached `thresholds:` entry
 into a non-zero exit.
+
+### Finding a target's capacity
+
+`benchmark` measures one rate. `find-max-rps` searches for the highest rate one
+endpoint sustains while holding a service level:
+
+```bash
+go run ./runner --output outputs/capacity find-max-rps \
+  --config ./config/benchmark/mixed.yaml \
+  --clients ./config/clients/clients.yaml \
+  --slo-p99 250 --slo-error-rate 0.5 --probe-duration 60s
+```
+
+It doubles the rate until the SLO breaks, then bisects. The config's `rps` and
+`duration` are replaced per probe; everything else — the call mix, the seed,
+`vus` — is used as written.
+
+The result lands in `outputs/capacity/max-rps.json` with every probe, the
+answer, and **what bounded it**:
+
+| `limited_by` | Meaning |
+|---|---|
+| `slo` | The endpoint breached the SLO. `max_rps` is its capacity, bracketed below `lowest_failing_rps`. |
+| `search_ceiling` | `--max-rps` was reached without a breach, so `max_rps` is a floor rather than a limit. |
+| `generator` | **Inconclusive.** The generator could not offer the next rate, so the result is a property of the load generator, not the endpoint. Raise `vus` and search again. |
+
+That last row is the reason this is trustworthy. At a rate the generator cannot
+offer, latency looks terrible for reasons that have nothing to do with the node,
+and a search reading only latency would report the generator's ceiling as the
+node's capacity. Each probe checks delivery first and refuses to draw a
+conclusion it cannot support. `--fail-on-generator-limit` turns that into a
+non-zero exit for CI.
 
 ### Historic Tracking & Analysis
 

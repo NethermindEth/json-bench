@@ -112,6 +112,19 @@ Two things worth knowing before drawing a conclusion:
   statistically significant, so read the shift and treat the p-value only as a
   check that the shift is real.
 
+## Finding the capacity rather than measuring one rate
+
+```bash
+./runner --output outputs/capacity find-max-rps \
+  --config bench.yaml --clients clients.yaml \
+  --slo-p99 250 --slo-error-rate 0.5 --probe-duration 60s
+```
+
+Read `limited_by` in `outputs/capacity/max-rps.json` before the number. If it
+says `generator`, the search measured the load generator rather than the node —
+raise `vus` and run it again. If it says `search_ceiling`, the node never
+breached the SLO and the answer is a floor.
+
 ## Reproducible runs
 
 Pre-generate the request sequence and point every run at the same file:

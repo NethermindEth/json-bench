@@ -76,6 +76,16 @@ type Node struct {
 	// to those methods, so an unrelated fault rate cannot make a pre-flight
 	// check flaky.
 	ProbeError bool `json:"probe_error,omitempty"`
+
+	// ConcurrencyLimit is how many requests the node serves at once, as
+	// Nethermind's JsonRpc.EthModuleConcurrentInstances does. Beyond it
+	// requests queue, so latency degrades with offered load and the node has a
+	// real capacity of roughly ConcurrencyLimit/serviceTime requests a second.
+	//
+	// Queueing makes total latency depend on arrival timing, so it is not
+	// reproducible the way service time and fault injection are. Leave it unset
+	// for an A/B comparison; set it to measure saturation behaviour.
+	ConcurrencyLimit int `json:"concurrency_limit,omitempty"`
 }
 
 // Config is the whole stub definition, loadable from JSON.
@@ -109,8 +119,9 @@ type Stats struct {
 }
 
 type Stub struct {
-	cfg Config
-	pad []byte
+	cfg     Config
+	pad     []byte
+	workers chan struct{}
 
 	mu    sync.Mutex
 	total int64
@@ -159,7 +170,11 @@ func New(cfg Config) (*Stub, error) {
 		pad[i] = "0123456789abcdef"[i%16]
 	}
 
-	return &Stub{cfg: cfg, pad: pad, seen: make(map[string]map[Outcome]int64)}, nil
+	stub := &Stub{cfg: cfg, pad: pad, seen: make(map[string]map[Outcome]int64)}
+	if cfg.Node.ConcurrencyLimit > 0 {
+		stub.workers = make(chan struct{}, cfg.Node.ConcurrencyLimit)
+	}
+	return stub, nil
 }
 
 func validate(cfg Config) error {
@@ -293,6 +308,12 @@ func (s *Stub) serveRPC(w http.ResponseWriter, r *http.Request) {
 
 	key := requestKey(req.ID, body)
 	method := s.methodConfig(req.Method)
+
+	if !s.acquireWorker(r) {
+		s.record(req.Method, OutcomeTimeout)
+		return
+	}
+	defer s.releaseWorker()
 
 	if !s.sleep(r, method.Latency, req.Method, key) {
 		s.record(req.Method, OutcomeTimeout)
@@ -534,4 +555,24 @@ func (s *Stub) identity(method string) (any, bool) {
 
 func hexUint(v int64) string {
 	return "0x" + strconv.FormatInt(v, 16)
+}
+
+// acquireWorker waits for one of the node's serving slots. Requests beyond the
+// limit queue here, which is where a saturated node's latency comes from.
+func (s *Stub) acquireWorker(r *http.Request) bool {
+	if s.workers == nil {
+		return true
+	}
+	select {
+	case s.workers <- struct{}{}:
+		return true
+	case <-r.Context().Done():
+		return false
+	}
+}
+
+func (s *Stub) releaseWorker() {
+	if s.workers != nil {
+		<-s.workers
+	}
 }
