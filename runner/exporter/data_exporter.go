@@ -86,7 +86,8 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 		"Client", "Method", "Count", "Success Rate (%)",
 		"Min (ms)", "P50 (ms)", "P75 (ms)", "P90 (ms)", "P95 (ms)", "P99 (ms)", "P99.9 (ms)", "Max (ms)",
 		"Avg (ms)", "Std Dev", "Variance", "CV (%)", "IQR", "MAD",
-		"Throughput (req/s)", "Error Count", "Timeout Rate (%)", "Connection Errors",
+		"Throughput (req/s)", "Error Count", "Null Results", "RPC Errors", "HTTP Errors",
+		"Timeout Rate (%)", "Connection Errors",
 	}
 
 	if err := writer.Write(header); err != nil {
@@ -117,6 +118,9 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 				formatFloat(metrics.MAD),
 				formatFloat(metrics.Throughput),
 				strconv.FormatInt(metrics.ErrorCount, 10),
+				methodOutcomeCount(client, methodName, "rpc_null"),
+				methodOutcomeCount(client, methodName, "rpc_error"),
+				methodOutcomeCount(client, methodName, "http_error"),
 				formatFloat(metrics.TimeoutRate),
 				strconv.FormatInt(metrics.ConnectionErrors, 10),
 			}
@@ -130,8 +134,23 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 	return nil
 }
 
+// unmeasuredValue marks a column that does not apply to this run, so a reader
+// does not take it for a measured zero.
+const unmeasuredValue = "NA"
+
 func formatFloat(v float64) string {
 	return fmt.Sprintf("%.2f", v)
+}
+
+func outcomeCount(client *types.ClientMetrics, outcome string) string {
+	return strconv.FormatInt(client.Outcomes[outcome], 10)
+}
+
+func methodOutcomeCount(client *types.ClientMetrics, method, outcome string) string {
+	if details, ok := client.MethodDetails[method]; ok {
+		return strconv.FormatInt(details.Outcomes[outcome], 10)
+	}
+	return "0"
 }
 
 // ExportClientComparisonCSV exports client-level comparison data
@@ -145,11 +164,17 @@ func (de *DataExporter) ExportClientComparisonCSV(result *types.BenchmarkResult,
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Write header
+	// The delivery and outcome columns come first among the derived ones: a
+	// reader has to see that a run offered less load than it asked for, or that
+	// its successes were empty results, before reading a latency figure that
+	// describes only the requests which went out.
 	header := []string{
 		"Client", "Total Requests", "Total Errors", "Error Rate (%)",
-		"Avg Latency (ms)", "P95 Latency (ms)", "Performance Score",
-		"Active Connections", "Connection Reuse (%)", "DNS Resolution (ms)", "TLS Handshake (ms)",
+		"Scheduled", "Sent", "Late", "Dropped", "Delivered (%)",
+		"Target RPS", "Achieved RPS", "Max Dispatch Delay (ms)",
+		"OK", "Null Results", "RPC Errors", "HTTP Errors", "Truncated", "Timeouts", "Transport Errors",
+		"Avg Latency (ms)", "P95 Latency (ms)", "P99 Latency (ms)", "Performance Score",
+		"Connection Reuse (%)", "DNS Resolution (ms)", "TCP Handshake (ms)", "TLS Handshake (ms)",
 	}
 
 	if err := writer.Write(header); err != nil {
@@ -158,22 +183,42 @@ func (de *DataExporter) ExportClientComparisonCSV(result *types.BenchmarkResult,
 
 	// Write data rows
 	for clientName, client := range result.ClientMetrics {
-		score := float64(0)
+		// The score normalises across the clients in a run, so with one client
+		// there is nothing to normalise against. Reporting 0 would read as the
+		// worst possible score rather than as not applicable.
+		score := unmeasuredValue
 		if result.PerformanceScore != nil {
-			score = result.PerformanceScore[clientName]
+			score = fmt.Sprintf("%.1f", result.PerformanceScore[clientName])
 		}
 
+		d := client.Delivery
 		row := []string{
 			clientName,
 			strconv.FormatInt(client.TotalRequests, 10),
 			strconv.FormatInt(client.TotalErrors, 10),
 			fmt.Sprintf("%.2f", client.ErrorRate),
+			strconv.FormatInt(d.Scheduled, 10),
+			strconv.FormatInt(d.Sent, 10),
+			strconv.FormatInt(d.Late, 10),
+			strconv.FormatInt(d.Dropped, 10),
+			fmt.Sprintf("%.2f", d.DeliveryRatio()*100),
+			fmt.Sprintf("%.1f", d.TargetRPS),
+			fmt.Sprintf("%.1f", d.AchievedRPS),
+			fmt.Sprintf("%.2f", d.MaxDispatchDelayMs),
+			outcomeCount(client, "ok"),
+			outcomeCount(client, "rpc_null"),
+			outcomeCount(client, "rpc_error"),
+			outcomeCount(client, "http_error"),
+			outcomeCount(client, "truncated"),
+			outcomeCount(client, "timeout"),
+			outcomeCount(client, "transport"),
 			fmt.Sprintf("%.2f", client.Latency.Avg),
 			fmt.Sprintf("%.2f", client.Latency.P95),
-			fmt.Sprintf("%.1f", score),
-			strconv.FormatInt(client.ConnectionMetrics.ActiveConnections, 10),
+			fmt.Sprintf("%.2f", client.Latency.P99),
+			score,
 			fmt.Sprintf("%.1f", client.ConnectionMetrics.ConnectionReuse),
 			fmt.Sprintf("%.2f", client.ConnectionMetrics.DNSResolutionTime),
+			fmt.Sprintf("%.2f", client.ConnectionMetrics.TCPHandshakeTime),
 			fmt.Sprintf("%.2f", client.ConnectionMetrics.TLSHandshakeTime),
 		}
 

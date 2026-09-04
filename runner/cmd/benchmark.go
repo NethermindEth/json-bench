@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -202,6 +203,10 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		logger.Infof("Generated HTML report at: %s", reportPath)
 	}
 
+	if err := writeManifest(outputDir, benchmarkResults); err != nil {
+		logger.WithError(err).Warn("Failed to write the run manifest")
+	}
+
 	dataExporter := exporter.NewDataExporter(outputDir)
 	if err := dataExporter.ExportAll(benchmarkResults); err != nil {
 		logger.Warnf("Failed to export data: %v", err)
@@ -210,6 +215,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	}
 
 	logOutcomes(benchmarkResults)
+	logComparisons(benchmarkResults)
 
 	for _, breach := range breaches {
 		logger.Warnf("Threshold breached: %s", breach)
@@ -276,6 +282,38 @@ func parseHeaderFlags(values []string) (map[string]string, error) {
 		out[name] = strings.TrimSpace(value)
 	}
 	return out, nil
+}
+
+// writeManifest records how the run was produced, so a later comparison can
+// tell whether two runs are comparable before treating a difference as a
+// regression.
+func writeManifest(dir string, result *types.BenchmarkResult) error {
+	data, err := json.MarshalIndent(result.Manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "manifest.json"), append(data, '\n'), 0o644)
+}
+
+// logComparisons reports the pairwise test between clients. The shift comes
+// first because at these sample sizes significance is cheap: tens of thousands
+// of requests make a tenth of a millisecond "significant", and only the
+// magnitude tells anyone whether to care.
+func logComparisons(result *types.BenchmarkResult) {
+	if result.Comparison == nil || len(result.Comparison.Methods) == 0 {
+		return
+	}
+
+	logger.Infof("Client comparison (Mann-Whitney U on retained samples; read the shift, not the p-value)")
+	for _, c := range result.Comparison.Methods {
+		verdict := "no significant difference"
+		if c.Faster != "" {
+			verdict = c.Faster + " faster"
+		}
+		logger.Infof("  %s: %s median %.2fms vs %s median %.2fms — %+.1f%% (%s, p=%.3g, n=%d/%d)",
+			c.Method, c.ClientA, c.MedianAMs, c.ClientB, c.MedianBMs,
+			c.MedianShiftPercent, verdict, c.PValue, c.CountA, c.CountB)
+	}
 }
 
 // logOutcomes prints the per-client outcome breakdown. It is the answer to "did

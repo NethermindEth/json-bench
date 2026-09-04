@@ -193,15 +193,38 @@ For a 5-client, 45-method profile that is roughly 16,000 series at one push
 every 5 s, comparable to what k6 produced. Tune with
 `--prometheus-push-interval`.
 
+## Run artifacts
+
+A run writes these under `--output`, whether or not Prometheus is configured:
+
+| File | Contents |
+|---|---|
+| `manifest.json` | How the run was produced: engine and version, the error-rate semantics, seed, saturation policy, load shape, the transport settings that change the numbers, and each client's name, type and URL. Read this before comparing two runs. |
+| `samples.jsonl.gz` | One record per request. |
+| `exports/results.json` | The whole result, including the manifest and the pairwise client comparison. |
+| `exports/client_comparison.csv` | Per client: delivery accounting, the outcome breakdown, latency percentiles. |
+| `exports/method_metrics.csv` | Per method: the full distribution statistics and outcome counts. |
+
+`manifest.json` exists because the error rate counts JSON-RPC errors, which an
+HTTP-only pipeline could not see. Two runs measured under different semantics
+are not comparable, and a regression detector needs something to check that
+against rather than silently reporting the change as a regression.
+
 ## Beyond Prometheus
 
 Prometheus holds cumulative aggregates. For anything else — the p99 of a
 window, a latency histogram, the distribution of one method's JSON-RPC error
-codes — read the per-request sample file the run writes to
-`<output>/samples.jsonl.gz`. One gzipped JSON object per request, carrying its
-timings, phase breakdown, outcome, RPC code and byte counts. Percentiles
-recomputed from it agree exactly with the reports, because both come from the
-same samples.
+codes — read the per-request sample file, `<output>/samples.jsonl.gz`. One
+gzipped JSON object per request, carrying its timings, phase breakdown, outcome,
+RPC code and byte counts. Percentiles recomputed from it agree exactly with the
+reports, because both come from the same samples.
+
+The same samples drive the pairwise client comparison in `results.json`: a
+two-sided Mann-Whitney U test of each method's latency between each pair of
+clients, with the median shift as the effect size. At benchmark sample sizes
+almost any difference is significant — tens of thousands of requests make a
+tenth of a millisecond "significant" — so the shift is the number to read and
+the p-value only says whether the shift is real.
 
 ## Dashboards
 

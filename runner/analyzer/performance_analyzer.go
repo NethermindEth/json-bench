@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"fmt"
-	"math"
 	"sort"
 
 	"github.com/jsonrpc-bench/runner/types"
@@ -34,14 +33,32 @@ func NewPerformanceAnalyzer() *PerformanceAnalyzer {
 }
 
 // AnalyzeResults performs comprehensive analysis on benchmark results
+// AnalyzeResults fills the heuristic scoring and the recommendations.
+//
+// The score is a weighted min-max normalisation of p95 latency, throughput,
+// error rate and stability across the clients in one run. It is a ranking
+// convenience, not a measurement, and it is only produced when there are at
+// least two clients to normalise between — with one client every normalised
+// value collapses to the midpoint and the score says nothing.
+//
+// Whether a difference between clients is real is answered separately, by the
+// engine's rank-sum test over the retained samples.
 func (pa *PerformanceAnalyzer) AnalyzeResults(result *types.BenchmarkResult) {
-	// Calculate performance scores
-	result.PerformanceScore = pa.calculatePerformanceScores(result.ClientMetrics)
+	if len(result.ClientMetrics) >= 2 {
+		result.PerformanceScore = pa.calculatePerformanceScores(result.ClientMetrics)
 
-	// Perform comparison analysis
-	result.Comparison = pa.compareClients(result.ClientMetrics, result.PerformanceScore)
+		// The engine's pairwise test is computed from the samples, which this
+		// package never sees; only the heuristic fields belong to it.
+		var methods []types.MethodComparison
+		if result.Comparison != nil {
+			methods = result.Comparison.Methods
+		}
+		result.Comparison = pa.compareClients(result.ClientMetrics, result.PerformanceScore)
+		if result.Comparison != nil {
+			result.Comparison.Methods = methods
+		}
+	}
 
-	// Generate recommendations
 	result.Recommendations = pa.generateRecommendations(result)
 }
 
@@ -186,15 +203,11 @@ func (pa *PerformanceAnalyzer) compareClients(clients map[string]*types.ClientMe
 	// Find significant differences
 	significantDiffs := pa.findSignificantDifferences(clients)
 
-	// Calculate p-values for statistical significance (simplified)
-	pValueMatrix := pa.calculatePValueMatrix(clients)
-
 	return &types.ComparisonResult{
 		Winner:           winner,
 		WinnerScore:      winnerScore,
 		RelativePerf:     relativePerf,
 		SignificantDiffs: significantDiffs,
-		PValueMatrix:     pValueMatrix,
 	}
 }
 
@@ -238,45 +251,6 @@ func (pa *PerformanceAnalyzer) findSignificantDifferences(clients map[string]*ty
 	}
 
 	return diffs
-}
-
-// calculatePValueMatrix calculates simplified p-values for client comparisons
-func (pa *PerformanceAnalyzer) calculatePValueMatrix(clients map[string]*types.ClientMetrics) map[string]map[string]float64 {
-	matrix := make(map[string]map[string]float64)
-
-	clientNames := make([]string, 0, len(clients))
-	for name := range clients {
-		clientNames = append(clientNames, name)
-		matrix[name] = make(map[string]float64)
-	}
-
-	// Simplified p-value calculation based on latency differences
-	for i, name1 := range clientNames {
-		for j, name2 := range clientNames {
-			if i == j {
-				matrix[name1][name2] = 1.0
-				continue
-			}
-
-			client1 := clients[name1]
-			client2 := clients[name2]
-
-			// Calculate simplified p-value based on latency difference
-			diff := math.Abs(client1.Latency.P95 - client2.Latency.P95)
-			avgLatency := (client1.Latency.P95 + client2.Latency.P95) / 2
-
-			if avgLatency > 0 {
-				relDiff := diff / avgLatency
-				// Simplified: smaller differences = higher p-value
-				pValue := math.Exp(-relDiff * 10)
-				matrix[name1][name2] = pValue
-			} else {
-				matrix[name1][name2] = 1.0
-			}
-		}
-	}
-
-	return matrix
 }
 
 // generateRecommendations generates performance recommendations based on analysis

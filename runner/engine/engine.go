@@ -129,7 +129,9 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 
 	clients := make(map[string]*types.ClientMetrics, len(targets))
 	for _, tgt := range targets {
-		clients[tgt.name] = run.accum.ClientMetrics(tgt.name, deliveries[tgt.name])
+		cm := run.accum.ClientMetrics(tgt.name, deliveries[tgt.name])
+		cm.Delivery.TargetRPS = float64(cfg.RPS)
+		clients[tgt.name] = cm
 	}
 
 	for _, tgt := range targets {
@@ -144,6 +146,11 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 		EndTime:       end.Format(time.DateTime),
 		Duration:      end.Sub(start).String(),
 		ResponsesDir:  opts.OutputDir,
+		Manifest:      buildManifest(cfg, opts, start, end),
+	}
+
+	if comparisons := run.accum.CompareClients(); len(comparisons) > 0 {
+		result.Comparison = &types.ComparisonResult{Methods: comparisons}
 	}
 
 	thresholds, err := collectConfigThresholds(cfg)
@@ -295,3 +302,39 @@ func collectConfigThresholds(cfg *config.Config) ([]Threshold, error) {
 // Version identifies the engine in run provenance and in the remote-write
 // User-Agent, so a stored run can be traced to what produced it.
 const Version = "1"
+
+// ErrorRateSemanticsRPCAware names what the error rate counts. It is recorded
+// on every run so a later comparison can refuse to read a semantics change as
+// a regression: JSON-RPC errors arrive as HTTP 200 and an HTTP-only pipeline
+// could not see them, so the same node measured both ways looks worse.
+const ErrorRateSemanticsRPCAware = "http_and_jsonrpc_errors"
+
+func buildManifest(cfg *config.Config, opts Options, start, end time.Time) types.RunManifest {
+	clients := make([]types.ClientProvenance, 0, len(cfg.ResolvedClients))
+	for _, client := range cfg.ResolvedClients {
+		clients = append(clients, types.ClientProvenance{
+			Name: client.Name,
+			Type: client.Type,
+			URL:  client.URL,
+		})
+	}
+
+	return types.RunManifest{
+		Engine:             "native",
+		EngineVersion:      Version,
+		ErrorRateSemantics: ErrorRateSemanticsRPCAware,
+		TestName:           cfg.TestName,
+		Seed:               cfg.Seed,
+		Saturation:         string(opts.Saturation),
+		TargetRPS:          cfg.RPS,
+		Iterations:         cfg.Iterations,
+		Concurrency:        cfg.VUs,
+		Duration:           cfg.Duration,
+		AcceptCompression:  opts.Transport.AcceptCompression,
+		ReuseConnections:   opts.Transport.ReuseConnections,
+		HTTP2:              opts.Transport.HTTP2,
+		StartTime:          start.Format(time.RFC3339),
+		EndTime:            end.Format(time.RFC3339),
+		Clients:            clients,
+	}
+}

@@ -71,14 +71,50 @@ type SystemMetrics struct {
 type MethodMetrics struct {
 	MetricSummary
 	Name string `json:"name,omitempty"` // Optional custom name
+
+	// Outcomes answers which method is failing, which an aggregate error count
+	// cannot.
+	Outcomes map[string]int64 `json:"outcomes,omitempty"`
+}
+
+// DeliveryMetrics is the load a client was actually offered, as distinct from
+// the load the config requested. Without it a run that offered a fraction of
+// its target rate is indistinguishable from one that met it, and its latency
+// figures describe only the requests that went out.
+type DeliveryMetrics struct {
+	Scheduled          int64   `json:"scheduled"`
+	Sent               int64   `json:"sent"`
+	Late               int64   `json:"late"`
+	Dropped            int64   `json:"dropped"`
+	TargetRPS          float64 `json:"target_rps"`
+	AchievedRPS        float64 `json:"achieved_rps"`
+	MaxDispatchDelayMs float64 `json:"max_dispatch_delay_ms"`
+	InflightPeak       int     `json:"inflight_peak"`
+	ElapsedSeconds     float64 `json:"elapsed_seconds"`
+}
+
+// Complete reports whether every scheduled request was sent on schedule.
+func (d DeliveryMetrics) Complete() bool { return d.Dropped == 0 && d.Late == 0 }
+
+// DeliveryRatio is the share of scheduled requests that were actually sent.
+func (d DeliveryMetrics) DeliveryRatio() float64 {
+	if d.Scheduled == 0 {
+		return 0
+	}
+	return float64(d.Sent) / float64(d.Scheduled)
 }
 
 // ClientMetrics represents metrics for a specific client
 type ClientMetrics struct {
-	Name          string                    `json:"name"`
-	TotalRequests int64                     `json:"total_requests"`
-	TotalErrors   int64                     `json:"total_errors"`
-	ErrorRate     float64                   `json:"error_rate"`
+	Name          string          `json:"name"`
+	TotalRequests int64           `json:"total_requests"`
+	TotalErrors   int64           `json:"total_errors"`
+	ErrorRate     float64         `json:"error_rate"`
+	Delivery      DeliveryMetrics `json:"delivery"`
+
+	// Outcomes counts every response class, successes included, so a reader can
+	// see that a run was fast because it returned nothing.
+	Outcomes      map[string]int64          `json:"outcomes,omitempty"`
 	Latency       MetricSummary             `json:"latency"`
 	Methods       map[string]MetricSummary  `json:"methods"`
 	MethodDetails map[string]*MethodMetrics `json:"method_details,omitempty"` // Method metrics with names
@@ -122,18 +158,49 @@ type BenchmarkResult struct {
 	PerformanceScore map[string]float64 `json:"performance_score"`
 	Recommendations  []string           `json:"recommendations"`
 	Environment      EnvironmentInfo    `json:"environment"`
+	Manifest         RunManifest        `json:"manifest"`
 }
 
 // ComparisonResult represents comparison between clients or runs
 type ComparisonResult struct {
-	Winner           string                        `json:"winner"`
-	WinnerScore      float64                       `json:"winner_score"`
-	RelativePerf     map[string]float64            `json:"relative_performance"`
-	SignificantDiffs []string                      `json:"significant_differences"`
-	PValueMatrix     map[string]map[string]float64 `json:"p_value_matrix"`
+	Winner           string             `json:"winner"`
+	WinnerScore      float64            `json:"winner_score"`
+	RelativePerf     map[string]float64 `json:"relative_performance"`
+	SignificantDiffs []string           `json:"significant_differences"`
+
+	// Methods holds a real pairwise test per method, computed from the retained
+	// samples. It replaces a p-value matrix that was exp(-relDiff*10): a
+	// p-value-shaped number with no test behind it.
+	Methods []MethodComparison `json:"method_comparisons,omitempty"`
 }
 
-// EnvironmentInfo captures system environment details
+// MethodComparison is a two-sided Mann-Whitney U test of one method's latency
+// between two clients, plus the effect size.
+//
+// At benchmark sample sizes almost any difference reaches significance, so
+// PValue answers "is this difference real" and MedianShiftPercent answers "is
+// it worth anything". Read the second first.
+type MethodComparison struct {
+	Method             string  `json:"method"`
+	ClientA            string  `json:"client_a"`
+	ClientB            string  `json:"client_b"`
+	CountA             int     `json:"count_a"`
+	CountB             int     `json:"count_b"`
+	MedianAMs          float64 `json:"median_a_ms"`
+	MedianBMs          float64 `json:"median_b_ms"`
+	P99AMs             float64 `json:"p99_a_ms"`
+	P99BMs             float64 `json:"p99_b_ms"`
+	MedianShiftMs      float64 `json:"median_shift_ms"`
+	MedianShiftPercent float64 `json:"median_shift_percent"`
+	U                  float64 `json:"u"`
+	Z                  float64 `json:"z"`
+	PValue             float64 `json:"p_value"`
+	Faster             string  `json:"faster,omitempty"`
+}
+
+// EnvironmentInfo captures system environment details. These describe the host
+// the load generator ran on, which is not the host under test unless the run
+// was co-located.
 type EnvironmentInfo struct {
 	OS            string  `json:"os"`
 	Architecture  string  `json:"architecture"`
@@ -141,6 +208,44 @@ type EnvironmentInfo struct {
 	CPUCores      int     `json:"cpu_cores"`
 	TotalMemoryGB float64 `json:"total_memory_gb"`
 	GoVersion     string  `json:"go_version"`
-	K6Version     string  `json:"k6_version"`
 	NetworkType   string  `json:"network_type"`
+}
+
+// RunManifest records how a run was produced. It exists so a later comparison
+// can tell whether two runs are comparable at all: the error rate counts
+// JSON-RPC errors, which an earlier pipeline could not see, so the same node
+// measured under different semantics looks worse rather than different.
+type RunManifest struct {
+	Engine        string `json:"engine"`
+	EngineVersion string `json:"engine_version"`
+
+	// ErrorRateSemantics names what the error rate counts. A regression
+	// detector must refuse to compare runs whose semantics differ.
+	ErrorRateSemantics string `json:"error_rate_semantics"`
+
+	TestName   string `json:"test_name"`
+	ConfigPath string `json:"config_path,omitempty"`
+	Seed       int64  `json:"seed"`
+	Saturation string `json:"saturation_policy"`
+
+	TargetRPS   int    `json:"target_rps,omitempty"`
+	Iterations  int    `json:"iterations,omitempty"`
+	Concurrency int    `json:"concurrency"`
+	Duration    string `json:"duration"`
+
+	AcceptCompression bool `json:"accept_compression"`
+	ReuseConnections  bool `json:"reuse_connections"`
+	HTTP2             bool `json:"http2"`
+
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time"`
+
+	Clients []ClientProvenance `json:"clients"`
+}
+
+// ClientProvenance identifies what a client actually was during the run.
+type ClientProvenance struct {
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+	URL  string `json:"url"`
 }

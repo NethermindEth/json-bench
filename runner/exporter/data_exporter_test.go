@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/jsonrpc-bench/runner/types"
 )
 
@@ -104,4 +106,86 @@ func TestExportMethodMetricsCSV_EmptyMetricsWritesHeaderOnly(t *testing.T) {
 	if len(rows) != 0 {
 		t.Errorf("expected no data rows, got %d", len(rows))
 	}
+}
+
+func TestExportClientComparisonCSV_ShowsUnderDeliveredLoad(t *testing.T) {
+	result := &types.BenchmarkResult{
+		ClientMetrics: map[string]*types.ClientMetrics{
+			"nethermind": {
+				Name:          "nethermind",
+				TotalRequests: 181,
+				TotalErrors:   28,
+				ErrorRate:     15.47,
+				Delivery: types.DeliveryMetrics{
+					Scheduled: 240, Sent: 181, Late: 0, Dropped: 59,
+					TargetRPS: 30, AchievedRPS: 22.6, MaxDispatchDelayMs: 0,
+				},
+				Outcomes: map[string]int64{
+					"ok": 153, "rpc_error": 21, "http_error": 6, "truncated": 1,
+				},
+			},
+		},
+	}
+
+	header, rows := writeClientComparison(t, result)
+	require.Len(t, rows, 1)
+	row := rows[0]
+
+	// The shortfall has to be readable without opening anything else: the
+	// latency columns on this row describe only the 181 requests that went out.
+	for col, want := range map[string]string{
+		"Scheduled":     "240",
+		"Sent":          "181",
+		"Dropped":       "59",
+		"Delivered (%)": "75.42",
+		"Target RPS":    "30.0",
+		"Achieved RPS":  "22.6",
+		"RPC Errors":    "21",
+		"HTTP Errors":   "6",
+		"Truncated":     "1",
+		"OK":            "153",
+	} {
+		if got := columnValue(t, header, row, col); got != want {
+			t.Errorf("%s = %q, want %q", col, got, want)
+		}
+	}
+}
+
+// The score normalises across the clients in a run, so with one client there is
+// nothing to normalise against and a numeric 0 would read as the worst possible
+// result rather than as not applicable.
+func TestExportClientComparisonCSV_MarksTheScoreNotApplicable(t *testing.T) {
+	result := &types.BenchmarkResult{
+		ClientMetrics: map[string]*types.ClientMetrics{
+			"only": {Name: "only", TotalRequests: 10},
+		},
+	}
+
+	header, rows := writeClientComparison(t, result)
+	require.Len(t, rows, 1)
+	if got := columnValue(t, header, rows[0], "Performance Score"); got != "NA" {
+		t.Errorf("Performance Score = %q, want NA", got)
+	}
+}
+
+func writeClientComparison(t *testing.T, result *types.BenchmarkResult) ([]string, [][]string) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "client_comparison.csv")
+	if err := NewDataExporter(dir).ExportClientComparisonCSV(result, path); err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer file.Close()
+	records, err := csv.NewReader(file).ReadAll()
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if len(records) == 0 {
+		t.Fatal("no records written")
+	}
+	return records[0], records[1:]
 }

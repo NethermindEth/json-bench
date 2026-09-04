@@ -290,10 +290,41 @@ func (a *Accumulator) ClientMetrics(name string, delivery Delivery) *types.Clien
 	}
 	cm.ErrorRate = cm.Latency.ErrorRate
 
+	// Every class, successes included: a reader has to be able to see that a
+	// run was fast because the node returned nothing.
+	cm.Outcomes = make(map[string]int64, len(Outcomes))
+	for _, outcome := range Outcomes {
+		if n := client.overall.outcomes[outcome]; n > 0 {
+			cm.Outcomes[string(outcome)] = n
+		}
+	}
+
+	cm.Delivery = types.DeliveryMetrics{
+		Scheduled:          int64(delivery.Scheduled),
+		Sent:               int64(delivery.Sent),
+		Late:               int64(delivery.Late),
+		Dropped:            int64(delivery.Dropped),
+		AchievedRPS:        delivery.AchievedRate(),
+		MaxDispatchDelayMs: msOf(delivery.MaxQueueDelay()),
+		InflightPeak:       delivery.InflightPeak,
+		ElapsedSeconds:     elapsed,
+	}
+
 	for method, g := range byMethod {
 		summary := g.summarize(elapsed)
 		cm.Methods[method] = summary
-		cm.MethodDetails[method] = &types.MethodMetrics{MetricSummary: summary, Name: method}
+
+		outcomes := make(map[string]int64, len(Outcomes))
+		for _, outcome := range Outcomes {
+			if n := g.outcomes[outcome]; n > 0 {
+				outcomes[string(outcome)] = n
+			}
+		}
+		cm.MethodDetails[method] = &types.MethodMetrics{
+			MetricSummary: summary,
+			Name:          method,
+			Outcomes:      outcomes,
+		}
 	}
 
 	// ErrorTypes is keyed on the outcome class and, for JSON-RPC failures, on

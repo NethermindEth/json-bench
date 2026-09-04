@@ -284,9 +284,12 @@ found by whoever picks them up rather than rediscovered.
   detector does not yet refuse to compare across them. Worth fixing before the
   first cross-cutover baseline comparison.
 
-- **`EnvironmentInfo.K6Version` is dead.** Nothing writes it, and the dashboard
-  UI reads `environment.k6Version` while the JSON tag is `k6_version`. It should
-  become an engine version.
+- **The dashboard UI still reads `environment.k6Version`.** That field is gone
+  from the Go type; the engine and its version are now recorded in the run
+  manifest (`manifest.json`, and `manifest` in `results.json`) alongside the
+  error-rate semantics. The UI needs a one-line change to read
+  `manifest.engine_version` instead. It renders blank until then, which it
+  already did — the old JSON tag was `k6_version` and never matched.
 
 ## Troubleshooting
 
