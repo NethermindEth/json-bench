@@ -118,6 +118,10 @@ func (h *HistoricStorage) SaveRun(result *types.BenchmarkResult, cfg *config.Con
 		TotalErrors:       calculateTotalErrors(result),
 		PerformanceScores: performanceScores,
 		FullResults:       fullResultsJSON,
+
+		// Recorded so a later comparison can tell whether this run and another
+		// measured the same thing.
+		ErrorRateSemantics: result.Manifest.ErrorRateSemantics,
 	}
 
 	// Save to database
@@ -706,8 +710,30 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	}
 
 	comparison := &types.BaselineComparison{
-		BaselineRun: baselineRun,
-		CurrentRun:  current,
+		BaselineRun:   baselineRun,
+		CurrentRun:    current,
+		Comparability: types.CompareSemantics(baselineRun.ErrorRateSemantics, currentRun.ErrorRateSemantics),
+	}
+
+	// A difference between runs that counted errors differently is not
+	// evidence about the target, so no regressions are derived from it.
+	if !comparison.Comparability.Comparable {
+		comparison.Summary = fmt.Sprintf("Refused to compare %s -> %s: %s",
+			runID1, runID2, comparison.Comparability.Reason)
+		h.log.WithFields(logrus.Fields{
+			"baseline_run":       sanitize.LogValue(runID1),
+			"current_run":        sanitize.LogValue(runID2),
+			"baseline_semantics": sanitize.LogValue(baselineRun.ErrorRateSemantics),
+			"current_semantics":  sanitize.LogValue(currentRun.ErrorRateSemantics),
+		}).Warn("Refused a comparison between runs that counted errors differently")
+		return comparison, nil
+	}
+
+	if !comparison.Comparability.Verified {
+		h.log.WithFields(logrus.Fields{
+			"baseline_run": sanitize.LogValue(runID1),
+			"current_run":  sanitize.LogValue(runID2),
+		}).Warn(comparison.Comparability.Reason)
 	}
 
 	if baseline == nil || current == nil {
@@ -722,6 +748,9 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	comparison.Improvements = improvements
 	comparison.Summary = fmt.Sprintf("Compared %s -> %s: %d regression(s), %d improvement(s)",
 		runID1, runID2, len(regressions), len(improvements))
+	if !comparison.Comparability.Verified {
+		comparison.Summary += " (unverified: " + comparison.Comparability.Reason + ")"
+	}
 	return comparison, nil
 }
 

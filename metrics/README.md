@@ -268,6 +268,14 @@ These are defects found while replacing the load engine, in parts of the stack
 that work was deliberately not touching. They are recorded here so they are
 found by whoever picks them up rather than rediscovered.
 
+Runs now record what their error rate counted, and both comparison paths check
+it: `CompareRuns` returns a refusal instead of regressions, and
+`CompareToBaseline` returns an error. A run that recorded nothing is reported as
+unverified rather than refused, since an absent value is not proof of a
+mismatch. The remaining gap is that `CompareToSequential` and
+`CompareToRollingAverage` aggregate several runs and do not yet check that the
+window is internally consistent.
+
 - **The simplejson datasource points at the wrong port.** `datasource.yml` sets
   `http://runner:8080/api/grafana` while the runner's API binds `:8081`, so the
   targets in `jsonrpc-benchmark-enhanced.json` cannot resolve as provisioned.
@@ -277,12 +285,20 @@ found by whoever picks them up rather than rediscovered.
   dot-separated segments (`test_name.client.metric`) and returns nil for
   anything shorter. All four rules are affected.
 
-- **Baseline comparisons across the engine change will report a false
-  regression.** The error rate now counts JSON-RPC errors, which the k6-era
-  pipeline could not see, so the same node measured before and after looks
-  worse. Runs record their engine and error-rate semantics; the regression
-  detector does not yet refuse to compare across them. Worth fixing before the
-  first cross-cutover baseline comparison.
+- **`full_results` is computed on every run and never stored.** `SaveRun`
+  marshals the whole result into the field, but `InsertRun`'s column list omits
+  it and `GetRun`'s `SELECT` does not read it back. So `CompareRuns` always
+  finds it empty and falls through to the aggregate summary, which means
+  `diffClientMetrics` — the per-client, per-method regression diff — never runs
+  against stored data. The same drift affects `metadata`. Adding both to the
+  INSERT and SELECT would switch that path on; it is left alone here because
+  turning it on changes what the API reports.
+
+- **`GetRun` fabricates p99 and max latency.** They are not stored, so it sets
+  both to the p95 it does have, with a comment saying so. A regression detector
+  comparing "p99" is therefore comparing p95, and `TotalErrors` is re-derived
+  from the success rate rather than read. Any threshold written against p99 in
+  the historic path is not measuring p99.
 
 - **The dashboard UI still reads `environment.k6Version`.** That field is gone
   from the Go type; the engine and its version are now recorded in the run

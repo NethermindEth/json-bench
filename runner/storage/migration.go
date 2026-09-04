@@ -49,6 +49,7 @@ var migrations = []Migration{
 	{Version: 2, SQL: GrafanaMetricsTable},
 	{Version: 3, SQL: CreateIndices()},
 	{Version: 4, SQL: CreateHypertable}, // Optional: for TimescaleDB
+	{Version: 5, SQL: AddErrorRateSemantics},
 }
 
 // CreateIndices returns SQL for creating performance indices

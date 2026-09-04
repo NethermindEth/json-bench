@@ -373,6 +373,24 @@ func (bm *baselineManager) CompareToBaseline(ctx context.Context, runID, baselin
 			run.TestName, baseline.TestName)
 	}
 
+	// And that they measured the same thing. The error rate feeds every
+	// regression verdict below, so comparing across a change in what it counts
+	// reports a regression when nothing about the target moved.
+	baselineRun, err := bm.storage.GetHistoricRun(ctx, baseline.RunID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the baseline's run %s: %w", baseline.RunID, err)
+	}
+	comparability := types.CompareSemantics(baselineRun.ErrorRateSemantics, run.ErrorRateSemantics)
+	if !comparability.Comparable {
+		return nil, fmt.Errorf("%w: %s", types.ErrIncomparableRuns, comparability.Reason)
+	}
+	if !comparability.Verified {
+		bm.log.WithFields(logrus.Fields{
+			"run_id":        sanitize.LogValue(runID),
+			"baseline_name": sanitize.LogValue(baselineName),
+		}).Warn(comparability.Reason)
+	}
+
 	// Perform comparison
 	comparison, err := bm.performComparison(ctx, run, baseline)
 	if err != nil {
