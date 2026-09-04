@@ -300,6 +300,16 @@ window is internally consistent.
   from the success rate rather than read. Any threshold written against p99 in
   the historic path is not measuring p99.
 
+- **The p99 integration test asserts a shape the schema forbids.** It inserted a
+  NULL `value` into `benchmark_metrics`, which declares the column NOT NULL, so
+  the subtest could only ever fail. It had never run: the suite skips without
+  `BENCH_TEST_POSTGRES_DSN`, which nothing set. The case is now written the way
+  the table actually represents an unmeasured metric — an absent row, which the
+  query's aggregate turns into a SQL NULL — and asserts the thing worth
+  asserting, that an unrecorded p99 does not read back as a real zero. The test
+  still exercises an inline copy of the query rather than the API's own
+  `handleGetRunMethods`, so it does not protect the shipped handler.
+
 - **The dashboard UI still reads `environment.k6Version`.** That field is gone
   from the Go type; the engine and its version are now recorded in the run
   manifest (`manifest.json`, and `manifest` in `results.json`) alongside the

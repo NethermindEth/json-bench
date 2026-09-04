@@ -14,6 +14,22 @@ jobs:
   check:
     name: Build, vet and test
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bench
+          POSTGRES_PASSWORD: bench
+          POSTGRES_DB: bench
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bench"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -43,5 +59,9 @@ jobs:
       - name: Vet debug helpers
         run: go vet -tags debug ./...
 
+      # Without a database the storage and p99 suites skip rather than fail, so
+      # the migrations and the comparability gate would go unexercised in CI.
       - name: Test
         run: go test -race ./...
+        env:
+          BENCH_TEST_POSTGRES_DSN: postgres://bench:bench@127.0.0.1:5432/bench?sslmode=disable

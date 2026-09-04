@@ -991,7 +991,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Select a different Stat to change the query\n\n<a href=\"https://k6.io/docs/using-k6/metrics/reference/#http\" target=\"_blank\">HTTP-specific built-in metrics</a>",
+      "description": "Select a different Stat to change the query.\n\nEvery series and label is listed in `metrics/METRICS.md`.",
       "fieldConfig": {
         "defaults": {
           "color": {

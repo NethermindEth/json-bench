@@ -59,9 +59,6 @@ func (suite *StorageConfigTestSuite) TestDefaultStorageConfig() {
 	assert.Equal(t, "disable", config.PostgreSQL.SSLMode)
 	assert.Equal(t, 10, config.PostgreSQL.MaxOpenConns)
 	assert.Equal(t, 5, config.PostgreSQL.MaxIdleConns)
-	assert.Equal(t, "benchmark_metrics", config.PostgreSQL.MetricsTable)
-	assert.Equal(t, "benchmark_runs", config.PostgreSQL.RunsTable)
-	assert.Equal(t, "7d", config.PostgreSQL.RetentionPolicy)
 }
 
 // TestLoadStorageConfigNoFile tests loading when config file doesn't exist
@@ -102,14 +99,11 @@ postgresql:
   host: "custom-host"
   port: 5433
   database: "custom_db"
-  user: "custom_user"
+  username: "custom_user"
   password: "custom_pass"
   ssl_mode: "require"
-  max_open_conns: 20
-  max_idle_conns: 10
-  metrics_table: "custom_metrics"
-  runs_table: "custom_runs"
-  retention_policy: "14d"
+  max_connections: 20
+  max_idle_connections: 10
 `
 
 	err := os.WriteFile(suite.testFile, []byte(configContent), 0644)
@@ -134,9 +128,6 @@ postgresql:
 	assert.Equal(t, "require", config.PostgreSQL.SSLMode)
 	assert.Equal(t, 20, config.PostgreSQL.MaxOpenConns)
 	assert.Equal(t, 10, config.PostgreSQL.MaxIdleConns)
-	assert.Equal(t, "custom_metrics", config.PostgreSQL.MetricsTable)
-	assert.Equal(t, "custom_runs", config.PostgreSQL.RunsTable)
-	assert.Equal(t, "14d", config.PostgreSQL.RetentionPolicy)
 }
 
 // TestLoadStorageConfigPartialFile tests loading config with missing fields
@@ -168,15 +159,12 @@ postgresql:
 	assert.Equal(t, "partial_db", config.PostgreSQL.Database)
 
 	// Verify defaults are applied for missing fields
-	assert.Equal(t, 90, config.RetentionDays)                            // Default
-	assert.Equal(t, 5432, config.PostgreSQL.Port)                        // Default
-	assert.Equal(t, "postgres", config.PostgreSQL.User)                  // Default
-	assert.Equal(t, "disable", config.PostgreSQL.SSLMode)                // Default
-	assert.Equal(t, 10, config.PostgreSQL.MaxOpenConns)                  // Default
-	assert.Equal(t, 5, config.PostgreSQL.MaxIdleConns)                   // Default
-	assert.Equal(t, "benchmark_metrics", config.PostgreSQL.MetricsTable) // Default
-	assert.Equal(t, "benchmark_runs", config.PostgreSQL.RunsTable)       // Default
-	assert.Equal(t, "7d", config.PostgreSQL.RetentionPolicy)             // Default
+	assert.Equal(t, 90, config.RetentionDays)             // Default
+	assert.Equal(t, 5432, config.PostgreSQL.Port)         // Default
+	assert.Equal(t, "postgres", config.PostgreSQL.User)   // Default
+	assert.Equal(t, "disable", config.PostgreSQL.SSLMode) // Default
+	assert.Equal(t, 10, config.PostgreSQL.MaxOpenConns)   // Default
+	assert.Equal(t, 5, config.PostgreSQL.MaxIdleConns)    // Default
 }
 
 // TestLoadStorageConfigInvalidYAML tests loading malformed YAML file
@@ -232,17 +220,14 @@ func (suite *StorageConfigTestSuite) TestStorageConfigValidateEnabled() {
 		RetentionDays:  30,
 		EnableHistoric: true,
 		PostgreSQL: PostgreSQLConfig{
-			Host:            "localhost",
-			Port:            5432,
-			Database:        "test_db",
-			User:            "test_user",
-			Password:        "test_pass",
-			SSLMode:         "disable",
-			MaxOpenConns:    10,
-			MaxIdleConns:    5,
-			MetricsTable:    "metrics",
-			RunsTable:       "runs",
-			RetentionPolicy: "7d",
+			Host:         "localhost",
+			Port:         5432,
+			Database:     "test_db",
+			User:         "test_user",
+			Password:     "test_pass",
+			SSLMode:      "disable",
+			MaxOpenConns: 10,
+			MaxIdleConns: 5,
 		},
 	}
 
@@ -286,8 +271,6 @@ func (suite *StorageConfigTestSuite) TestStorageConfigValidateInvalidHistoricPat
 			User:         "test_user",
 			MaxOpenConns: 10,
 			MaxIdleConns: 5,
-			MetricsTable: "metrics",
-			RunsTable:    "runs",
 		},
 	}
 
@@ -335,8 +318,6 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "test_user",
 				MaxOpenConns: 10,
 				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError: false,
 		},
@@ -349,8 +330,6 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "test_user",
 				MaxOpenConns: 10,
 				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError:   true,
 			errorContains: "host is required",
@@ -364,8 +343,6 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "test_user",
 				MaxOpenConns: 10,
 				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError:   true,
 			errorContains: "port must be between 1 and 65535",
@@ -379,8 +356,6 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "test_user",
 				MaxOpenConns: 10,
 				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError:   true,
 			errorContains: "port must be between 1 and 65535",
@@ -394,8 +369,6 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "test_user",
 				MaxOpenConns: 10,
 				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError:   true,
 			errorContains: "database is required",
@@ -409,11 +382,9 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "",
 				MaxOpenConns: 10,
 				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError:   true,
-			errorContains: "user is required",
+			errorContains: "username is required",
 		},
 		{
 			name: "invalid_max_open_conns",
@@ -424,11 +395,9 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "test_user",
 				MaxOpenConns: 0,
 				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError:   true,
-			errorContains: "max_open_conns must be greater than 0",
+			errorContains: "max_connections must be greater than 0",
 		},
 		{
 			name: "invalid_max_idle_conns",
@@ -439,41 +408,9 @@ func (suite *StorageConfigTestSuite) TestPostgreSQLConfigValidation() {
 				User:         "test_user",
 				MaxOpenConns: 10,
 				MaxIdleConns: 0,
-				MetricsTable: "metrics",
-				RunsTable:    "runs",
 			},
 			shouldError:   true,
-			errorContains: "max_idle_conns must be greater than 0",
-		},
-		{
-			name: "empty_metrics_table",
-			config: PostgreSQLConfig{
-				Host:         "localhost",
-				Port:         5432,
-				Database:     "test_db",
-				User:         "test_user",
-				MaxOpenConns: 10,
-				MaxIdleConns: 5,
-				MetricsTable: "",
-				RunsTable:    "runs",
-			},
-			shouldError:   true,
-			errorContains: "metrics_table is required",
-		},
-		{
-			name: "empty_runs_table",
-			config: PostgreSQLConfig{
-				Host:         "localhost",
-				Port:         5432,
-				Database:     "test_db",
-				User:         "test_user",
-				MaxOpenConns: 10,
-				MaxIdleConns: 5,
-				MetricsTable: "metrics",
-				RunsTable:    "",
-			},
-			shouldError:   true,
-			errorContains: "runs_table is required",
+			errorContains: "max_idle_connections must be greater than 0",
 		},
 	}
 
@@ -648,14 +585,11 @@ postgresql:
   host: "integration-host"
   port: 5432
   database: "integration_db"
-  user: "integration_user"
+  username: "integration_user"
   password: "integration_pass"
   ssl_mode: "require"
-  max_open_conns: 15
-  max_idle_conns: 8
-  metrics_table: "integration_metrics"
-  runs_table: "integration_runs"
-  retention_policy: "30d"
+  max_connections: 15
+  max_idle_connections: 8
 `
 
 	err := os.WriteFile(suite.testFile, []byte(configContent), 0644)
@@ -701,8 +635,6 @@ func (suite *StorageConfigTestSuite) TestConfigurationEdgeCases() {
 			User:         "test",
 			MaxOpenConns: 1,
 			MaxIdleConns: 1,
-			MetricsTable: "m",
-			RunsTable:    "r",
 		},
 	}
 
@@ -721,8 +653,6 @@ func (suite *StorageConfigTestSuite) TestConfigurationEdgeCases() {
 			User:         "u",
 			MaxOpenConns: 1,
 			MaxIdleConns: 1,
-			MetricsTable: "m",
-			RunsTable:    "r",
 		},
 	}
 
@@ -740,8 +670,6 @@ func (suite *StorageConfigTestSuite) TestConfigurationEdgeCases() {
 			User:         "test",
 			MaxOpenConns: 1,
 			MaxIdleConns: 1,
-			MetricsTable: "metrics",
-			RunsTable:    "runs",
 		},
 	}
 
@@ -766,12 +694,10 @@ postgresql:
   host: "localhost"
   port: 5432
   database: "concurrent_db_%d"
-  user: "user_%d"
-  max_open_conns: %d
-  max_idle_conns: %d
-  metrics_table: "metrics_%d"
-  runs_table: "runs_%d"
-`, filepath.Join(suite.tempDir, fmt.Sprintf("concurrent_historic_%d", i)), 30+i, i, i, 10+i, 5+i, i, i)
+  username: "user_%d"
+  max_connections: %d
+  max_idle_connections: %d
+`, filepath.Join(suite.tempDir, fmt.Sprintf("concurrent_historic_%d", i)), 30+i, i, i, 10+i, 5+i)
 
 		err := os.WriteFile(configFile, []byte(configContent), 0644)
 		require.NoError(t, err)
@@ -823,11 +749,9 @@ postgresql:
   host: "localhost"
   port: 5432
   database: "bench_db"
-  user: "bench_user"
-  max_open_conns: 10
-  max_idle_conns: 5
-  metrics_table: "metrics"
-  runs_table: "runs"
+  username: "bench_user"
+  max_connections: 10
+  max_idle_connections: 5
 `
 
 	os.WriteFile(configFile, []byte(configContent), 0644)
@@ -858,8 +782,6 @@ func BenchmarkStorageConfigValidation(b *testing.B) {
 			User:         "bench_user",
 			MaxOpenConns: 10,
 			MaxIdleConns: 5,
-			MetricsTable: "metrics",
-			RunsTable:    "runs",
 		},
 	}
 
@@ -904,8 +826,6 @@ func TestPostgreSQLConfigEdgeCases(t *testing.T) {
 		User:         "test",
 		MaxOpenConns: 1000,
 		MaxIdleConns: 500,
-		MetricsTable: "metrics",
-		RunsTable:    "runs",
 	}
 
 	err := config.Validate()

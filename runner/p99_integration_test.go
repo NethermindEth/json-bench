@@ -133,11 +133,12 @@ func TestP99DataFlow(t *testing.T) {
 		assert.True(t, found, "Method not found in response")
 	})
 
-	// Test 2: Insert test data with NULL p99
-	t.Run("Test_P99_With_NULL", func(t *testing.T) {
+	// A method that was measured but whose p99 was never recorded must read back
+	// as absent rather than as a real zero, which would look like a fast method.
+	t.Run("Test_P99_Unrecorded", func(t *testing.T) {
 		testMethodNull := "eth_getBalance"
 		err := insertTestP99Metric(db, testRunID, testMethodNull, nil)
-		require.NoError(t, err, "Failed to insert test metric with NULL p99")
+		require.NoError(t, err, "Failed to insert test metric without a p99")
 
 		// Call API endpoint again
 		resp, err := http.Get(fmt.Sprintf("%s/api/runs/%s/methods", ts.URL, testRunID))
@@ -153,10 +154,10 @@ func TestP99DataFlow(t *testing.T) {
 		for _, method := range methods {
 			if method.Name == testMethodNull {
 				found = true
-				assert.Nil(t, method.P99Latency, "P99 latency should be nil for NULL value")
+				assert.Nil(t, method.P99Latency, "an unrecorded p99 must not read back as zero")
 			}
 		}
-		assert.True(t, found, "Method with NULL p99 not found in response")
+		assert.True(t, found, "Method without a recorded p99 not found in response")
 	})
 
 	// Test 3: Verify zero values are preserved
@@ -227,25 +228,17 @@ func insertTestP99Metric(db *sql.DB, runID string, method string, p99 *float64) 
 		return fmt.Errorf("failed to insert test run: %w", err)
 	}
 
-	// Insert the metric
-	if p99 == nil {
-		// Insert NULL value
-		query := `
-			INSERT INTO benchmark_metrics (time, run_id, client, method, metric_name, value)
-			VALUES ($1, $2, 'test_client', $3, 'latency_p99', NULL)
-		`
-		_, err = db.Exec(query, time.Now(), runID, method)
-	} else {
-		// Insert actual value
+	// An unmeasured metric is an absent row, not a null one: benchmark_metrics
+	// is narrow and declares value NOT NULL, so a p99 nobody recorded simply has
+	// no row and the query's aggregate turns that into a SQL NULL.
+	if p99 != nil {
 		query := `
 			INSERT INTO benchmark_metrics (time, run_id, client, method, metric_name, value)
 			VALUES ($1, $2, 'test_client', $3, 'latency_p99', $4)
 		`
-		_, err = db.Exec(query, time.Now(), runID, method, *p99)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to insert test metric: %w", err)
+		if _, err = db.Exec(query, time.Now(), runID, method, *p99); err != nil {
+			return fmt.Errorf("failed to insert test metric: %w", err)
+		}
 	}
 
 	// Also insert avg_latency for completeness

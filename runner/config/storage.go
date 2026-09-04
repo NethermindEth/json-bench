@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
 // StorageConfig holds configuration for historic storage
@@ -24,16 +23,11 @@ type PostgreSQLConfig struct {
 	Host         string `yaml:"host"`
 	Port         int    `yaml:"port"`
 	Database     string `yaml:"database"`
-	User         string `yaml:"user"`
+	User         string `yaml:"username"`
 	Password     string `yaml:"password"`
 	SSLMode      string `yaml:"ssl_mode"`
-	MaxOpenConns int    `yaml:"max_open_conns"`
-	MaxIdleConns int    `yaml:"max_idle_conns"`
-
-	// Grafana-specific settings
-	MetricsTable    string `yaml:"metrics_table"`
-	RunsTable       string `yaml:"runs_table"`
-	RetentionPolicy string `yaml:"retention_policy"`
+	MaxOpenConns int    `yaml:"max_connections"`
+	MaxIdleConns int    `yaml:"max_idle_connections"`
 }
 
 // DefaultStorageConfig returns a default storage configuration
@@ -43,17 +37,14 @@ func DefaultStorageConfig() *StorageConfig {
 		RetentionDays:  90,
 		EnableHistoric: false,
 		PostgreSQL: PostgreSQLConfig{
-			Host:            "localhost",
-			Port:            5432,
-			Database:        "rpc_benchmarks",
-			User:            "postgres",
-			Password:        "",
-			SSLMode:         "disable",
-			MaxOpenConns:    10,
-			MaxIdleConns:    5,
-			MetricsTable:    "benchmark_metrics",
-			RunsTable:       "benchmark_runs",
-			RetentionPolicy: "7d",
+			Host:         "localhost",
+			Port:         5432,
+			Database:     "rpc_benchmarks",
+			User:         "postgres",
+			Password:     "",
+			SSLMode:      "disable",
+			MaxOpenConns: 10,
+			MaxIdleConns: 5,
 		},
 	}
 }
@@ -78,7 +69,7 @@ func LoadStorageConfig(path string, log logrus.FieldLogger) (*StorageConfig, err
 	}
 
 	var cfg StorageConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	if err := UnmarshalStrict(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal storage config: %w", err)
 	}
 
@@ -109,15 +100,6 @@ func LoadStorageConfig(path string, log logrus.FieldLogger) (*StorageConfig, err
 	}
 	if cfg.PostgreSQL.MaxIdleConns == 0 {
 		cfg.PostgreSQL.MaxIdleConns = 5
-	}
-	if cfg.PostgreSQL.MetricsTable == "" {
-		cfg.PostgreSQL.MetricsTable = "benchmark_metrics"
-	}
-	if cfg.PostgreSQL.RunsTable == "" {
-		cfg.PostgreSQL.RunsTable = "benchmark_runs"
-	}
-	if cfg.PostgreSQL.RetentionPolicy == "" {
-		cfg.PostgreSQL.RetentionPolicy = "7d"
 	}
 
 	log.WithFields(logrus.Fields{
@@ -165,19 +147,13 @@ func (c *PostgreSQLConfig) Validate() error {
 		return fmt.Errorf("database is required")
 	}
 	if c.User == "" {
-		return fmt.Errorf("user is required")
+		return fmt.Errorf("username is required")
 	}
 	if c.MaxOpenConns <= 0 {
-		return fmt.Errorf("max_open_conns must be greater than 0")
+		return fmt.Errorf("max_connections must be greater than 0")
 	}
 	if c.MaxIdleConns <= 0 {
-		return fmt.Errorf("max_idle_conns must be greater than 0")
-	}
-	if c.MetricsTable == "" {
-		return fmt.Errorf("metrics_table is required")
-	}
-	if c.RunsTable == "" {
-		return fmt.Errorf("runs_table is required")
+		return fmt.Errorf("max_idle_connections must be greater than 0")
 	}
 
 	return nil

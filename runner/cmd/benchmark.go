@@ -377,13 +377,19 @@ func logOutcomes(result *types.BenchmarkResult) {
 			continue
 		}
 
-		parts := make([]string, 0, len(client.ErrorTypes)+1)
-		parts = append(parts, fmt.Sprintf("%d ok", client.TotalRequests-client.TotalErrors))
+		// Every class is named, rpc_null included. Folding nulls into ok would
+		// hide the archive-node failure mode they exist to expose: a node that
+		// looks fast because it answered with nothing.
+		parts := make([]string, 0, len(engine.Outcomes))
 		for _, outcome := range engine.Outcomes {
-			if !outcome.IsError() {
-				continue
+			n, ok := client.Outcomes[string(outcome)]
+			if !ok && outcome.IsError() {
+				n = client.ErrorTypes[string(outcome)]
 			}
-			if n := client.ErrorTypes[string(outcome)]; n > 0 {
+			if outcome == engine.OutcomeOK && len(client.Outcomes) == 0 {
+				n = client.TotalRequests - client.TotalErrors
+			}
+			if n > 0 {
 				parts = append(parts, fmt.Sprintf("%d %s", n, outcome))
 			}
 		}

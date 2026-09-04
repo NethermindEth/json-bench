@@ -717,14 +717,12 @@ postgresql:
   username: "postgres"
   password: "postgres"
   ssl_mode: "disable"
-  
-  grafana:
-    metrics_table: "benchmark_metrics"
-    runs_table: "benchmark_runs"
-    retention_policy:
-      metrics_retention: "30d"
-      aggregated_retention: "90d"
+  max_connections: 25
+  max_idle_connections: 5
 ```
+
+The storage config is decoded strictly: an unrecognised key is an error rather
+than a setting that silently does nothing.
 
 ```yaml
 # config/storage/storage-docker.yaml (for Docker environment)
