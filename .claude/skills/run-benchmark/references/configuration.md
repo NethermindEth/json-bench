@@ -132,7 +132,7 @@ Global flags (before the subcommand):
 
 Prints the CSV path (columns: id, name, method, payload). Reference it from every run's benchmark config via `calls_file`. A run with `calls_file` set uses that file verbatim and skips sampling; keep the `calls` section anyway for threshold metadata.
 
-Which column matters: **`method` (column 3) drives the per-method breakdown.** Every request is tagged with it as `rpc_method`, and that is what `method_metrics.csv` rows are keyed on for a `calls_file` run — so the `Method` column holds real RPC methods, and `name` (column 2) is free to be any label. The file is parsed at startup, so a missing path or a malformed row fails immediately rather than minutes into the run.
+Both label columns matter. **`name` (column 2) keys the `method_metrics.csv` rows** and is tagged on every request as `req_name`; **`method` (column 3)** is tagged as `rpc_method` and appears alongside as its own column. That split is what lets a run drive one RPC method through many parameter shapes — `eth_getProof` bucketed by state depth and storage-key count, say — and still read a distribution per bucket. Give the `name` column the label you want to compare on. The file is parsed at startup, so a missing path or a malformed row fails immediately rather than minutes into the run.
 
 ## Related subcommands
 

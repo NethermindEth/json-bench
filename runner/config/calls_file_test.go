@@ -60,29 +60,22 @@ func TestLoadCallsFileMethodsErrors(t *testing.T) {
 	}
 }
 
-func TestMethodKeys(t *testing.T) {
-	declared := &Config{Calls: []*Call{
-		{Name: "blocks", Method: "eth_getBlockByNumber"},
-		{Method: "eth_chainId"}, // no name: falls back to the method
-	}}
-	tag, ids := declared.MethodKeys()
-	if tag != "req_name" {
-		t.Errorf("tag = %q, want req_name for a declared-calls run", tag)
-	}
-	if len(ids) != 2 || ids[0] != "blocks" || ids[1] != "eth_chainId" {
-		t.Errorf("identifiers = %v, want [blocks eth_chainId]", ids)
-	}
+// A calls file can drive one method through many named parameter shapes; the
+// names are the dimension the breakdown keys on, so both are read.
+func TestLoadCallsFileLabels(t *testing.T) {
+	path := writeCallsFile(t, `1,proof_head,eth_getProof,"{}"
+2,proof_deep,eth_getProof,"{}"
+3,proof_head,eth_getProof,"{}"
+`)
 
-	fromFile := &Config{
-		Calls:            []*Call{{Name: "multimethod", Method: "eth_call"}},
-		CallsFile:        "requests.csv",
-		CallsFileMethods: []string{"eth_call", "eth_getLogs"},
+	methods, names, err := LoadCallsFileLabels(path)
+	if err != nil {
+		t.Fatalf("LoadCallsFileLabels: %v", err)
 	}
-	tag, ids = fromFile.MethodKeys()
-	if tag != "rpc_method" {
-		t.Errorf("tag = %q, want rpc_method for a calls-file run", tag)
+	if len(methods) != 1 || methods[0] != "eth_getProof" {
+		t.Errorf("methods = %v, want one distinct method", methods)
 	}
-	if len(ids) != 2 || ids[0] != "eth_call" || ids[1] != "eth_getLogs" {
-		t.Errorf("identifiers = %v, want the calls-file methods, not the declared name", ids)
+	if len(names) != 2 || names[0] != "proof_head" || names[1] != "proof_deep" {
+		t.Errorf("names = %v, want [proof_head proof_deep] in first-seen order", names)
 	}
 }

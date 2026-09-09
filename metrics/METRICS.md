@@ -245,7 +245,7 @@ A run writes these under `--output`, whether or not Prometheus is configured:
 | `samples.jsonl.gz` | One record per request. |
 | `exports/results.json` | The whole result, including the manifest and the pairwise client comparison. |
 | `exports/client_comparison.csv` | Per client: delivery accounting, the outcome breakdown, latency percentiles. |
-| `exports/method_metrics.csv` | Per method: the full distribution statistics and outcome counts. |
+| `exports/method_metrics.csv` | Per call: the full distribution statistics and outcome counts, with the RPC method alongside. |
 
 `manifest.json` exists because the error rate counts JSON-RPC errors, which an
 HTTP-only pipeline could not see. Two runs measured under different semantics

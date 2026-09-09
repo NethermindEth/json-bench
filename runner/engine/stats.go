@@ -254,6 +254,16 @@ func (a *Accumulator) Add(s Sample) {
 	}
 }
 
+func groupOutcomes(g *group) map[string]int64 {
+	out := make(map[string]int64, len(Outcomes))
+	for _, outcome := range Outcomes {
+		if n := g.outcomes[outcome]; n > 0 {
+			out[string(outcome)] = n
+		}
+	}
+	return out
+}
+
 // ClientMetrics projects one client's observations onto the report type. The
 // client-level latency summary comes from that client's pooled samples, not
 // from averaging the per-method percentiles, which is not a percentile of any
@@ -324,16 +334,35 @@ func (a *Accumulator) ClientMetrics(name string, delivery Delivery) *types.Clien
 		summary := g.summarize(elapsed)
 		cm.Methods[method] = summary
 
-		outcomes := make(map[string]int64, len(Outcomes))
-		for _, outcome := range Outcomes {
-			if n := g.outcomes[outcome]; n > 0 {
-				outcomes[string(outcome)] = n
-			}
-		}
 		cm.MethodDetails[method] = &types.MethodMetrics{
 			MetricSummary: summary,
 			Name:          method,
-			Outcomes:      outcomes,
+			Method:        method,
+			Outcomes:      groupOutcomes(g),
+		}
+	}
+
+	// The call name is a second, independent breakdown: several calls can drive
+	// one method with different parameters, and then the method key alone hides
+	// what the run was built to measure.
+	byCall := make(map[string]*group)
+	callMethod := make(map[string]string)
+	for key, g := range client.keyed {
+		merged, ok := byCall[key.name]
+		if !ok {
+			merged = newGroup()
+			byCall[key.name] = merged
+		}
+		merged.merge(g)
+		callMethod[key.name] = key.method
+	}
+	cm.Calls = make(map[string]*types.MethodMetrics, len(byCall))
+	for name, g := range byCall {
+		cm.Calls[name] = &types.MethodMetrics{
+			MetricSummary: g.summarize(elapsed),
+			Name:          name,
+			Method:        callMethod[name],
+			Outcomes:      groupOutcomes(g),
 		}
 	}
 

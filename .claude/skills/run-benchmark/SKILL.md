@@ -76,7 +76,7 @@ The deliverable is the benchmark's output directory containing every run's repor
 
 - Create `outputs/<benchmark-name>/ANALYSIS.md`.
 - **First state whether each run actually offered its requested load** — `Scheduled`, `Sent`, `Dropped`, `Delivered (%)` and `Achieved RPS` in `client_comparison.csv`. A run below 100% delivered has latency figures that describe only the requests that were sent, and any comparison against it must say so.
-- Compare targets on latency percentiles per method (avg/p90/p95/p99 from `method_metrics.csv`), error rates, and achieved throughput vs requested.
+- Compare targets on latency percentiles per call (avg/p90/p95/p99 from `method_metrics.csv`, whose rows are keyed on the config's call name with the RPC method alongside), error rates, and achieved throughput vs requested.
 - Break errors down by outcome class rather than quoting one error rate: `RPC Errors` (an HTTP 200 carrying a JSON-RPC error), `HTTP Errors`, `Truncated`, `Timeouts`, `Transport Errors`, and `Null Results` — a call that succeeded and returned nothing, which is a real archive-node failure mode.
 - With several clients in one run, `exports/results.json` carries a rank-sum test per method with the median shift. Quote the shift; the p-value only says the shift is real, and at these sample sizes nearly everything is significant.
 - State the run context: where each run executed (on-host vs local, and the network caveat if local), config used, duration/load shape, and timestamps.

@@ -110,7 +110,7 @@ Start here, in this order:
 2. **`outputs/first-run/exports/client_comparison.csv`.** Load delivery first,
    then the outcome breakdown, then the latency percentiles. If `Delivered (%)`
    is below 100 the latency columns describe only the requests that were sent.
-3. **`outputs/first-run/exports/method_metrics.csv`.** Per method: the full
+3. **`outputs/first-run/exports/method_metrics.csv`.** Per call: the full
    distribution, and which methods produced the errors.
 4. **`outputs/first-run/manifest.json`.** How the run was produced. Check this
    matches before comparing against another run.

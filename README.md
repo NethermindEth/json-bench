@@ -188,7 +188,7 @@ A run writes, under `--output`:
 | `samples.jsonl.gz` | One gzipped JSON record per request: timings, phase breakdown, outcome, JSON-RPC code, byte counts. Disable with `--no-samples`. |
 | `exports/results.json` | The whole result, including the manifest and the pairwise client comparison. |
 | `exports/client_comparison.csv` | Per client: load delivery, outcome breakdown, latency percentiles. |
-| `exports/method_metrics.csv` | Per method: full distribution statistics and outcome counts. |
+| `exports/method_metrics.csv` | Per call: full distribution statistics and outcome counts, with the RPC method alongside. Several calls can share one method. |
 | `report.html` | Opt-in via `--html-report`. |
 
 `compare` and `compare-openrpc` always produce their HTML report.

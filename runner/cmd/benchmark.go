@@ -118,7 +118,8 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.UsesCallsFile() {
-		logger.Infof("Using pre-generated requests from %s: %d distinct RPC methods, which is what the per-method breakdown is keyed on", cfg.CallsFile, len(cfg.CallsFileMethods))
+		logger.Infof("Using pre-generated requests from %s: %d distinct calls over %d RPC methods; the breakdown is keyed on the call name",
+			cfg.CallsFile, len(cfg.CallsFileNames), len(cfg.CallsFileMethods))
 	}
 
 	cfg.Outputs = &config.Outputs{}

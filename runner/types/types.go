@@ -138,6 +138,12 @@ type MethodMetrics struct {
 	MetricSummary
 	Name string `json:"name,omitempty"` // Optional custom name
 
+	// Method is the RPC method the call issues. It differs from Name whenever a
+	// run distinguishes several parameter shapes of one method — an archive
+	// eth_getProof bucketed by state depth, say — which is the case the
+	// per-method key alone cannot express.
+	Method string `json:"method,omitempty"`
+
 	// Outcomes answers which method is failing, which an aggregate error count
 	// cannot.
 	Outcomes map[string]int64 `json:"outcomes,omitempty"`
@@ -195,6 +201,13 @@ type ClientMetrics struct {
 	Latency       MetricSummary             `json:"latency"`
 	Methods       map[string]MetricSummary  `json:"methods"`
 	MethodDetails map[string]*MethodMetrics `json:"method_details,omitempty"` // Method metrics with names
+
+	// Calls breaks the run down by the config's call name rather than by RPC
+	// method. A run that drives one method with many parameter shapes — an
+	// archive eth_getProof bucketed by state depth and key count — collapses to
+	// a single row under Methods, which loses the only dimension that run was
+	// measuring.
+	Calls map[string]*MethodMetrics `json:"calls,omitempty"`
 
 	// Advanced metrics
 	ConnectionMetrics ConnectionMetrics            `json:"connection_metrics"`

@@ -49,10 +49,12 @@ type Config struct {
 	ResolvedClients []*types.ClientConfig `yaml:"-"`
 	Outputs         *Outputs              `yaml:"-"`
 
-	// CallsFileMethods holds the distinct RPC methods found in CallsFile, in
-	// first-seen order. It is what the per-method breakdown is keyed on for a
-	// calls-file run, since the file's names need not match the declared calls.
+	// CallsFileMethods and CallsFileNames hold the distinct RPC methods and
+	// request names found in CallsFile, in first-seen order. Both matter: a
+	// profile can drive one method through many named parameter shapes, and the
+	// name is then the only thing telling them apart.
 	CallsFileMethods []string `yaml:"-"`
+	CallsFileNames   []string `yaml:"-"`
 }
 
 // UsesCallsFile reports whether the run's traffic comes from a pre-generated
@@ -89,12 +91,13 @@ func validateConfig(cfg *Config) error {
 		}
 	} else {
 		// Read the file now rather than discovering a bad path minutes into the
-		// run, and record the methods the per-method breakdown keys on.
-		methods, err := LoadCallsFileMethods(cfg.CallsFile)
+		// run, and record the labels the breakdown keys on.
+		methods, names, err := LoadCallsFileLabels(cfg.CallsFile)
 		if err != nil {
 			return err
 		}
 		cfg.CallsFileMethods = methods
+		cfg.CallsFileNames = names
 	}
 
 	if err := validateLoadShape(cfg); err != nil {

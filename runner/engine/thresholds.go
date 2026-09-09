@@ -157,6 +157,21 @@ type callThresholds struct {
 	expressions []string
 }
 
+// resolveTarget finds the series a threshold names. A config's thresholds sit on
+// a call, whose target is its method when it declares one and its name
+// otherwise — so a threshold on a file-driven call names something the
+// per-method breakdown does not key on, and would be reported as a breach for
+// having no traffic.
+func resolveTarget(client *types.ClientMetrics, target string) (types.MetricSummary, bool) {
+	if summary, ok := client.Methods[target]; ok {
+		return summary, true
+	}
+	if details, ok := client.Calls[target]; ok {
+		return details.MetricSummary, true
+	}
+	return types.MetricSummary{}, false
+}
+
 // EvaluateThresholds checks every threshold against the client metrics it
 // targets, returning the breaches. A threshold whose target saw no traffic is
 // reported as a breach: silently passing a condition on a method that never ran
@@ -165,7 +180,7 @@ func EvaluateThresholds(thresholds []Threshold, clients map[string]*types.Client
 	var breaches []ThresholdBreach
 	for name, client := range clients {
 		for _, threshold := range thresholds {
-			summary, ok := client.Methods[threshold.Target]
+			summary, ok := resolveTarget(client, threshold.Target)
 			if !ok {
 				breaches = append(breaches, ThresholdBreach{
 					Client: name, Target: threshold.Target,

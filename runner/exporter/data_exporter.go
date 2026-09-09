@@ -83,7 +83,7 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 
 	// Write header
 	header := []string{
-		"Client", "Method", "Count", "Success Rate (%)",
+		"Client", "Call", "Method", "Count", "Success Rate (%)",
 		"Min (ms)", "P50 (ms)", "P75 (ms)", "P90 (ms)", "P95 (ms)", "P99 (ms)", "P99.9 (ms)", "Max (ms)",
 		"Avg (ms)", "Std Dev", "Variance", "CV (%)", "IQR", "MAD",
 		"Throughput (req/s)", "Error Count", "Null Results", "RPC Errors", "HTTP Errors",
@@ -94,12 +94,16 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 		return err
 	}
 
-	// Write data rows
+	// Keyed on the call name, with the method alongside: a run that drives one
+	// method with many parameter shapes has its whole subject in the name, and
+	// keying on the method alone would collapse it to a single row.
 	for clientName, client := range result.ClientMetrics {
-		for methodName, metrics := range client.Methods {
+		for callName, details := range callBreakdown(client) {
+			metrics := details.MetricSummary
 			row := []string{
 				clientName,
-				methodName,
+				callName,
+				details.Method,
 				strconv.FormatInt(metrics.Count, 10),
 				fmt.Sprintf("%.2f", metrics.SuccessRate),
 				fmt.Sprintf("%.2f", metrics.Min),
@@ -118,9 +122,9 @@ func (de *DataExporter) ExportMethodMetricsCSV(result *types.BenchmarkResult, ou
 				formatFloat(metrics.MAD),
 				formatFloat(metrics.Throughput),
 				strconv.FormatInt(metrics.ErrorCount, 10),
-				methodOutcomeCount(client, methodName, "rpc_null"),
-				methodOutcomeCount(client, methodName, "rpc_error"),
-				methodOutcomeCount(client, methodName, "http_error"),
+				strconv.FormatInt(details.Outcomes["rpc_null"], 10),
+				strconv.FormatInt(details.Outcomes["rpc_error"], 10),
+				strconv.FormatInt(details.Outcomes["http_error"], 10),
 				formatFloat(metrics.TimeoutRate),
 				strconv.FormatInt(metrics.ConnectionErrors, 10),
 			}
@@ -146,11 +150,20 @@ func outcomeCount(client *types.ClientMetrics, outcome string) string {
 	return strconv.FormatInt(client.Outcomes[outcome], 10)
 }
 
-func methodOutcomeCount(client *types.ClientMetrics, method, outcome string) string {
-	if details, ok := client.MethodDetails[method]; ok {
-		return strconv.FormatInt(details.Outcomes[outcome], 10)
+// callBreakdown prefers the per-call view and falls back to the per-method one,
+// so a result assembled by something other than the engine still exports.
+func callBreakdown(client *types.ClientMetrics) map[string]*types.MethodMetrics {
+	if len(client.Calls) > 0 {
+		return client.Calls
 	}
-	return "0"
+	if len(client.MethodDetails) > 0 {
+		return client.MethodDetails
+	}
+	out := make(map[string]*types.MethodMetrics, len(client.Methods))
+	for method, summary := range client.Methods {
+		out[method] = &types.MethodMetrics{MetricSummary: summary, Name: method, Method: method}
+	}
+	return out
 }
 
 // ExportClientComparisonCSV exports client-level comparison data
