@@ -332,6 +332,11 @@ type RunManifest struct {
 	BatchSize   int    `json:"batch_size,omitempty"`
 	Duration    string `json:"duration"`
 
+	// Transports names how each target was reached. Latency over a multiplexed
+	// socket and latency over pooled HTTP exchanges are not the same
+	// measurement, so a comparison has to be able to see this.
+	Transports map[string]string `json:"transports,omitempty"`
+
 	AcceptCompression bool `json:"accept_compression"`
 	ReuseConnections  bool `json:"reuse_connections"`
 	HTTP2             bool `json:"http2"`

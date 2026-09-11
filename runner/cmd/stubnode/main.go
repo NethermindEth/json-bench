@@ -16,7 +16,8 @@ import (
 )
 
 func main() {
-	listen := flag.String("listen", "127.0.0.1:18545", "Address to serve JSON-RPC on")
+	listen := flag.String("listen", "127.0.0.1:18545", "Address to serve JSON-RPC on (HTTP at /, WebSocket at /ws)")
+	ipc := flag.String("ipc", "", "Also serve JSON-RPC on this Unix socket path")
 	configPath := flag.String("config", "", "Path to a stub config JSON file (see -print-config for the shape)")
 	seed := flag.Int64("seed", 0, "Override the config seed")
 	printConfig := flag.Bool("print-config", false, "Print the default config and exit")
@@ -53,8 +54,17 @@ func main() {
 		log.Fatalf("stubnode: %v", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "stubnode: JSON-RPC on http://%s (seed %d), tally at http://%s/__stats\n",
-		*listen, cfg.Seed, *listen)
+	if *ipc != "" {
+		listener, err := stub.ListenIPC(*ipc)
+		if err != nil {
+			log.Fatalf("stubnode: %v", err)
+		}
+		defer listener.Close()
+		fmt.Fprintf(os.Stderr, "stubnode: JSON-RPC on ipc://%s\n", *ipc)
+	}
+
+	fmt.Fprintf(os.Stderr, "stubnode: JSON-RPC on http://%s and ws://%s/ws (seed %d), tally at http://%s/__stats\n",
+		*listen, *listen, cfg.Seed, *listen)
 	if err := http.ListenAndServe(*listen, stub.Handler()); err != nil {
 		log.Fatalf("stubnode: %v", err)
 	}

@@ -1,5 +1,6 @@
 # Configuration reference
 
+
 ## Clients registry (`config/clients/*.yaml`)
 
 Maps client names to RPC endpoints. Benchmark configs reference these names.
@@ -8,7 +9,7 @@ Maps client names to RPC endpoints. Benchmark configs reference these names.
 clients:
   - name: "nethermind_local"     # required, unique; NO DASHES (validation rejects them)
     type: "nethermind"           # optional label; tagged onto metrics as client_type
-    url: "http://localhost:8545" # required RPC endpoint
+    url: "http://localhost:8545" # required RPC endpoint; the scheme picks the transport
     timeout: "30s"               # optional
     max_retries: 3               # optional
     headers:                     # optional custom HTTP headers
@@ -22,6 +23,30 @@ clients:
 ```
 
 Existing registries: `config/clients/clients.yaml`, `clients-production.yaml`, `test-clients.yaml`.
+
+## Transports
+
+The URL scheme decides how the target is reached. All three carry the same
+JSON-RPC methods:
+
+| URL | Transport |
+|---|---|
+| `http://…`, `https://…` | HTTP, one exchange per request over a pooled connection |
+| `ws://…`, `wss://…` | WebSocket, many requests multiplexed over one socket |
+| `ipc:///run/node.ipc`, or a bare `/run/node.ipc` | Unix domain socket |
+
+Two things differ on a socket transport, and the manifest records which transport
+a run used so a comparison can see them:
+
+- **Requests are matched to answers by JSON-RPC id**, not by order, because many
+  are in flight on one connection and a node may answer in any order.
+- **`waiting` holds the whole round trip and `receiving` is zero.** A multiplexed
+  reader sees a frame arrive whole, so there is no first byte to split on. There
+  is also no HTTP status, so `status` reads 200 for any delivered frame and the
+  outcome comes from the JSON-RPC body alone.
+
+Latency is not comparable across transports: IPC skips the TCP and HTTP framing
+that HTTP pays for. Compare a transport against itself.
 
 ## Benchmark config (`config/benchmark/*.yaml`)
 

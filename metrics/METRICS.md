@@ -59,6 +59,12 @@ succeeded. Every response resolves to exactly one class:
 | `timeout` | the request deadline expired | yes |
 | `transport` | any other transport failure | yes |
 
+Over WebSocket and IPC there is no HTTP status, so `status` carries 200 for any
+frame that arrived and `http_error` cannot occur; the outcome comes from the
+JSON-RPC body alone. `bench_http_req_waiting_*` then holds the whole round trip
+and `bench_http_req_receiving_*` is zero, because a multiplexed reader sees a
+frame arrive whole. The run manifest records each target's transport.
+
 `rpc_null` is deliberately not an error: the call succeeded and returned
 nothing. It is counted separately because "fast because it returned nothing" is
 a real archive-node failure mode, and folding it into `ok` hides it.

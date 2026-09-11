@@ -253,6 +253,43 @@ same measurement. Differences that change what a diff means but still permit one
 — a different seed, rate, batch size, saturation policy or transport setting —
 are reported as warnings above the table.
 
+#### Transports
+
+The URL scheme picks how the target is reached, because the choice belongs to
+the endpoint rather than to a flag:
+
+```yaml
+clients:
+  - name: "nethermind_http"
+    url: "http://127.0.0.1:8545"
+  - name: "nethermind_ws"
+    url: "ws://127.0.0.1:8546"
+  - name: "nethermind_ipc"
+    url: "ipc:///var/lib/nethermind/nethermind.ipc"
+```
+
+HTTP gives each request its own exchange over a pooled connection. WebSocket and
+IPC multiplex many requests over a single socket and **match answers to requests
+by JSON-RPC id**, never by arrival order — a node is free to answer out of order,
+and over one wire every answer shares the same stream. Frames that answer nothing
+in flight, such as subscription notifications, are ignored rather than handed to
+whichever request happens to be waiting.
+
+Two measurements read differently on a socket, and the manifest records the
+transport so a comparison can see it:
+
+- **`waiting` carries the whole round trip and `receiving` is zero.** A
+  multiplexed reader sees a frame arrive whole, so there is no first byte to
+  split on. Inventing a split would be worse than reporting none.
+- **There is no HTTP status**, so `status` reads 200 for any frame that arrived
+  and the outcome comes from the JSON-RPC body alone. The failure classes that
+  are protocol-level — `rpc_error`, `rpc_null`, `timeout`, `transport` — work
+  exactly as they do over HTTP.
+
+Do not compare latency across transports: IPC skips the TCP and HTTP framing that
+HTTP pays for, which is the point of using it. Compare a transport against
+itself.
+
 #### Load shape and honesty about it
 
 The engine schedules arrivals on a fixed interval and dispatches them through a

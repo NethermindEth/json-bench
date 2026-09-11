@@ -122,6 +122,13 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 		}
 		targets = append(targets, tgt)
 	}
+	// A socket transport holds a live connection the node can see, so the run
+	// hands them back rather than leaving them to the process exiting.
+	defer func() {
+		for _, tgt := range targets {
+			_ = tgt.Close()
+		}
+	}()
 
 	provenance, preflightErr := runPreflight(ctx, targets, opts, log)
 	if preflightErr != nil {
@@ -406,6 +413,11 @@ func IdentifyTargets(ctx context.Context, cfg *config.Config, opts Options) ([]t
 		}
 		targets = append(targets, tgt)
 	}
+	defer func() {
+		for _, tgt := range targets {
+			_ = tgt.Close()
+		}
+	}()
 
 	return runPreflight(ctx, targets, opts, opts.Logger)
 }
@@ -458,6 +470,13 @@ func buildManifest(cfg *config.Config, opts Options, provenance []types.ClientPr
 		}
 	}
 
+	transports := make(map[string]string, len(cfg.ResolvedClients))
+	for _, client := range cfg.ResolvedClients {
+		if kind, err := TransportKindFor(client.URL); err == nil {
+			transports[client.Name] = string(kind)
+		}
+	}
+
 	return types.RunManifest{
 		Engine:             "native",
 		EngineVersion:      Version,
@@ -470,6 +489,7 @@ func buildManifest(cfg *config.Config, opts Options, provenance []types.ClientPr
 		Concurrency:        cfg.VUs,
 		BatchSize:          cfg.BatchSize,
 		Duration:           cfg.Duration,
+		Transports:         transports,
 		AcceptCompression:  opts.Transport.AcceptCompression,
 		ReuseConnections:   opts.Transport.ReuseConnections,
 		HTTP2:              opts.Transport.HTTP2,

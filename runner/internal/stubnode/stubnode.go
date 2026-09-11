@@ -11,6 +11,7 @@
 package stubnode
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -250,7 +251,8 @@ func (s *Stub) record(method string, outcome Outcome) {
 	s.seen[method][outcome]++
 }
 
-// Handler serves JSON-RPC on POST / and the tally on GET /__stats.
+// Handler serves JSON-RPC on POST /, the same over a WebSocket at /ws, and the
+// tally on GET /__stats.
 func (s *Stub) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/__stats", func(w http.ResponseWriter, r *http.Request) {
@@ -262,6 +264,7 @@ func (s *Stub) Handler() http.Handler {
 	if s.cfg.Node.Metrics {
 		mux.HandleFunc("/metrics", s.serveMetrics)
 	}
+	mux.HandleFunc("/ws", s.ServeWebSocket)
 	mux.HandleFunc("/", s.serveRPC)
 	return mux
 }
@@ -351,13 +354,13 @@ func (s *Stub) serveRPC(w http.ResponseWriter, r *http.Request) {
 	key := requestKey(req.ID, body)
 	method := s.methodConfig(req.Method)
 
-	if !s.acquireWorker(r) {
+	if !s.acquireWorker(r.Context()) {
 		s.record(req.Method, OutcomeTimeout)
 		return
 	}
 	defer s.releaseWorker()
 
-	if !s.sleep(r, method.Latency, req.Method, key) {
+	if !s.sleep(r.Context(), method.Latency, req.Method, key) {
 		s.record(req.Method, OutcomeTimeout)
 		return
 	}
@@ -371,7 +374,7 @@ func (s *Stub) serveRPC(w http.ResponseWriter, r *http.Request) {
 		serveTruncated(w, req.ID)
 		return
 	case OutcomeTimeout:
-		s.hang(r, req.Method)
+		s.hang(r.Context(), req.Method)
 		return
 	}
 
@@ -434,7 +437,7 @@ func (s *Stub) serveHTTPFault(w http.ResponseWriter, method string, key uint64) 
 // hang holds the request open past any sane client deadline so the engine has
 // to classify it as a timeout, releasing the goroutine as soon as the client
 // gives up.
-func (s *Stub) hang(r *http.Request, method string) {
+func (s *Stub) hang(ctx context.Context, method string) {
 	d := time.Duration(s.cfg.Faults.TimeoutMS) * time.Millisecond
 	if d <= 0 {
 		d = time.Minute
@@ -443,12 +446,12 @@ func (s *Stub) hang(r *http.Request, method string) {
 	defer timer.Stop()
 	select {
 	case <-timer.C:
-	case <-r.Context().Done():
+	case <-ctx.Done():
 	}
 	s.record(method, OutcomeTimeout)
 }
 
-func (s *Stub) sleep(r *http.Request, l *Latency, method string, key uint64) bool {
+func (s *Stub) sleep(ctx context.Context, l *Latency, method string, key uint64) bool {
 	d := s.latency(l, method, key)
 	if d <= 0 {
 		return true
@@ -458,7 +461,23 @@ func (s *Stub) sleep(r *http.Request, l *Latency, method string, key uint64) boo
 	select {
 	case <-timer.C:
 		return true
-	case <-r.Context().Done():
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// sleepFor waits out a duration in nanoseconds, reporting whether it completed
+// rather than being cut short by the caller going away.
+func (s *Stub) sleepFor(ctx context.Context, ns int64) bool {
+	if ns <= 0 {
+		return true
+	}
+	timer := time.NewTimer(time.Duration(ns))
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
 		return false
 	}
 }
@@ -601,14 +620,14 @@ func hexUint(v int64) string {
 
 // acquireWorker waits for one of the node's serving slots. Requests beyond the
 // limit queue here, which is where a saturated node's latency comes from.
-func (s *Stub) acquireWorker(r *http.Request) bool {
+func (s *Stub) acquireWorker(ctx context.Context) bool {
 	if s.workers == nil {
 		return true
 	}
 	select {
 	case s.workers <- struct{}{}:
 		return true
-	case <-r.Context().Done():
+	case <-ctx.Done():
 		return false
 	}
 }
@@ -660,7 +679,7 @@ func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 		return
 	}
 
-	if !s.acquireWorker(r) {
+	if !s.acquireWorker(r.Context()) {
 		s.record("batch", OutcomeTimeout)
 		return
 	}

@@ -46,13 +46,36 @@ func DefaultTransportOptions() TransportOptions {
 	return TransportOptions{ReuseConnections: true, Timeout: 30 * time.Second}
 }
 
-// target sends requests to one client, owning that client's connection pool.
+// conn carries one request to a node and brings back what it answered. HTTP
+// gives a request its own exchange; WebSocket and IPC multiplex many over one
+// connection and match responses by JSON-RPC id.
+type conn interface {
+	do(ctx context.Context, payload []byte) attempt
+	Close() error
+}
+
+// target sends requests to one client, owning that client's connection.
 type target struct {
 	name       string
 	clientType string
 	url        string
+	transport  TransportKind
 	headers    map[string]string
-	http       *http.Client
+	conn       conn
+}
+
+func (t *target) do(ctx context.Context, payload []byte) attempt {
+	return t.conn.do(ctx, payload)
+}
+
+// Close releases the target's connection. HTTP keeps a pool that the runtime
+// would reclaim anyway; a WebSocket or IPC connection is a live socket the node
+// sees, so leaving it open outlasts the run.
+func (t *target) Close() error {
+	if t.conn == nil {
+		return nil
+	}
+	return t.conn.Close()
 }
 
 func newTarget(client *types.ClientConfig, concurrency int, opts TransportOptions) (*target, error) {
@@ -67,6 +90,36 @@ func newTarget(client *types.ClientConfig, concurrency int, opts TransportOption
 
 	if concurrency < 1 {
 		concurrency = 1
+	}
+
+	kind, err := TransportKindFor(client.URL)
+	if err != nil {
+		return nil, fmt.Errorf("client %s: %w", client.Name, err)
+	}
+
+	headers := map[string]string{"Content-Type": "application/json"}
+	for name, value := range client.Headers {
+		headers[name] = value
+	}
+	if err := applyAuth(headers, client); err != nil {
+		return nil, err
+	}
+
+	tgt := &target{
+		name:       client.Name,
+		clientType: client.Type,
+		url:        client.URL,
+		transport:  kind,
+		headers:    headers,
+	}
+
+	switch kind {
+	case TransportWebSocket:
+		tgt.conn = newWebSocketConn(client.URL, headers, timeout, opts)
+		return tgt, nil
+	case TransportIPC:
+		tgt.conn = newIPCConn(ipcPath(client.URL), timeout)
+		return tgt, nil
 	}
 
 	transport := &http.Transport{
@@ -84,21 +137,12 @@ func newTarget(client *types.ClientConfig, concurrency int, opts TransportOption
 		ExpectContinueTimeout: time.Second,
 	}
 
-	headers := map[string]string{"Content-Type": "application/json"}
-	for name, value := range client.Headers {
-		headers[name] = value
+	tgt.conn = &httpConn{
+		url:     client.URL,
+		headers: headers,
+		client:  &http.Client{Timeout: timeout, Transport: transport},
 	}
-	if err := applyAuth(headers, client); err != nil {
-		return nil, err
-	}
-
-	return &target{
-		name:       client.Name,
-		clientType: client.Type,
-		url:        client.URL,
-		headers:    headers,
-		http:       &http.Client{Timeout: timeout, Transport: transport},
-	}, nil
+	return tgt, nil
 }
 
 // applyAuth turns the client's auth block into request headers. The registry
@@ -130,22 +174,34 @@ type attempt struct {
 	err       error
 }
 
-func (t *target) do(ctx context.Context, payload []byte) attempt {
+// httpConn gives every request its own exchange over a pooled connection.
+type httpConn struct {
+	url     string
+	headers map[string]string
+	client  *http.Client
+}
+
+func (h *httpConn) Close() error {
+	h.client.CloseIdleConnections()
+	return nil
+}
+
+func (h *httpConn) do(ctx context.Context, payload []byte) attempt {
 	tr := &tracer{}
 	req, err := http.NewRequestWithContext(
 		httptrace.WithClientTrace(ctx, tr.clientTrace()),
-		http.MethodPost, t.url, bytes.NewReader(payload))
+		http.MethodPost, h.url, bytes.NewReader(payload))
 	if err != nil {
 		return attempt{err: fmt.Errorf("failed to build request: %w", err)}
 	}
-	for name, value := range t.headers {
+	for name, value := range h.headers {
 		req.Header.Set(name, value)
 	}
 	req.ContentLength = int64(len(payload))
 
 	sent := len(payload) + estimateHeaderBytes(req)
 
-	resp, err := t.http.Do(req)
+	resp, err := h.client.Do(req)
 	if err != nil {
 		return attempt{phases: tr.phases(time.Time{}), reused: tr.reused, sentBytes: sent, err: err}
 	}
