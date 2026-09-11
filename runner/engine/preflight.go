@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -219,6 +220,13 @@ func probeHeadTimestamp(ctx context.Context, tgt *target, head string) (time.Tim
 	seconds, err := parseHexUint(block.Timestamp)
 	if err != nil {
 		return time.Time{}, err
+	}
+	// The value comes from the node being measured, and a seconds count past
+	// this cannot be held in the signed type time.Unix takes: it would wrap to a
+	// date far in the past or the future, and the head-staleness check would
+	// then be reading a number the node effectively chose.
+	if seconds > math.MaxInt64 {
+		return time.Time{}, fmt.Errorf("block timestamp %s is not a representable time", block.Timestamp)
 	}
 	return time.Unix(int64(seconds), 0), nil
 }

@@ -2,7 +2,10 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -196,4 +199,55 @@ func TestParseHexUint(t *testing.T) {
 		_, err := parseHexUint(input)
 		assert.Error(t, err, input)
 	}
+}
+
+// The head timestamp comes from the node being measured. A seconds count past
+// what time.Unix can hold would wrap to a date far in the past or the future,
+// and the staleness check would then be reading a number the node chose rather
+// than the time — so it is reported as a probe failure instead of a time.
+func TestPreflightRejectsAnUnrepresentableHeadTimestamp(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			ID     json.RawMessage `json:"id"`
+			Method string          `json:"method"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		result := map[string]any{}
+		switch req.Method {
+		case "web3_clientVersion":
+			writeResult(w, req.ID, "Nethermind/v1.0.0")
+			return
+		case "eth_chainId":
+			writeResult(w, req.ID, "0x1")
+			return
+		case "eth_blockNumber":
+			writeResult(w, req.ID, "0x1")
+			return
+		case "eth_syncing":
+			writeResult(w, req.ID, false)
+			return
+		case "eth_getBlockByNumber":
+			// Larger than math.MaxInt64.
+			result = map[string]any{"timestamp": "0xffffffffffffffff"}
+		}
+		writeResult(w, req.ID, result)
+	}))
+	t.Cleanup(srv.Close)
+
+	tgt, err := newTarget(&types.ClientConfig{Name: "n", URL: srv.URL}, 2, DefaultTransportOptions())
+	require.NoError(t, err)
+
+	info, err := Preflight(context.Background(), []*target{tgt}, PreflightOptions{})
+	require.NoError(t, err)
+	require.Len(t, info, 1)
+
+	assert.Empty(t, info[0].HeadTimestamp, "no time is recorded rather than a fabricated one")
+	require.NotEmpty(t, info[0].ProbeErrors)
+	assert.Contains(t, strings.Join(info[0].ProbeErrors, " "), "not a representable time")
+}
+
+func writeResult(w http.ResponseWriter, id json.RawMessage, result any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
 }
