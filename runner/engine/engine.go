@@ -24,7 +24,10 @@ import (
 )
 
 // SampleFilename is where a run's per-request records are written.
-const SampleFilename = "samples.jsonl.gz"
+const (
+	SampleFilename   = "samples.jsonl.gz"
+	ManifestFilename = "manifest.json"
+)
 
 // Options are the run's knobs that are not part of the benchmark config.
 type Options struct {
@@ -156,6 +159,7 @@ func Run(ctx context.Context, cfg *config.Config, opts Options) (*types.Benchmar
 		fields["batches"] = sched.total
 	}
 	log.WithFields(fields).Info("Running benchmark")
+	warnRetention(log, sched.total*batchSize*len(targets))
 
 	start := time.Now()
 	run := newRunState(cfg.TestName, targets)
@@ -350,6 +354,27 @@ func collectConfigThresholds(cfg *config.Config) ([]Threshold, error) {
 		calls = append(calls, &callThresholds{target: target, expressions: call.Thresholds})
 	}
 	return CollectThresholds(calls)
+}
+
+// retainedBytesPerSample is what one observation costs the accumulator, measured
+// rather than derived, and pinned by a test. Exact percentiles are computed from
+// every observation, so the cost is linear in the request count.
+const retainedBytesPerSample = 93
+
+// retentionWarnThreshold is where the generator's own footprint starts to matter
+// on a run that shares a host with the node it measures.
+const retentionWarnThreshold = 512 << 20
+
+// warnRetention says up front what a long run will cost in memory. A load
+// generator running on the node it measures competes with it, so the size is
+// worth knowing before the run rather than from the OOM killer after it.
+func warnRetention(log logrus.FieldLogger, requests int) {
+	projected := int64(requests) * retainedBytesPerSample
+	if projected < retentionWarnThreshold {
+		return
+	}
+	log.Warnf("this run will retain about %d MB of samples in memory for exact percentiles; "+
+		"on a run sharing a host with the target that competes with it", projected>>20)
 }
 
 // Version identifies the engine in run provenance and in the remote-write

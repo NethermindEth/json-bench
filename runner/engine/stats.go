@@ -37,6 +37,13 @@ var PhaseNames = []Phase{
 
 // group accumulates the observations behind one series identity.
 type group struct {
+	// countersOnly suppresses the retained observations. Every sample already
+	// lands in a keyed group, so a client-wide group that kept them too would
+	// double the engine's memory for a distribution that can be concatenated
+	// back from the keys — and on an on-host run the generator's footprint is
+	// inside the measurement.
+	countersOnly bool
+
 	phases map[Phase][]float64
 	// dns is kept for the connection report even though no series family
 	// carries it: k6 folds DNS into blocked rather than emitting its own trend.
@@ -49,6 +56,12 @@ type group struct {
 	dialed    int64
 }
 
+func newCountersGroup() *group {
+	g := newGroup()
+	g.countersOnly = true
+	return g
+}
+
 func newGroup() *group {
 	return &group{
 		phases:   make(map[Phase][]float64, len(PhaseNames)),
@@ -59,6 +72,10 @@ func newGroup() *group {
 }
 
 func (g *group) add(s Sample) {
+	if g.countersOnly {
+		g.addCounters(s)
+		return
+	}
 	g.phases[PhaseDuration] = append(g.phases[PhaseDuration], msOf(s.Service()))
 	g.phases[PhaseBlocked] = append(g.phases[PhaseBlocked], msOf(s.Phases.Blocked))
 	g.phases[PhaseConnecting] = append(g.phases[PhaseConnecting], msOf(s.Phases.Connecting))
@@ -69,6 +86,10 @@ func (g *group) add(s Sample) {
 
 	g.dns = append(g.dns, msOf(s.Phases.DNS))
 	g.respBytes = append(g.respBytes, float64(s.ResponseBytes))
+	g.addCounters(s)
+}
+
+func (g *group) addCounters(s Sample) {
 	g.outcomes[s.Outcome]++
 	g.statuses[s.Status]++
 	if s.Outcome == OutcomeRPCError {
@@ -102,6 +123,7 @@ func (g *group) merge(other *group) {
 
 func (g *group) clone() *group {
 	out := newGroup()
+	out.countersOnly = g.countersOnly
 	out.merge(g)
 	return out
 }
@@ -136,7 +158,14 @@ func (g *group) httpFailures() int64 {
 // is computed from the samples, including the ones the k6 pipeline left at zero
 // or filled with a stand-in.
 func (g *group) summarize(elapsedSeconds float64) types.MetricSummary {
-	summary := summarizeValues(g.phases[PhaseDuration])
+	return g.summarizeOver(g.phases[PhaseDuration], elapsedSeconds)
+}
+
+// summarizeOver attaches this group's counters to a distribution held elsewhere,
+// which is how the client-wide summary is built without a second copy of every
+// observation.
+func (g *group) summarizeOver(values []float64, elapsedSeconds float64) types.MetricSummary {
+	summary := summarizeValues(values)
 	count := g.count()
 	if count == 0 {
 		return types.MetricSummary{}
@@ -234,7 +263,7 @@ func (a *Accumulator) Add(s Sample) {
 	if !ok {
 		client = &clientAccum{
 			clientType: s.ClientType,
-			overall:    newGroup(),
+			overall:    newCountersGroup(),
 			keyed:      make(map[seriesKey]*group),
 		}
 		a.clients[s.Client] = client
@@ -303,7 +332,7 @@ func (a *Accumulator) ClientMetrics(name string, delivery Delivery) *types.Clien
 		StatusCodes:   make(map[int]int64, len(client.overall.statuses)),
 		TotalRequests: client.overall.count(),
 		TotalErrors:   client.overall.errors(),
-		Latency:       client.overall.summarize(elapsed),
+		Latency:       client.overall.summarizeOver(client.phaseValues(PhaseDuration), elapsed),
 		TimeSeries:    make(map[string][]types.TimeSeriesPoint),
 	}
 	cm.ErrorRate = cm.Latency.ErrorRate
@@ -389,9 +418,9 @@ func (a *Accumulator) ClientMetrics(name string, delivery Delivery) *types.Clien
 		ConnectionTimeouts: client.overall.outcomes[OutcomeTimeout],
 		// Averaged over the requests that actually dialed: a mean over every
 		// request would mostly measure how often the pool was warm.
-		DNSResolutionTime: meanOfNonZero(client.overall.dns),
-		TCPHandshakeTime:  meanOfNonZero(client.overall.phases[PhaseConnecting]),
-		TLSHandshakeTime:  meanOfNonZero(client.overall.phases[PhaseTLS]),
+		DNSResolutionTime: meanOfNonZero(client.dnsValues()),
+		TCPHandshakeTime:  meanOfNonZero(client.phaseValues(PhaseConnecting)),
+		TLSHandshakeTime:  meanOfNonZero(client.phaseValues(PhaseTLS)),
 	}
 	if total > 0 {
 		cm.ConnectionMetrics.ConnectionReuse = float64(client.overall.reused) / float64(total) * 100
@@ -571,6 +600,34 @@ func (a *Accumulator) Snapshot(testName string, at time.Time, deliveries map[str
 		snap.Clients = append(snap.Clients, cs)
 	}
 	return snap
+}
+
+// phaseValues concatenates one phase's observations across every key. It is the
+// client-wide distribution, rebuilt on demand rather than retained twice. Only
+// one phase is materialised at a time, so the transient cost is a single
+// float64 per sample instead of the nine a duplicate group would hold.
+func (c *clientAccum) phaseValues(phase Phase) []float64 {
+	var n int
+	for _, g := range c.keyed {
+		n += len(g.phases[phase])
+	}
+	out := make([]float64, 0, n)
+	for _, g := range c.keyed {
+		out = append(out, g.phases[phase]...)
+	}
+	return out
+}
+
+func (c *clientAccum) dnsValues() []float64 {
+	var n int
+	for _, g := range c.keyed {
+		n += len(g.dns)
+	}
+	out := make([]float64, 0, n)
+	for _, g := range c.keyed {
+		out = append(out, g.dns...)
+	}
+	return out
 }
 
 func (c *clientAccum) snapshotLocked() *clientAccum {
