@@ -149,8 +149,63 @@ Pre-generate the request sequence and point every run at the same file:
 
 Then set `calls_file: outputs/shared/requests.csv` in the config. This is
 required whenever results will be compared across targets, hosts or repeat
-runs. The per-method breakdown keys on the CSV's `method` column, so its `name`
-column can be any label.
+runs. The breakdown keys on the CSV's `name` column with the RPC method
+alongside, so give `name` the label you want to compare on — that is what lets
+one method driven through many parameter shapes be read per shape.
+
+## Sweeping a setting
+
+To learn what a setting does, run the same benchmark at several values of it
+rather than editing the config between runs:
+
+```bash
+./runner --output outputs/batching sweep \
+  --config bench.yaml --clients clients.yaml \
+  --vary batch_size=1,5,10,20 --repeat 3
+```
+
+One request sequence is pinned across every point, so the sweep compares
+settings rather than workloads. A point the generator could not deliver is
+reported as **inconclusive** instead of as a result. With `--repeat`, each point
+also reports its **P99 spread** between passes — treat a difference between
+settings as real only when it exceeds that.
+
+## Re-reading a finished run
+
+Every run retains its observations, so it can be taken apart again without
+re-running it:
+
+```bash
+./runner report outputs/first-run --phases
+./runner report --compare outputs/before outputs/after
+```
+
+`--phases` splits each call into `sending`, `waiting` and `receiving`. That split
+answers a question no summary can: a difference that sits entirely in `waiting`
+is the node thinking, while one in `sending` or `receiving` is the generator or
+the link. `--ok-only` drops failures so a latency figure is not a blend of real
+work and fast errors.
+
+`--compare` refuses two runs that counted errors differently, and warns about
+settings — seed, rate, batch size, saturation policy, transport — that change
+what a difference means.
+
+## Other transports
+
+The URL scheme in the clients file picks the transport:
+
+```yaml
+clients:
+  - name: "node_ws"
+    url: "ws://127.0.0.1:8546"
+  - name: "node_ipc"
+    url: "ipc:///var/lib/nethermind/nethermind.ipc"
+```
+
+WebSocket and IPC multiplex over one connection and match answers by JSON-RPC
+id. On those, `waiting` holds the whole round trip, `receiving` is zero, and
+`status` is always 200 because there is no HTTP status — the outcome comes from
+the JSON-RPC body. Do not compare latency across transports.
 
 ## Optional: Prometheus and Grafana
 

@@ -48,7 +48,7 @@ go build -o benchmark ./runner
   --config <benchmark-config>.yaml --out outputs/<benchmark-name>/requests.csv
 ```
 
-then point every run's benchmark config at it with `calls_file: <path>/requests.csv`. This is mandatory whenever results will be compared — across targets, across hosts, or across repeat runs — and a good default even for a single target (it makes the run reproducible). The per-method breakdown keys on the CSV's `method` column (column 3), so its `name` column can be any label; see `references/configuration.md`.
+then point every run's benchmark config at it with `calls_file: <path>/requests.csv`. This is mandatory whenever results will be compared — across targets, across hosts, or across repeat runs — and a good default even for a single target (it makes the run reproducible). The breakdown keys on the CSV's `name` column (column 2) with the RPC method alongside, so give `name` the label you want to compare on — that is what lets one method driven through many parameter shapes be read per shape; see `references/configuration.md`.
 
 **Multiple targets.** Follow the user's instructions for how to handle them. The runner natively benchmarks several registry clients in one run, sharing one request sequence and one arrival schedule, which works when benchmarking from a single vantage point. But for on-host SSH runs each target needs its own individual run on its own host — same workload config, same pre-generated `calls_file`, only the clients registry differs. Manage them one at a time and aggregate afterwards.
 

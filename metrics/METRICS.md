@@ -38,8 +38,8 @@ state rather than the average of steady state and start-up.
 | `testid` | everything | `test_name` from the benchmark config. The dashboard's run selector. |
 | `scenario` | everything | Client name from the clients registry. One scenario per client. |
 | `client_type` | everything | The client's `type` (`nethermind`, `geth`, …), when set. |
-| `req_name` | per-request families | The call's `name` in the config, or the method when unnamed. |
-| `rpc_method` | per-request families | The JSON-RPC method. This is what the per-method breakdown keys on. |
+| `req_name` | per-request families | The call's `name` in the config, or the method when unnamed. This is what the breakdown keys on: one method driven through several parameter shapes is told apart only by this. |
+| `rpc_method` | per-request families | The JSON-RPC method. Several calls can share one, so it is the coarser of the two labels. |
 | `status` | distributions and `bench_http_reqs_total` | HTTP status, `0` when no response arrived. |
 | `outcome` | distributions and `bench_http_reqs_total` | The response class — see below. |
 | `rpc_code` | `bench_rpc_errors_total` | The `error.code` the node returned, e.g. `-32000`. |
