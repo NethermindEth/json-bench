@@ -7,14 +7,14 @@ duration: "120s"
 rps: 2
 vus: 16
 calls:
-  - name: "debug_traceBlockByNumber (latest, callTracer)"
+  - name: "debug_traceBlockByNumber (callTracer)"
     method: "debug_traceBlockByNumber"
     params:
       - "latest"
       - tracer: "callTracer"
     weight: 1
     thresholds: ["p(99)<600000"]
-  - name: "debug_traceBlockByNumber (latest, prestateTracer)"
+  - name: "debug_traceBlockByNumber (prestateTracer)"
     method: "debug_traceBlockByNumber"
     params:
       - "latest"
@@ -27,7 +27,7 @@ calls:
       - "latest"
     weight: 1
     thresholds: ["p(99)<600000"]
-  - name: "trace_replayBlockTransactions (latest, trace)"
+  - name: "trace_replayBlockTransactions (latest)"
     method: "trace_replayBlockTransactions"
     params:
       - "latest"
