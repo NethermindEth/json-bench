@@ -8,7 +8,7 @@ duration: "120s"
 rps: 50
 vus: 64
 calls:
-  - name: "debug_traceCall (head, mixed tracers)"
+  - name: "debug_traceCall (head)"
     file: "./rpc-calls/debug_traceCall-mainnet-latest.jsonl"
     file_type: "jsonl"
     weight: 1
