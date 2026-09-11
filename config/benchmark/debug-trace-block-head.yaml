@@ -1,0 +1,36 @@
+test_name: "Block-level tracing at head"
+description: "Whole-block tracing of `latest` through both namespaces: debug_traceBlockByNumber with callTracer and prestateTracer, plus the parity-style trace_block and trace_replayBlockTransactions. Re-executes every transaction of the head block against its parent state, so it runs on a pruned node while remaining the heaviest trace workload a client serves. The parity calls are skipped by clients that do not expose the trace namespace."
+clients:
+  - nethermind
+  - reth
+duration: "120s"
+rps: 2
+vus: 16
+calls:
+  - name: "debug_traceBlockByNumber (latest, callTracer)"
+    method: "debug_traceBlockByNumber"
+    params:
+      - "latest"
+      - tracer: "callTracer"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceBlockByNumber (latest, prestateTracer)"
+    method: "debug_traceBlockByNumber"
+    params:
+      - "latest"
+      - tracer: "prestateTracer"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "trace_block (latest)"
+    method: "trace_block"
+    params:
+      - "latest"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "trace_replayBlockTransactions (latest, trace)"
+    method: "trace_replayBlockTransactions"
+    params:
+      - "latest"
+      - - "trace"
+    weight: 1
+    thresholds: ["p(99)<600000"]
