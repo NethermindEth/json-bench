@@ -31,6 +31,33 @@ the Prometheus base unit and what k6 wrote. `0.0429` is a 42.9 ms call.
 issued but excluded from every series here, so a latency panel shows steady
 state rather than the average of steady state and start-up.
 
+## Naming
+
+The convention is **k6's, not Prometheus's**, and that is a deliberate choice
+rather than an oversight. Keeping the shape k6 established is what let every
+dashboard panel and every saved query migrate by swapping a prefix; inventing a
+more idiomatic scheme would have been a rewrite of both for no measurement gained.
+
+What it does share with Prometheus norms:
+
+- a namespace prefix on every series, `bench_`
+- `_total` for counters, cumulative in the ordinary sense, so `rate()`,
+  `irate()` and `increase()` behave as expected
+- base units on the wire — durations in seconds, sizes in bytes
+
+Where it departs, and what each one means for you:
+
+| Departure | Consequence |
+|---|---|
+| **The statistic is in the name.** `bench_http_req_duration_p99` rather than a histogram or a `quantile` label. | `histogram_quantile()` does not apply and there are no buckets to re-aggregate. Read the stat you want directly. It is also why the latency families number 63 rather than 7 — nine stats across seven phases. |
+| **The name carries no unit suffix.** Durations are seconds, but the name does not say so. | Trust this document, not the name. `0.0429` on any duration family is 42.9 ms. |
+| **Rates are published, not derived.** `bench_http_req_failed_rate`, `bench_rpc_error_rate` and `bench_achieved_rate` are gauges the runner computes. | Read them as they are. Deriving the same figure from the `_total` counters is also valid and will agree. |
+| **Trend gauges are cumulative from the start of the run.** | Never `rate()` a trend family — the result is meaningless. Aggregate it (`avg by (...)`) or read the per-request sample file for a windowed view. Counters are exempt; they are ordinary. |
+
+The one place this convention is *not* followed is the republished node metrics
+under `bench_target_*`, which keep whatever names the node itself exposes so they
+stay recognisable to someone who knows that client.
+
 ## Labels
 
 | Label | On | Meaning |
