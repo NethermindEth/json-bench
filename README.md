@@ -131,6 +131,7 @@ The `runner` binary exposes its functionality through subcommands. Running
 ```text
 runner benchmark        Run a load test against one or more JSON-RPC endpoints
 runner find-max-rps     Search for the highest rate a target sustains within an SLO
+runner sweep            Run one config at several settings and compare them
 runner report           Re-analyse a finished run, or compare two of them
 runner compare          One-shot cross-client JSON-RPC response comparison
 runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
@@ -193,6 +194,31 @@ A run writes, under `--output`:
 | `report.html` | Opt-in via `--html-report`. |
 
 `compare` and `compare-openrpc` always produce their HTML report.
+
+#### Sweeping a setting
+
+To find out what a setting actually does, run the same benchmark at several
+values of it:
+
+```bash
+runner sweep --config bench.yaml --vary batch_size=1,5,10,20
+runner sweep --config bench.yaml --vary rps=100,200,400 --repeat 3
+```
+
+`rps`, `vus`, `batch_size` and `duration` can be varied. Every run replays the
+same request sequence, pinned once up front and sized for whichever setting needs
+the most requests, so the sweep compares settings rather than workloads.
+
+Two things keep the result honest. A point that could not be delivered is
+reported as **inconclusive** rather than as a result, because a setting the
+generator could not offer measures the generator. And `--repeat` runs the whole
+sweep again and reports each point's **P99 spread** between passes — a difference
+between settings means nothing unless it is larger than the variation within one.
+A single pass says so in a warning.
+
+The rate column is requests per second, not dispatches: a batched arrival carries
+several calls, and counting arrivals would make batching look like a throughput
+collapse when it is the opposite.
 
 #### Re-analysing a finished run
 
