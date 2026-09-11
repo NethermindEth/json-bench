@@ -1,0 +1,15 @@
+test_name: "debug_traceCall at head"
+description: "Head-only debug_traceCall workload: 15 curated mainnet calls replayed against `latest`, spanning the structlog default, callTracer (onlyTopCall on and off) and prestateTracer. Safe on snap-synced/pruned nodes because no fixture pins a historical block. Intended as the trace-path counterpart to ethcall-contracts-head.yaml for cross-client comparison."
+clients:
+  - nethermind
+  - reth
+  - geth
+duration: "120s"
+rps: 50
+vus: 64
+calls:
+  - name: "debug_traceCall (head, mixed tracers)"
+    file: "./rpc-calls/debug_traceCall-mainnet-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
