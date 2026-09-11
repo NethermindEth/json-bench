@@ -319,7 +319,7 @@ func writeManifest(dir string, result *types.BenchmarkResult) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "manifest.json"), append(data, '\n'), 0o644)
+	return os.WriteFile(filepath.Join(dir, engine.ManifestFilename), append(data, '\n'), 0o644)
 }
 
 // logTargetMetrics reports what each node said about itself. A counter is

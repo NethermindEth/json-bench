@@ -131,6 +131,7 @@ The `runner` binary exposes its functionality through subcommands. Running
 ```text
 runner benchmark        Run a load test against one or more JSON-RPC endpoints
 runner find-max-rps     Search for the highest rate a target sustains within an SLO
+runner report           Re-analyse a finished run, or compare two of them
 runner compare          One-shot cross-client JSON-RPC response comparison
 runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
 runner api              Start the HTTP API server
@@ -192,6 +193,39 @@ A run writes, under `--output`:
 | `report.html` | Opt-in via `--html-report`. |
 
 `compare` and `compare-openrpc` always produce their HTML report.
+
+#### Re-analysing a finished run
+
+Every run retains its observations, so a run can be taken apart again without
+re-running it:
+
+```bash
+runner report outputs/capacity --phases
+```
+
+Rows are per call, with the `sending`/`waiting`/`receiving` split. That split is
+worth reaching for: a latency difference that sits entirely in `waiting` is the
+node thinking, and one that shows up in `sending` or `receiving` is the generator
+or the link between you and it.
+
+`--ok-only` restricts to successful responses, so a latency figure is not a blend
+of real work and fast failures. `--client` separates a multi-client run.
+
+Two runs can be diffed directly:
+
+```bash
+runner report --compare outputs/before outputs/after
+```
+
+Per call: the median shift, a rank-sum test, the waiting-time split and the
+outcome counts. The shift is the number to read — at these sample sizes almost
+any real difference is significant.
+
+The comparison checks whether it means anything before reporting it. Runs that
+counted errors differently are **refused**, because their error rates are not the
+same measurement. Differences that change what a diff means but still permit one
+— a different seed, rate, batch size, saturation policy or transport setting —
+are reported as warnings above the table.
 
 #### Load shape and honesty about it
 
