@@ -238,6 +238,11 @@ type wireTransformDoc struct {
 
 func runStrictPair(t *testing.T, strict bool, methods map[string][]interface{}, rpcNames map[string]string, blockOverride string, result func(req rpcRequest) string) (*Comparator, *recordingFake, *recordingFake, string) {
 	t.Helper()
+	return runStrictPairAt(t, strict, methods, rpcNames, blockOverride, 1, result)
+}
+
+func runStrictPairAt(t *testing.T, strict bool, methods map[string][]interface{}, rpcNames map[string]string, blockOverride string, concurrency int, result func(req rpcRequest) string) (*Comparator, *recordingFake, *recordingFake, string) {
+	t.Helper()
 	a := newRecordingFake(t, "0x1", result)
 	b := newRecordingFake(t, "0x1", result)
 
@@ -260,7 +265,7 @@ func runStrictPair(t *testing.T, strict bool, methods map[string][]interface{}, 
 			{Name: "candidate", URL: b.srv.URL},
 		},
 		TimeoutSeconds: 5,
-		Concurrency:    1,
+		Concurrency:    concurrency,
 		OutputDir:      dir,
 	}
 	comp, err := NewComparator(cfg)
@@ -401,5 +406,45 @@ func TestStrictIntegration_LargeIntegersDiffer(t *testing.T) {
 				t.Errorf("differences = %d (%v), want %d", got, results[0].Differences, tc.wantDiffs)
 			}
 		})
+	}
+}
+
+// TestStrictIntegration_WireTransformsRecordOnlyChanges pins the two
+// properties the single-call tests cannot: a call that already carries the
+// block it is pinned to is *not* recorded (the override copies the params but
+// changes nothing, so the list stays the set of requests that really changed),
+// and the recorder is safe from many goroutines at once.
+func TestStrictIntegration_WireTransformsRecordOnlyChanges(t *testing.T) {
+	const n = 60
+	methods := make(map[string][]interface{}, n)
+	rpcNames := make(map[string]string, n)
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("eth_call_variant%02d", i)
+		rpcNames[id] = "eth_call"
+		block := interface{}("latest")
+		if i%2 == 0 {
+			block = "0x77" // already pinned: nothing to rewrite, nothing to record
+		}
+		methods[id] = []interface{}{map[string]interface{}{"to": fmt.Sprintf("0x%x", i)}, block}
+	}
+
+	comp, _, _, _ := runStrictPairAt(t, true, methods, rpcNames, "0x77", 16, func(req rpcRequest) string {
+		return `"0xab"`
+	})
+
+	if got := len(comp.GetResults()); got != n {
+		t.Fatalf("results = %d, want %d", got, n)
+	}
+	got := comp.Provenance()["wire_transformations"].([]wireTransform)
+	if len(got) != n/2 {
+		t.Fatalf("recorded %d transforms, want %d — only the latest-tagged half changed", len(got), n/2)
+	}
+	for i, tr := range got {
+		if i > 0 && got[i-1].Method >= tr.Method {
+			t.Fatalf("transforms are not in a stable order at %d: %q then %q", i, got[i-1].Method, tr.Method)
+		}
+		if tr.OriginalParams[1] != "latest" || tr.EffectiveParams[1] != "0x77" {
+			t.Errorf("entry %d recorded a call that did not change: %+v", i, tr)
+		}
 	}
 }
