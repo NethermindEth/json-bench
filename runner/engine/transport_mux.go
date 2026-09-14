@@ -56,6 +56,18 @@ func envelopeID(raw json.RawMessage) string {
 	return id
 }
 
+// writeDeadline is when a send must have completed by: the request's own
+// deadline when it has one, the transport timeout otherwise.
+func writeDeadline(ctx context.Context, timeout time.Duration) time.Time {
+	if deadline, ok := ctx.Deadline(); ok {
+		return deadline
+	}
+	if timeout <= 0 {
+		return time.Time{}
+	}
+	return time.Now().Add(timeout)
+}
+
 // pending is one in-flight request waiting for its answer.
 type pending struct {
 	ids  []string

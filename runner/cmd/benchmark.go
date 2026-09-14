@@ -115,6 +115,9 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 
 	if benchmarkBatchSize > 0 {
 		cfg.BatchSize = benchmarkBatchSize
+		if err := config.Revalidate(cfg); err != nil {
+			return fmt.Errorf("--batch-size %d does not fit this config: %w", benchmarkBatchSize, err)
+		}
 	}
 
 	if cfg.UsesCallsFile() {

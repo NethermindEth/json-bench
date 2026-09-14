@@ -172,6 +172,11 @@ func FindMaxRPS(ctx context.Context, cfg *config.Config, opts Options, search Se
 	if search.Tolerance <= 0 {
 		search.Tolerance = 1
 	}
+	// A ceiling below the floor is never probed, so the search would report a
+	// limit it never tested against a bound it never respected.
+	if search.MaxRPS > 0 && search.MaxRPS < search.MinRPS {
+		return nil, fmt.Errorf("the rate ceiling (%d) is below the floor (%d)", search.MaxRPS, search.MinRPS)
+	}
 
 	log := opts.Logger
 	if log == nil {

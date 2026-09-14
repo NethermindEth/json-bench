@@ -253,6 +253,11 @@ same measurement. Differences that change what a diff means but still permit one
 — a different seed, rate, batch size, saturation policy or transport setting —
 are reported as warnings above the table.
 
+> **Delivery counts arrivals, not calls.** With `batch_size` on, one arrival is
+> one round trip carrying that many JSON-RPC calls, so `Sent` and `Achieved RPS`
+> are per round trip while `Total Requests` is per call. A dropped arrival drops
+> every call it carried.
+
 #### Transports
 
 The URL scheme picks how the target is reached, because the choice belongs to

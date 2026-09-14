@@ -131,9 +131,11 @@ func (cr *ClientRegistry) validateConfig(config types.ClientsConfig) error {
 			return fmt.Errorf("client %s has empty URL", client.Name)
 		}
 
-		// Basic URL validation - check it starts with http:// or https://
-		if len(client.URL) < 7 || (client.URL[:7] != "http://" && (len(client.URL) < 8 || client.URL[:8] != "https://")) {
-			return fmt.Errorf("client %s has invalid URL: %s (must start with http:// or https://)", client.Name, client.URL)
+		// The URL decides the transport, so the same rule the engine dispatches
+		// on decides what is configurable. Restating it here is what made every
+		// ws:// and ipc:// endpoint unreachable while the engine supported them.
+		if _, err := types.TransportKindFor(client.URL); err != nil {
+			return fmt.Errorf("client %s has an unusable URL: %w", client.Name, err)
 		}
 
 		// Validate auth configuration if present

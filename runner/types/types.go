@@ -153,6 +153,14 @@ type MethodMetrics struct {
 // the load the config requested. Without it a run that offered a fraction of
 // its target rate is indistinguishable from one that met it, and its latency
 // figures describe only the requests that went out.
+//
+// These count arrivals, not JSON-RPC calls, and the two differ once batching is
+// on: an arrival is one HTTP round trip carrying BatchSize calls, and a dropped
+// arrival drops all of them. Scheduling is what this measures, so the arrival is
+// the right unit — but it means Sent multiplied by the run's batch size is the
+// request figure, and ClientMetrics.TotalRequests already holds that. AchievedRPS
+// is likewise arrivals per second; for requests per second divide TotalRequests
+// by OfferedSeconds.
 type DeliveryMetrics struct {
 	Scheduled          int64   `json:"scheduled"`
 	Sent               int64   `json:"sent"`

@@ -96,6 +96,13 @@ func newSchedule(cfg *config.Config, available, batchSize int) (schedule, error)
 		if total > available {
 			total = available
 		}
+		// Batching divides the rate, so a short run at a low rate can round down
+		// to nothing. Saying so beats a run that completes instantly having
+		// measured a target it never contacted.
+		if total == 0 {
+			return schedule{}, fmt.Errorf("%d rps in batches of %d over %s schedules no requests at all; "+
+				"lengthen the run, raise the rate, or reduce batch_size", cfg.RPS, batchSize, duration)
+		}
 		return schedule{
 			total:    total,
 			interval: time.Duration(float64(time.Second) / arrivalRate),

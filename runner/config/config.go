@@ -64,6 +64,12 @@ func (c *Config) UsesCallsFile() bool {
 }
 
 // validateConfig performs validation on the loaded configuration
+// Revalidate re-checks a config after a caller has changed it. A CLI flag that
+// overrides a setting lands after loading, which is past the point where the
+// file was validated — so the override has to be checked too, or it can put the
+// config into a shape the file itself would have been rejected for.
+func Revalidate(cfg *Config) error { return validateConfig(cfg) }
+
 func validateConfig(cfg *Config) error {
 	if cfg.TestName == "" {
 		return fmt.Errorf("test_name is required")
@@ -87,6 +93,12 @@ func validateConfig(cfg *Config) error {
 				if call.Method == "" || call.Params == nil {
 					return fmt.Errorf("call must have a method and params defined if no file is provided")
 				}
+			}
+			// A negative weight does not merely silence its own call: it shrinks
+			// the total the weighted draw divides by, so every other call's share
+			// is wrong too, and nothing about the run says so.
+			if call.Weight < 0 {
+				return fmt.Errorf("call %s has a negative weight (%d); weights are shares of the traffic", call.Name, call.Weight)
 			}
 		}
 	} else {

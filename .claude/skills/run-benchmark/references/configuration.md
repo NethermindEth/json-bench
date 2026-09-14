@@ -84,7 +84,7 @@ calls:                           # the workload mix
                                  # (ONLY weight is parsed; a "frequency: N%" key in older
                                  # profiles is silently ignored -> zero traffic for that call)
     thresholds:                  # optional pass/fail conditions, e.g. ["p(99)<500"] in ms
-      - "p(95) < 500ms"
+      - "p(95)<500"            # milliseconds, bare number: a unit suffix is not parsed
   - name: "recorded_getlogs"
     file: "./rpc-calls/..."      # ...or a file of recorded calls
     file_type: "jsonl"           # json | jsonl

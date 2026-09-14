@@ -124,7 +124,13 @@ func (w *wsConn) do(ctx context.Context, payload []byte) attempt {
 
 	sendStart := time.Now()
 	w.writeMu.Lock()
-	writeErr := socket.WriteMessage(websocket.TextMessage, payload)
+	// Without a deadline a peer that accepts the connection and stops reading
+	// blocks this write forever while holding the mutex, which stalls every
+	// other request on the connection and outlives the configured timeout.
+	writeErr := socket.SetWriteDeadline(writeDeadline(ctx, w.timeout))
+	if writeErr == nil {
+		writeErr = socket.WriteMessage(websocket.TextMessage, payload)
+	}
 	w.writeMu.Unlock()
 	sent := time.Now()
 

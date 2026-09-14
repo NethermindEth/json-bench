@@ -245,3 +245,28 @@ calls:
 		})
 	}
 }
+
+// A negative weight does not merely silence its own call: it shrinks the total
+// the weighted draw divides by, so every other call's share is wrong too.
+func TestLoadTestConfigRejectsANegativeWeight(t *testing.T) {
+	path := writeTemp(t, "config.yaml", `
+test_name: "weights"
+clients: ["geth"]
+duration: "1m"
+rps: 100
+vus: 10
+calls:
+  - name: "eth_call"
+    method: "eth_call"
+    params: []
+    weight: -1
+  - name: "eth_getLogs"
+    method: "eth_getLogs"
+    params: []
+    weight: 2
+`)
+
+	_, err := NewConfigLoader(registryWith(t, "geth")).LoadTestConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "negative weight")
+}

@@ -125,7 +125,12 @@ func (c *ipcConn) do(ctx context.Context, payload []byte) attempt {
 
 	sendStart := time.Now()
 	c.writeMu.Lock()
-	_, writeErr := socket.Write(payload)
+	// See the WebSocket transport: an unbounded write holds the mutex and
+	// stalls every other request on the connection.
+	writeErr := socket.SetWriteDeadline(writeDeadline(ctx, c.timeout))
+	if writeErr == nil {
+		_, writeErr = socket.Write(payload)
+	}
 	c.writeMu.Unlock()
 	sent := time.Now()
 
