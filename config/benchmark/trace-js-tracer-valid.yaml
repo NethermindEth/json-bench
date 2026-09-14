@@ -1,0 +1,41 @@
+{
+  "test_name": "Valid JavaScript tracer: whole block versus single transaction",
+  "description": "Identical valid geth-style JS tracer issued two ways against snapshot 25490000 (head block has 319 transactions). debug_traceBlockByNumber drives one tracer per transaction; debug_traceTransaction drives exactly one. If only the block form fails the cause is per-transaction engine accumulation rather than tracer validity. Paced at 1 rps so nothing is load related.",
+  "clients": [
+    "nethermind",
+    "reth"
+  ],
+  "duration": "120s",
+  "rps": 1,
+  "vus": 4,
+  "calls": [
+    {
+      "name": "debug_traceTransaction valid JS tracer (one tx)",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d",
+        {
+          "tracer": "{data: [], step: function(log, db) { }, fault: function(log, db) { }, result: function(ctx, db) { return this.data.length; }}"
+        }
+      ],
+      "weight": 3,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "debug_traceBlockByNumber valid JS tracer (319 tx)",
+      "method": "debug_traceBlockByNumber",
+      "params": [
+        "latest",
+        {
+          "tracer": "{data: [], step: function(log, db) { }, fault: function(log, db) { }, result: function(ctx, db) { return this.data.length; }}"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    }
+  ]
+}
