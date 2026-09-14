@@ -1,0 +1,131 @@
+test_name: "Debug and trace RPC suite at head"
+description: "Broad head-safe sweep of the debug_ and trace_ namespaces against snapshot 25490000 (block 0x1bcc8cd8ce5471e5c25f9a4b5c711ce11d37445eb24be3e0b7ee57b048000933, 319 transactions). Complements debug-trace-head.yaml (debug_traceCall), debug-trace-block-head.yaml (whole-block callTracer/prestateTracer) and trace-transaction-prefix-25490000.yaml (single-transaction positions) by covering the methods none of those reach: the parity call paths, the alternative tracers, the heavier traceType combinations, and the cheap non-EVM debug reads that establish a floor. Every fixture resolves to head or to the head block's own hashes, so it runs on a pruned node. Names carry no commas - k6 builds threshold sub-metric names from them."
+clients:
+  - nethermind
+  - reth
+duration: "120s"
+rps: 2
+vus: 32
+calls:
+  # --- parity call paths (no replay; the trace_ analogue of debug_traceCall) ---
+  - name: "trace_call (trace)"
+    method: "trace_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a082310000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488d"
+      - ["trace"]
+      - "latest"
+    weight: 2
+    thresholds: ["p(99)<600000"]
+  - name: "trace_call (trace vmTrace stateDiff)"
+    method: "trace_call"
+    params:
+      - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        data: "0x70a082310000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488d"
+      - ["trace", "vmTrace", "stateDiff"]
+      - "latest"
+    weight: 2
+    thresholds: ["p(99)<600000"]
+  - name: "trace_callMany (two calls)"
+    method: "trace_callMany"
+    params:
+      - - - to: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+            data: "0x70a082310000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488d"
+          - ["trace"]
+        - - to: "0x6b175474e89094c44da98b954eedeac495271d0f"
+            data: "0x70a082310000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488d"
+          - ["trace"]
+      - "latest"
+    weight: 2
+    thresholds: ["p(99)<600000"]
+
+  # --- parity lookups over the head block ---
+  - name: "trace_get (first tx index 0)"
+    method: "trace_get"
+    params:
+      - "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d"
+      - ["0x0"]
+    weight: 2
+    thresholds: ["p(99)<600000"]
+  - name: "trace_filter (head block only)"
+    method: "trace_filter"
+    params:
+      - fromBlock: "latest"
+        toBlock: "latest"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+
+  # --- the heavier traceType combination on a whole block ---
+  - name: "trace_replayBlockTransactions (trace vmTrace stateDiff)"
+    method: "trace_replayBlockTransactions"
+    params:
+      - "latest"
+      - ["trace", "vmTrace", "stateDiff"]
+    weight: 1
+    thresholds: ["p(99)<600000"]
+
+  # --- alternative tracers on a whole block; noopTracer isolates traversal from output cost ---
+  - name: "debug_traceBlockByNumber (noopTracer)"
+    method: "debug_traceBlockByNumber"
+    params:
+      - "latest"
+      - tracer: "noopTracer"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceBlockByNumber (4byteTracer)"
+    method: "debug_traceBlockByNumber"
+    params:
+      - "latest"
+      - tracer: "4byteTracer"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceBlockByHash (callTracer)"
+    method: "debug_traceBlockByHash"
+    params:
+      - "0x1bcc8cd8ce5471e5c25f9a4b5c711ce11d37445eb24be3e0b7ee57b048000933"
+      - tracer: "callTracer"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+
+  # --- structlog: the only debug_ path that streams (CanStreamStructLogs bails on a named tracer).
+  #     Kept to a single transaction; whole-block structlog output is unbounded.
+  - name: "debug_traceTransaction structlog first"
+    method: "debug_traceTransaction"
+    params:
+      - "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d"
+      - enableMemory: false
+        disableStack: true
+        disableStorage: true
+    weight: 2
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceTransactionByBlockAndIndex (callTracer)"
+    method: "debug_traceTransactionByBlockAndIndex"
+    params:
+      - "latest"
+      - 0
+      - tracer: "callTracer"
+    weight: 2
+    thresholds: ["p(99)<600000"]
+
+  # --- cheap non-EVM debug reads: the floor these namespaces are measured against ---
+  - name: "debug_getRawBlock (latest)"
+    method: "debug_getRawBlock"
+    params: ["latest"]
+    weight: 2
+    thresholds: ["p(99)<600000"]
+  - name: "debug_getRawReceipts (latest)"
+    method: "debug_getRawReceipts"
+    params: ["latest"]
+    weight: 2
+    thresholds: ["p(99)<600000"]
+  - name: "debug_getRawHeader (latest)"
+    method: "debug_getRawHeader"
+    params: ["latest"]
+    weight: 2
+    thresholds: ["p(99)<600000"]
+  - name: "debug_getRawTransaction (first tx)"
+    method: "debug_getRawTransaction"
+    params:
+      - "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d"
+    weight: 2
+    thresholds: ["p(99)<600000"]
