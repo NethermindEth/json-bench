@@ -1,0 +1,16 @@
+test_name: "Block traversal cost with no tracer output"
+description: "debug_traceBlockByNumber with noopTracer over the head block, alone on the node. noopTracer walks every transaction and emits nothing, so this separates block traversal and re-execution cost from response serialisation. Isolated because a co-tenant call in the broad suite killed the node and contaminated the figure."
+clients:
+  - nethermind
+  - reth
+duration: "120s"
+rps: 1
+vus: 4
+calls:
+  - name: "debug_traceBlockByNumber (noopTracer)"
+    method: "debug_traceBlockByNumber"
+    params:
+      - "latest"
+      - tracer: "noopTracer"
+    weight: 1
+    thresholds: ["p(99)<600000"]
