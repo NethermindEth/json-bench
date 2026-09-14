@@ -60,12 +60,14 @@ func (d *Database) InsertRun(run *types.HistoricRun) error {
 		INSERT INTO benchmark_runs (
 			id, timestamp, git_commit, git_branch, test_name, description,
 			config_hash, result_path, duration, total_requests, success_rate,
-			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name,
+			error_rate_semantics
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		ON CONFLICT (id) DO UPDATE SET
 			success_rate = EXCLUDED.success_rate,
 			avg_latency = EXCLUDED.avg_latency,
-			p95_latency = EXCLUDED.p95_latency`
+			p95_latency = EXCLUDED.p95_latency,
+			error_rate_semantics = EXCLUDED.error_rate_semantics`
 
 	clientsJSON, _ := json.Marshal(run.Clients)
 	methodsJSON, _ := json.Marshal(run.Methods)
@@ -76,6 +78,7 @@ func (d *Database) InsertRun(run *types.HistoricRun) error {
 		run.Description, run.ConfigHash, run.ResultPath, run.Duration,
 		run.TotalRequests, run.SuccessRate, run.AvgLatency, run.P95Latency,
 		clientsJSON, methodsJSON, tagsJSON, run.IsBaseline, run.BaselineName,
+		nullableString(run.ErrorRateSemantics),
 	)
 
 	if err != nil {
@@ -124,18 +127,20 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 	query := `
 		SELECT id, timestamp, git_commit, git_branch, test_name, description,
 			config_hash, result_path, duration, total_requests, success_rate,
-			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name
+			avg_latency, p95_latency, clients, methods, tags, is_baseline, baseline_name,
+			error_rate_semantics
 		FROM benchmark_runs WHERE id = $1`
 
 	var run types.HistoricRun
 	var clientsJSON, methodsJSON, tagsJSON []byte
+	var semantics sql.NullString
 
 	err := d.db.QueryRow(query, id).Scan(
 		&run.ID, &run.Timestamp, &run.GitCommit, &run.GitBranch,
 		&run.TestName, &run.Description, &run.ConfigHash, &run.ResultPath,
 		&run.Duration, &run.TotalRequests, &run.SuccessRate,
 		&run.AvgLatency, &run.P95Latency, &clientsJSON, &methodsJSON,
-		&tagsJSON, &run.IsBaseline, &run.BaselineName,
+		&tagsJSON, &run.IsBaseline, &run.BaselineName, &semantics,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -147,6 +152,7 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 	json.Unmarshal(clientsJSON, &run.Clients)
 	json.Unmarshal(methodsJSON, &run.Methods)
 	json.Unmarshal(tagsJSON, &run.Tags)
+	run.ErrorRateSemantics = semantics.String
 
 	// Populate the millisecond fields from the base fields
 	// since the database only stores avg_latency, not avg_latency_ms
@@ -163,7 +169,8 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 // ListRuns lists runs with filtering
 func (d *Database) ListRuns(filter types.RunFilter) ([]*types.HistoricRun, error) {
 	query := `SELECT id, timestamp, git_commit, git_branch, test_name, description,
-		total_requests, success_rate, avg_latency, p95_latency, is_baseline, baseline_name
+		total_requests, success_rate, avg_latency, p95_latency, is_baseline, baseline_name,
+		error_rate_semantics
 		FROM benchmark_runs WHERE 1=1`
 
 	args := []interface{}{}
@@ -211,15 +218,17 @@ func (d *Database) ListRuns(filter types.RunFilter) ([]*types.HistoricRun, error
 	var runs []*types.HistoricRun
 	for rows.Next() {
 		run := &types.HistoricRun{}
+		var semantics sql.NullString
 		err := rows.Scan(
 			&run.ID, &run.Timestamp, &run.GitCommit, &run.GitBranch,
 			&run.TestName, &run.Description, &run.TotalRequests,
 			&run.SuccessRate, &run.AvgLatency, &run.P95Latency,
-			&run.IsBaseline, &run.BaselineName,
+			&run.IsBaseline, &run.BaselineName, &semantics,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan run: %w", err)
 		}
+		run.ErrorRateSemantics = semantics.String
 
 		// Populate the millisecond fields from the base fields
 		// since the database only stores avg_latency, not avg_latency_ms
@@ -329,4 +338,13 @@ func (d *Database) QueryMetrics(query types.MetricQuery) ([]types.TimeSeriesMetr
 	}
 
 	return metrics, rows.Err()
+}
+
+// nullableString stores an empty string as NULL, so a run that did not record a
+// value is distinguishable from one that recorded an empty one.
+func nullableString(v string) any {
+	if v == "" {
+		return nil
+	}
+	return v
 }

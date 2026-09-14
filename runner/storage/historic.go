@@ -118,6 +118,10 @@ func (h *HistoricStorage) SaveRun(result *types.BenchmarkResult, cfg *config.Con
 		TotalErrors:       calculateTotalErrors(result),
 		PerformanceScores: performanceScores,
 		FullResults:       fullResultsJSON,
+
+		// Recorded so a later comparison can tell whether this run and another
+		// measured the same thing.
+		ErrorRateSemantics: result.Manifest.ErrorRateSemantics,
 	}
 
 	// Save to database
@@ -201,18 +205,18 @@ func (h *HistoricStorage) getGitInfo() (commit, branch string) {
 		return "", ""
 	}
 
-	// Get commit hash
-	if cmd := exec.Command("git", "rev-parse", "HEAD"); cmd != nil {
-		if output, err := cmd.Output(); err == nil {
-			commit = strings.TrimSpace(string(output))
-		}
+	if output, err := exec.Command("git", "rev-parse", "HEAD").Output(); err == nil {
+		commit = strings.TrimSpace(string(output))
+	}
+	if output, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+		branch = strings.TrimSpace(string(output))
 	}
 
-	// Get branch name
-	if cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD"); cmd != nil {
-		if output, err := cmd.Output(); err == nil {
-			branch = strings.TrimSpace(string(output))
-		}
+	// git resolves against the working directory, so a runner invoked from
+	// outside its checkout records no provenance at all. Saying so beats
+	// persisting a run that silently cannot be traced back to a revision.
+	if commit == "" {
+		h.log.Warn("Could not determine the runner's git revision; this run will be stored without provenance")
 	}
 
 	return commit, branch
@@ -403,14 +407,21 @@ func (h *HistoricStorage) LoadRun(runID string) (*types.BenchmarkResult, error) 
 	}, nil
 }
 
-// Helper functions for extracting data from config and results
+// extractTestName is what every per-test query keys on — trends, baselines and
+// run listings all group by it — so a constant here silently collapses every
+// benchmark in the database into one series.
 func extractTestName(cfg *config.Config) string {
-	// Extract test name from config
-	return "default_test"
+	if cfg == nil || cfg.TestName == "" {
+		return "unnamed_test"
+	}
+	return cfg.TestName
 }
 
 func extractDescription(cfg *config.Config) string {
-	return ""
+	if cfg == nil {
+		return ""
+	}
+	return cfg.Description
 }
 
 func extractTags(cfg *config.Config) []string {
@@ -573,7 +584,7 @@ func (h *HistoricStorage) GetHistoricTrends(ctx context.Context, filter types.Tr
 	}
 
 	metrics := []struct {
-		name   string
+		name    string
 		select_ func(sample) float64
 	}{
 		{"avg_latency", func(s sample) float64 { return s.avgLatency }},
@@ -706,8 +717,30 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	}
 
 	comparison := &types.BaselineComparison{
-		BaselineRun: baselineRun,
-		CurrentRun:  current,
+		BaselineRun:   baselineRun,
+		CurrentRun:    current,
+		Comparability: types.CompareSemantics(baselineRun.ErrorRateSemantics, currentRun.ErrorRateSemantics),
+	}
+
+	// A difference between runs that counted errors differently is not
+	// evidence about the target, so no regressions are derived from it.
+	if !comparison.Comparability.Comparable {
+		comparison.Summary = fmt.Sprintf("Refused to compare %s -> %s: %s",
+			runID1, runID2, comparison.Comparability.Reason)
+		h.log.WithFields(logrus.Fields{
+			"baseline_run":       sanitize.LogValue(runID1),
+			"current_run":        sanitize.LogValue(runID2),
+			"baseline_semantics": sanitize.LogValue(baselineRun.ErrorRateSemantics),
+			"current_semantics":  sanitize.LogValue(currentRun.ErrorRateSemantics),
+		}).Warn("Refused a comparison between runs that counted errors differently")
+		return comparison, nil
+	}
+
+	if !comparison.Comparability.Verified {
+		h.log.WithFields(logrus.Fields{
+			"baseline_run": sanitize.LogValue(runID1),
+			"current_run":  sanitize.LogValue(runID2),
+		}).Warn(comparison.Comparability.Reason)
 	}
 
 	if baseline == nil || current == nil {
@@ -722,6 +755,9 @@ func (h *HistoricStorage) CompareRuns(ctx context.Context, runID1, runID2 string
 	comparison.Improvements = improvements
 	comparison.Summary = fmt.Sprintf("Compared %s -> %s: %d regression(s), %d improvement(s)",
 		runID1, runID2, len(regressions), len(improvements))
+	if !comparison.Comparability.Verified {
+		comparison.Summary += " (unverified: " + comparison.Comparability.Reason + ")"
+	}
 	return comparison, nil
 }
 

@@ -175,7 +175,7 @@ func debugClientMetrics(runID string, storageConfigPath string, logger *logrus.L
 	if len(clientMetrics) == 0 {
 		fmt.Println("[FAIL] No per-client metrics found. Possible causes:")
 		fmt.Println("   1. The benchmark was run before per-client tracking was implemented")
-		fmt.Println("   2. The K6 script is not correctly collecting per-client metrics")
+		fmt.Println("   2. The run was not persisted with --historic")
 		fmt.Println("   3. The metrics parser failed to extract client-specific data")
 		fmt.Println("\n   Action: Re-run the benchmark with the latest version")
 	} else {

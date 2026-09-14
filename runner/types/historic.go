@@ -3,6 +3,7 @@ package types
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -37,6 +38,13 @@ type HistoricRun struct {
 	TotalErrors       int64              `json:"total_errors" db:"total_errors"`
 	PerformanceScores map[string]float64 `json:"performance_scores" db:"performance_scores"`
 	FullResults       json.RawMessage    `json:"full_results" db:"full_results"`
+
+	// ErrorRateSemantics names what this run's error rate counted. It is
+	// stored per run because the answer changed: the engine counts JSON-RPC
+	// errors, which arrive as HTTP 200 and which the earlier pipeline could
+	// not see. Comparing across the change reads as a regression when nothing
+	// about the node moved.
+	ErrorRateSemantics string `json:"error_rate_semantics,omitempty" db:"error_rate_semantics"`
 
 	// Additional fields for API compatibility
 	BestClient     string `json:"best_client,omitempty"`
@@ -89,6 +97,9 @@ type BaselineComparison struct {
 	Regressions  []Regression     `json:"regressions"`
 	Improvements []Improvement    `json:"improvements"`
 	Summary      string           `json:"summary"`
+
+	// Comparability says whether the two runs measured the same thing.
+	Comparability Comparability `json:"comparability"`
 }
 
 // TrendPoint represents a single point in a performance trend
@@ -251,3 +262,63 @@ func (s *StringSlice) Remove(str string) {
 		}
 	}
 }
+
+// Error-rate semantics, recorded per run so a comparison can tell whether two
+// runs measured the same thing.
+const (
+	// ErrorRateSemanticsHTTPOnly counted only HTTP-level failures, which is
+	// what a pipeline reading HTTP status alone could see. A JSON-RPC error
+	// arrives as HTTP 200 and went uncounted.
+	ErrorRateSemanticsHTTPOnly = "http_errors"
+
+	// ErrorRateSemanticsRPCAware counts JSON-RPC errors as well.
+	ErrorRateSemanticsRPCAware = "http_and_jsonrpc_errors"
+)
+
+// Comparability is the verdict on whether two runs can be compared.
+type Comparability struct {
+	// Comparable is false when the runs are known to have measured different
+	// things, so a difference between them is not evidence about the target.
+	Comparable bool `json:"comparable"`
+
+	// Verified is false when at least one run did not record its semantics, so
+	// the comparison could not be checked either way.
+	Verified bool `json:"verified"`
+
+	Reason string `json:"reason,omitempty"`
+
+	BaselineSemantics string `json:"baseline_semantics,omitempty"`
+	CurrentSemantics  string `json:"current_semantics,omitempty"`
+}
+
+// CompareSemantics reports whether two runs measured the same thing.
+//
+// A mismatch is not comparable: the error rate is an input to every regression
+// verdict, so comparing a run that counted JSON-RPC errors against one that
+// could not see them reports a regression where nothing about the target
+// changed. An unrecorded value is not proof of a mismatch, so it is reported as
+// unverified rather than refused.
+func CompareSemantics(baseline, current string) Comparability {
+	verdict := Comparability{BaselineSemantics: baseline, CurrentSemantics: current}
+
+	switch {
+	case baseline == "" || current == "":
+		verdict.Comparable = true
+		verdict.Reason = "at least one run did not record what its error rate counted, so this comparison could not be verified"
+		return verdict
+	case baseline != current:
+		verdict.Verified = true
+		verdict.Reason = fmt.Sprintf(
+			"the runs counted errors differently (%s vs %s), so a difference between them is not evidence about the target",
+			baseline, current)
+		return verdict
+	default:
+		verdict.Comparable = true
+		verdict.Verified = true
+		return verdict
+	}
+}
+
+// ErrIncomparableRuns is returned when a comparison was refused because the
+// runs did not measure the same thing.
+var ErrIncomparableRuns = errors.New("runs are not comparable")

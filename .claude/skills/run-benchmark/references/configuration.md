@@ -1,5 +1,6 @@
 # Configuration reference
 
+
 ## Clients registry (`config/clients/*.yaml`)
 
 Maps client names to RPC endpoints. Benchmark configs reference these names.
@@ -8,7 +9,7 @@ Maps client names to RPC endpoints. Benchmark configs reference these names.
 clients:
   - name: "nethermind_local"     # required, unique; NO DASHES (validation rejects them)
     type: "nethermind"           # optional label; tagged onto metrics as client_type
-    url: "http://localhost:8545" # required RPC endpoint
+    url: "http://localhost:8545" # required RPC endpoint; the scheme picks the transport
     timeout: "30s"               # optional
     max_retries: 3               # optional
     headers:                     # optional custom HTTP headers
@@ -23,6 +24,30 @@ clients:
 
 Existing registries: `config/clients/clients.yaml`, `clients-production.yaml`, `test-clients.yaml`.
 
+## Transports
+
+The URL scheme decides how the target is reached. All three carry the same
+JSON-RPC methods:
+
+| URL | Transport |
+|---|---|
+| `http://…`, `https://…` | HTTP, one exchange per request over a pooled connection |
+| `ws://…`, `wss://…` | WebSocket, many requests multiplexed over one socket |
+| `ipc:///run/node.ipc`, or a bare `/run/node.ipc` | Unix domain socket |
+
+Two things differ on a socket transport, and the manifest records which transport
+a run used so a comparison can see them:
+
+- **Requests are matched to answers by JSON-RPC id**, not by order, because many
+  are in flight on one connection and a node may answer in any order.
+- **`waiting` holds the whole round trip and `receiving` is zero.** A multiplexed
+  reader sees a frame arrive whole, so there is no first byte to split on. There
+  is also no HTTP status, so `status` reads 200 for any delivered frame and the
+  outcome comes from the JSON-RPC body alone.
+
+Latency is not comparable across transports: IPC skips the TCP and HTTP framing
+that HTTP pays for. Compare a transport against itself.
+
 ## Benchmark config (`config/benchmark/*.yaml`)
 
 ```yaml
@@ -30,7 +55,19 @@ test_name: "my-benchmark"        # required
 description: "..."               # optional
 clients:                         # required: names from the clients registry
   - nethermind_local
-duration: "1m"                   # required k6 duration ("30s", "5m", ...)
+duration: "1m"                   # required unless `stages` is used, Go duration syntax
+warmup: "10s"                    # optional; load applied before the measured window,
+                                 #   excluded from every reported statistic
+batch_size: 10                   # optional; group requests into JSON-RPC arrays.
+                                 #   `rps` stays a rate of requests, so batches go
+                                 #   out at rps/batch_size. Each request's latency is
+                                 #   its batch's, so per-method comparison inside a
+                                 #   batched run is not meaningful.
+stages:                          # optional; ramps the rate instead of holding it.
+  - duration: "30s"              #   Sets the run's length, so `duration` must be omitted.
+    target: 200                  #   Each stage ramps linearly from the previous rate
+  - duration: "1m"               #   (`rps` for the first) to its target.
+    target: 200
 rps: 300                         # constant-arrival-rate executor...
 iterations: 1000                 # ...OR shared-iterations executor (pick one)
 vus: 20                          # ALWAYS set explicitly: loader requires vus > 0 and
@@ -46,8 +83,8 @@ calls:                           # the workload mix
     weight: 60                   # relative weight -> request frequency
                                  # (ONLY weight is parsed; a "frequency: N%" key in older
                                  # profiles is silently ignored -> zero traffic for that call)
-    thresholds:                  # optional k6 thresholds
-      - "p(95) < 500ms"
+    thresholds:                  # optional pass/fail conditions, e.g. ["p(99)<500"] in ms
+      - "p(95)<500"            # milliseconds, bare number: a unit suffix is not parsed
   - name: "recorded_getlogs"
     file: "./rpc-calls/..."      # ...or a file of recorded calls
     file_type: "jsonl"           # json | jsonl
@@ -79,7 +116,10 @@ Global flags (before the subcommand):
 |---|---|---|
 | `--config` | (required) | benchmark YAML |
 | `--clients` | — | clients registry YAML |
-| `--prometheus` | unset (Prometheus disabled) | Prometheus base URL (queries + remote-write root). Omit it to skip export entirely — metrics then come from k6's `summary.json`. If the URL is set but unreachable, the run still completes and falls back to `summary.json`, warning twice (once before the run, once after). |
+| `--prometheus` | unset (Prometheus disabled) | Prometheus base URL; the remote-write path is appended. Omitting it skips only the time series. An unreachable endpoint is warned about and the run still completes. See `metrics/METRICS.md` for the series. |
+| `--on-saturation` | `queue` | What to do when the in-flight limit is reached at a request's scheduled time: `queue` (send late, record the delay), `drop` (discard and count), `abort` (fail the run). |
+| `--fail-on-threshold` | off | Exit non-zero when a configured `thresholds:` entry is breached. |
+| `--no-samples` | off | Skip the per-request sample file. |
 | `--prometheus-rw-path` | `/api/v1/write` | remote-write path appended to `--prometheus` |
 | `--prometheus-rw-user` / `--prometheus-rw-pass` | — | remote-write basic auth |
 | `--html-report` | off | also generate `report.html` (JSON/CSV always produced) |
@@ -89,19 +129,20 @@ Global flags (before the subcommand):
 
 ```
 <output-dir>/
-  config.json          # generated k6 options
-  k6-script.js         # generated k6 script
+  manifest.json        # how the run was produced; check before comparing runs
+  samples.jsonl.gz     # one record per request (unless --no-samples)
   requests.csv         # generated RPC requests
-  summary.json         # k6 summary
   report.html          # only with --html-report
   exports/
-    results.json           # full structured result
+    results.json           # full structured result, incl. manifest and client comparison
     method_metrics.csv     # per-method latency/error stats  <- main analysis input
-                           #   Throughput (req/s) is requests over elapsed time (k6's own rate).
-                           #   Columns neither Prometheus nor summary.json can supply read NA,
-                           #   not 0.00: Variance, IQR, MAD, Timeout Rate, Connection Errors.
-                           #   Std Dev and CV are (max-min)/4 estimates, not sample statistics.
+                           #   Every distribution statistic is computed from the samples,
+                           #   including Variance, IQR, MAD and Std Dev.
+                           #   Outcome columns: Null Results, RPC Errors, HTTP Errors.
     client_comparison.csv  # per-client summary              <- main analysis input
+                           #   Load delivery first: Scheduled, Sent, Late, Dropped,
+                           #   Delivered (%), Target/Achieved RPS. Read these before
+                           #   any latency column.
     time_series.csv
     system_metrics.csv
 ```
@@ -116,7 +157,7 @@ Global flags (before the subcommand):
 
 Prints the CSV path (columns: id, name, method, payload). Reference it from every run's benchmark config via `calls_file`. A run with `calls_file` set uses that file verbatim and skips sampling; keep the `calls` section anyway for threshold metadata.
 
-Which column matters: **`method` (column 3) drives the per-method breakdown.** k6 tags every request with it as `rpc_method`, and that is what `method_metrics.csv` rows are keyed on for a `calls_file` run — so the `Method` column holds real RPC methods, and `name` (column 2) is free to be any label. The file is parsed at startup, so a missing path or a malformed row fails immediately instead of surfacing inside k6 minutes later.
+Both label columns matter. **`name` (column 2) keys the `method_metrics.csv` rows** and is tagged on every request as `req_name`; **`method` (column 3)** is tagged as `rpc_method` and appears alongside as its own column. That split is what lets a run drive one RPC method through many parameter shapes — `eth_getProof` bucketed by state depth and storage-key count, say — and still read a distribution per bucket. Give the `name` column the label you want to compare on. The file is parsed at startup, so a missing path or a malformed row fails immediately rather than minutes into the run.
 
 ## Related subcommands
 

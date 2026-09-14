@@ -8,7 +8,7 @@ This project runs predefined RPC tests derived from the official Ethereum Execut
 
 ## Features
 
-- **Performance Benchmarking**: Benchmark and compare Ethereum clients under realistic load using k6
+- **Performance Benchmarking**: Benchmark and compare Ethereum clients under realistic load with a built-in JSON-RPC load engine
 - **Historic Tracking**: Store and analyze performance trends over time with PostgreSQL + Grafana integration
 - **Real-time Dashboard**: Modern React UI for viewing results, trends, and comparisons
 - **Response Validation**: Validate RPC response compatibility with [ethereum/execution-apis](https://github.com/ethereum/execution-apis)
@@ -40,12 +40,14 @@ json-bench/
 │
 ├── runner/                   # Go benchmark runner with historic tracking
 │   ├── main.go              # Thin entry point - delegates to cmd.Execute()
-│   ├── cmd/                 # Cobra subcommands (benchmark, api, historic,
-│   │                        #                    compare, compare-openrpc)
+│   ├── cmd/                 # Cobra subcommands (benchmark, generate-requests,
+│   │                        #  api, historic, compare, compare-openrpc) plus
+│   │                        #  the stubnode and promsink test fixtures
 │   ├── api/                 # HTTP API server and WebSocket support
 │   ├── storage/             # PostgreSQL integration
 │   ├── analysis/            # Trend analysis and regression detection
-│   └── generator/           # K6 script generation and HTML reports
+│   ├── engine/              # JSON-RPC load engine and Prometheus remote write
+│   └── generator/           # HTML reports
 │
 ├── dashboard/               # React dashboard for historic analysis
 │   ├── src/
@@ -58,7 +60,7 @@ json-bench/
 │   ├── grafana-provisioning/
 │   └── dashboards/         # Pre-built Grafana dashboards
 │
-└── cmd/                     # Legacy debug helpers (not built by default)
+└── rpc-calls/               # Request corpora and the generators that build them
 ```
 
 ## Getting Started
@@ -66,9 +68,8 @@ json-bench/
 ### Prerequisites
 
 - **Docker and Docker Compose** (for client nodes and infrastructure)
-- **Go 1.20+** (for the benchmark runner)
+- **Go 1.25+** (for the benchmark runner)
 - **Node.js 18+** (for the React dashboard)
-- **k6** (for load testing - install from <https://k6.io/>)
 - **PostgreSQL** (for historic tracking - included in Docker Compose)
 
 ### Quick Start
@@ -128,7 +129,10 @@ The `runner` binary exposes its functionality through subcommands. Running
 `runner` with no subcommand prints usage and exits with status 2.
 
 ```text
-runner benchmark        Run a benchmark (k6 -> Prometheus -> reports)
+runner benchmark        Run a load test against one or more JSON-RPC endpoints
+runner find-max-rps     Search for the highest rate a target sustains within an SLO
+runner sweep            Run one config at several settings and compare them
+runner report           Re-analyse a finished run, or compare two of them
 runner compare          One-shot cross-client JSON-RPC response comparison
 runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
 runner api              Start the HTTP API server
@@ -144,7 +148,7 @@ Global flags accepted by every subcommand:
 ### Basic Benchmarking
 
 ```bash
-# Run a mixed workload benchmark (no Prometheus; metrics come from k6's summary.json)
+# Run a mixed workload benchmark (no Prometheus; results land in the exports)
 go run ./runner benchmark --config ./config/benchmark/mixed.yaml --clients ./config/clients/clients.yaml
 
 # Run a read-heavy benchmark
@@ -170,17 +174,255 @@ go run ./runner benchmark \
   --html-report
 ```
 
-`--prometheus` is optional and disabled by default. When it is omitted (or
-empty), k6 remote-write is not enabled and per-client metrics are collected from
-k6's `summary.json` instead. Passing an endpoint opts into remote-write and
-post-run PromQL queries. An endpoint that cannot be reached is reported twice —
-once before the run and once when metrics are collected — and the run falls back
-to `summary.json` rather than producing empty exports; do not point
+`--prometheus` is optional and disabled by default. Omitting it skips the time
+series only: the exports, the sample file and the reports are produced either
+way. Passing an endpoint publishes `bench_*` series over remote write while the
+run is in progress — see [metrics/METRICS.md](metrics/METRICS.md) for every
+series and its meaning. An unreachable endpoint is reported before the run and
+warned about on every push, and the run itself still completes; do not point
 `--prometheus` at an unused port to disable it, just omit the flag.
 
-`benchmark` always writes `outputs/results.json` and `outputs/results.csv`.
-The HTML report at `outputs/report.html` is opt-in via `--html-report`.
+A run writes, under `--output`:
+
+| File | Contents |
+|---|---|
+| `manifest.json` | How the run was produced: engine and version, error-rate semantics, seed, saturation policy, load shape, transport settings, and each client's URL. Read this before comparing two runs. |
+| `samples.jsonl.gz` | One gzipped JSON record per request: timings, phase breakdown, outcome, JSON-RPC code, byte counts. Disable with `--no-samples`. |
+| `exports/results.json` | The whole result, including the manifest and the pairwise client comparison. |
+| `exports/client_comparison.csv` | Per client: load delivery, outcome breakdown, latency percentiles. |
+| `exports/method_metrics.csv` | Per call: full distribution statistics and outcome counts, with the RPC method alongside. Several calls can share one method. |
+| `report.html` | Opt-in via `--html-report`. |
+
 `compare` and `compare-openrpc` always produce their HTML report.
+
+#### Sweeping a setting
+
+To find out what a setting actually does, run the same benchmark at several
+values of it:
+
+```bash
+runner sweep --config bench.yaml --vary batch_size=1,5,10,20
+runner sweep --config bench.yaml --vary rps=100,200,400 --repeat 3
+```
+
+`rps`, `vus`, `batch_size` and `duration` can be varied. Every run replays the
+same request sequence, pinned once up front and sized for whichever setting needs
+the most requests, so the sweep compares settings rather than workloads.
+
+Two things keep the result honest. A point that could not be delivered is
+reported as **inconclusive** rather than as a result, because a setting the
+generator could not offer measures the generator. And `--repeat` runs the whole
+sweep again and reports each point's **P99 spread** between passes — a difference
+between settings means nothing unless it is larger than the variation within one.
+A single pass says so in a warning.
+
+The rate column is requests per second, not dispatches: a batched arrival carries
+several calls, and counting arrivals would make batching look like a throughput
+collapse when it is the opposite.
+
+#### Re-analysing a finished run
+
+Every run retains its observations, so a run can be taken apart again without
+re-running it:
+
+```bash
+runner report outputs/capacity --phases
+```
+
+Rows are per call, with the `sending`/`waiting`/`receiving` split. That split is
+worth reaching for: a latency difference that sits entirely in `waiting` is the
+node thinking, and one that shows up in `sending` or `receiving` is the generator
+or the link between you and it.
+
+`--ok-only` restricts to successful responses, so a latency figure is not a blend
+of real work and fast failures. `--client` separates a multi-client run.
+
+Two runs can be diffed directly:
+
+```bash
+runner report --compare outputs/before outputs/after
+```
+
+Per call: the median shift, a rank-sum test, the waiting-time split and the
+outcome counts. The shift is the number to read — at these sample sizes almost
+any real difference is significant.
+
+The comparison checks whether it means anything before reporting it. Runs that
+counted errors differently are **refused**, because their error rates are not the
+same measurement. Differences that change what a diff means but still permit one
+— a different seed, rate, batch size, saturation policy or transport setting —
+are reported as warnings above the table.
+
+> **Delivery counts arrivals, not calls.** With `batch_size` on, one arrival is
+> one round trip carrying that many JSON-RPC calls, so `Sent` and `Achieved RPS`
+> are per round trip while `Total Requests` is per call. A dropped arrival drops
+> every call it carried.
+
+#### Transports
+
+The URL scheme picks how the target is reached, because the choice belongs to
+the endpoint rather than to a flag:
+
+```yaml
+clients:
+  - name: "nethermind_http"
+    url: "http://127.0.0.1:8545"
+  - name: "nethermind_ws"
+    url: "ws://127.0.0.1:8546"
+  - name: "nethermind_ipc"
+    url: "ipc:///var/lib/nethermind/nethermind.ipc"
+```
+
+HTTP gives each request its own exchange over a pooled connection. WebSocket and
+IPC multiplex many requests over a single socket and **match answers to requests
+by JSON-RPC id**, never by arrival order — a node is free to answer out of order,
+and over one wire every answer shares the same stream. Frames that answer nothing
+in flight, such as subscription notifications, are ignored rather than handed to
+whichever request happens to be waiting.
+
+Two measurements read differently on a socket, and the manifest records the
+transport so a comparison can see it:
+
+- **`waiting` carries the whole round trip and `receiving` is zero.** A
+  multiplexed reader sees a frame arrive whole, so there is no first byte to
+  split on. Inventing a split would be worse than reporting none.
+- **There is no HTTP status**, so `status` reads 200 for any frame that arrived
+  and the outcome comes from the JSON-RPC body alone. The failure classes that
+  are protocol-level — `rpc_error`, `rpc_null`, `timeout`, `transport` — work
+  exactly as they do over HTTP.
+
+Do not compare latency across transports: IPC skips the TCP and HTTP framing that
+HTTP pays for, which is the point of using it. Compare a transport against
+itself.
+
+#### Load shape and honesty about it
+
+The engine schedules arrivals on a fixed interval and dispatches them through a
+bounded pool sized by `vus`. When the pool is full at a request's scheduled
+moment, `--on-saturation` decides what happens:
+
+| Value | Behaviour |
+|---|---|
+| `queue` (default) | Send as soon as a slot frees, and record how late it went out. The dispatch delay is the coordinated-omission error: while it is above zero the latencies describe a slower offered rate than the one configured. |
+| `drop` | Discard the request and count it. |
+| `abort` | Fail the run, so a CI job cannot publish numbers from a generator that could not offer the load. |
+
+Either way the exports and the report carry `scheduled`, `sent`, `late`,
+`dropped` and the achieved rate, because a run that offered a fraction of its
+requested load must not read like one that met it.
+
+#### Warmup and ramps
+
+The first seconds of a run measure cold caches, an empty connection pool and a
+runtime that has not compiled anything yet. `warmup` applies load for a period
+before the measured window opens and excludes those requests from every reported
+statistic:
+
+```yaml
+duration: "5m"
+warmup: "30s"
+rps: 200
+vus: 40
+```
+
+The warmup requests are still written to the sample file, marked `warmup`, so
+nothing is thrown away — only the report's percentiles, error rate, throughput
+and delivery accounting describe the measured window alone.
+
+To move the rate rather than hold it, use `stages`. Each stage ramps linearly
+from wherever the previous one left off to its `target`, with `rps` as the
+starting rate; a stage whose target equals the previous one holds. Stages set
+the run's length, so `duration` is omitted:
+
+```yaml
+rps: 10
+vus: 200
+stages:
+  - duration: "1m"
+    target: 500      # ramp 10 -> 500
+  - duration: "3m"
+    target: 500      # hold
+  - duration: "30s"
+    target: 0        # ramp down
+```
+
+This follows k6's `ramping-arrival-rate` shape. Warmup is the addition: k6 has
+no way to discard a period from its statistics, and for a benchmark that is the
+difference between reporting steady state and reporting the average of steady
+state and start-up.
+
+#### Batching
+
+`batch_size` groups consecutive requests into JSON-RPC arrays, one HTTP round
+trip each — which is how a client library with batching enabled actually talks
+to a node, and what exercises Nethermind's `JsonRpc.MaxBatchSize`:
+
+```yaml
+rps: 500
+batch_size: 10      # 500 requests a second, carried by 50 round trips
+vus: 20
+```
+
+`rps` stays a rate of *requests*, so batches go out at `rps/batch_size` and two
+runs at different batch sizes offer the node the same work. `--batch-size`
+overrides the config, which is the quick way to sweep it.
+
+What the numbers mean changes:
+
+- **Each request's latency is its batch's latency**, because every caller in a
+  batch waited the whole round trip for its answer. That is the latency they
+  saw, but it means comparing methods against each other *within* a batched run
+  is not meaningful — they share a duration.
+- **`bench_iteration_duration_*` is the per-batch latency**, recorded once per
+  round trip, while `bench_http_req_duration_*` records it once per request.
+  `bench_iterations_total` counts round trips and `bench_http_reqs_total` counts
+  calls.
+- **A batch can fail in part.** Each member is matched to its own response by
+  id and classified on its own, so a batch of ten with three reverts reports
+  three `rpc_error`s. A node refusing the batch outright — which is what
+  exceeding a batch limit looks like — answers with one error object instead of
+  an array, and that failure is attributed to every call it carried.
+
+#### Errors
+
+A JSON-RPC error arrives as HTTP 200, so every response is classified into one
+of `ok`, `rpc_null`, `rpc_error`, `http_error`, `truncated`, `timeout` or
+`transport`. The reported error rate counts JSON-RPC errors, and `rpc_null` — a
+call that succeeded and returned nothing — is counted separately rather than
+folded into `ok`. `--fail-on-threshold` turns a breached `thresholds:` entry
+into a non-zero exit.
+
+### Finding a target's capacity
+
+`benchmark` measures one rate. `find-max-rps` searches for the highest rate one
+endpoint sustains while holding a service level:
+
+```bash
+go run ./runner --output outputs/capacity find-max-rps \
+  --config ./config/benchmark/mixed.yaml \
+  --clients ./config/clients/clients.yaml \
+  --slo-p99 250 --slo-error-rate 0.5 --probe-duration 60s
+```
+
+It doubles the rate until the SLO breaks, then bisects. The config's `rps` and
+`duration` are replaced per probe; everything else — the call mix, the seed,
+`vus` — is used as written.
+
+The result lands in `outputs/capacity/max-rps.json` with every probe, the
+answer, and **what bounded it**:
+
+| `limited_by` | Meaning |
+|---|---|
+| `slo` | The endpoint breached the SLO. `max_rps` is its capacity, bracketed below `lowest_failing_rps`. |
+| `search_ceiling` | `--max-rps` was reached without a breach, so `max_rps` is a floor rather than a limit. |
+| `generator` | **Inconclusive.** The generator could not offer the next rate, so the result is a property of the load generator, not the endpoint. Raise `vus` and search again. |
+
+That last row is the reason this is trustworthy. At a rate the generator cannot
+offer, latency looks terrible for reasons that have nothing to do with the node,
+and a search reading only latency would report the generator's ceiling as the
+node's capacity. Each probe checks delivery first and refuses to draw a
+conclusion it cannot support. `--fail-on-generator-limit` turns that into a
+non-zero exit for CI.
 
 ### Historic Tracking & Analysis
 
@@ -424,20 +666,18 @@ clear error. The mapping is:
 Additional behaviour changes worth noting:
 
 - `--prometheus` is now optional and disabled by default. Omit it to run
-  without remote-write (metrics are read from k6's `summary.json`); pass an
-  endpoint to opt into Prometheus.
+  without publishing time series; pass an endpoint to opt into Prometheus.
 - The benchmark `report.html` is opt-in via `--html-report`. JSON and CSV
   exports remain on by default.
 - The legacy `endpoints + frequency` YAML schema is no longer accepted.
   Configs using it must be migrated by hand to the `calls:` schema (see
   `config/benchmark/mixed.yaml` for the canonical shape). No migrator is
   provided.
-- The `jsonrpc-benchmark.json` Grafana dashboard has been removed. Its
-  Prometheus queries (`method_calls_*`, `rpc_errors_*`, `rpc_calls_*`)
-  reference custom counters from the pre-refactor k6 template that are
-  no longer emitted. The other three dashboards
-  (`k6-dashboard.json`, `jsonrpc-benchmark-enhanced.json`,
-  `baseline-comparison.json`) remain in place.
+- The Prometheus series are now named `bench_*` rather than `k6_*`, and the
+  dashboard that reads them is `benchmark-dashboard.json`. The previous one is
+  kept at `metrics/dashboards/archive/k6-dashboard.json`.
+  [metrics/METRICS.md](metrics/METRICS.md) maps every old name to its
+  replacement.
 
 **Available API endpoints:**
 
@@ -501,7 +741,6 @@ For advanced time-series analysis and alerting, you can use Grafana:
 
 4. **Provisioned dashboards** from `metrics/dashboards/`
 
-   - K6 Performance
    - Client performance comparison
    - Method-specific latency trends
    - Error rate monitoring
@@ -510,13 +749,29 @@ For advanced time-series analysis and alerting, you can use Grafana:
 
 5. **Set up alerting** for performance regressions and system issues
 
-#### Scraping node-side metrics
+#### Reading the node's own metrics
 
-When Prometheus is enabled, this tool only ships k6 client-side metrics
-(`k6_http_req_*`) to it. It does **not** scrape the Geth/Nethermind/etc.
-clients under test — bring
-your own observability for server-side metrics. To add them, point your own
-Prometheus at the node's metrics endpoint (each EL client publishes one):
+Give a client a `metrics_url` and the runner reads that endpoint during the run,
+reporting what the node said about itself beside the latency it produced:
+
+```yaml
+clients:
+  - name: nethermind
+    url: http://127.0.0.1:8545
+    metrics_url: http://127.0.0.1:9091/metrics
+```
+
+Counters are reported as their change over the run, gauges as their range, and
+the selected families are republished to Prometheus as `bench_target_*` so both
+sides sit on one timeline. Choose the families with `--target-metric`
+(repeatable, trailing `*` matches by prefix); the default set is generic process
+and runtime families, so client-specific ones need naming:
+`--target-metric "nethermind_*"`.
+
+This is a point-in-time read taken by the benchmark, not a substitute for
+scraping your nodes continuously. For that, bring
+your own Prometheus and point it at the node's metrics endpoint (each EL client
+publishes one):
 
 ```yaml
 # prometheus.yml — example for a local Geth instance
@@ -528,8 +783,8 @@ scrape_configs:
 ```
 
 If you compose your own Prometheus alongside this stack, add the scrape
-job to that config; the bundled `metrics/prometheus.yml` only handles k6's
-remote-write target.
+job to that config; the bundled `metrics/prometheus.yml` only handles the
+runner's remote-write target.
 
 ### Storage Configuration
 
@@ -564,14 +819,12 @@ postgresql:
   username: "postgres"
   password: "postgres"
   ssl_mode: "disable"
-  
-  grafana:
-    metrics_table: "benchmark_metrics"
-    runs_table: "benchmark_runs"
-    retention_policy:
-      metrics_retention: "30d"
-      aggregated_retention: "90d"
+  max_connections: 25
+  max_idle_connections: 5
 ```
+
+The storage config is decoded strictly: an unrecognised key is an error rather
+than a setting that silently does nothing.
 
 ```yaml
 # config/storage/storage-docker.yaml (for Docker environment)

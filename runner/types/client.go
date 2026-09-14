@@ -6,14 +6,20 @@ import (
 
 // ClientConfig represents a client configuration with all necessary settings
 type ClientConfig struct {
-	Name       string            `yaml:"name" json:"name"`
-	Type       string            `yaml:"type,omitempty" json:"type,omitempty"`
-	URL        string            `yaml:"url" json:"url"`
-	Headers    map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
-	Timeout    string            `yaml:"timeout,omitempty" json:"timeout,omitempty"`
-	MaxRetries int               `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`
-	RateLimit  *RateLimitConfig  `yaml:"rate_limit,omitempty" json:"rate_limit,omitempty"`
-	Auth       *AuthConfig       `yaml:"auth,omitempty" json:"auth,omitempty"`
+	Name    string            `yaml:"name" json:"name"`
+	Type    string            `yaml:"type,omitempty" json:"type,omitempty"`
+	URL     string            `yaml:"url" json:"url"`
+	Headers map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
+	Timeout string            `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+
+	// MetricsURL is the node's own Prometheus endpoint, read during a run so
+	// its resource use can be reported beside the latency it produced. Geth
+	// publishes /debug/metrics/prometheus; Nethermind publishes /metrics on its
+	// own metrics port.
+	MetricsURL string           `yaml:"metrics_url,omitempty" json:"metrics_url,omitempty"`
+	MaxRetries int              `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`
+	RateLimit  *RateLimitConfig `yaml:"rate_limit,omitempty" json:"rate_limit,omitempty"`
+	Auth       *AuthConfig      `yaml:"auth,omitempty" json:"auth,omitempty"`
 }
 
 func (c *ClientConfig) GetBasicAuthURL() string {

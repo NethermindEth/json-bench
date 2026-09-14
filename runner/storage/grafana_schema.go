@@ -21,8 +21,14 @@ CREATE TABLE IF NOT EXISTS benchmark_runs (
     tags JSONB,
     is_baseline BOOLEAN DEFAULT FALSE,
     baseline_name VARCHAR(255),
+    error_rate_semantics VARCHAR(64),
     metadata JSONB
 );`
+
+// AddErrorRateSemantics backfills the column on databases created before runs
+// recorded what their error rate counted.
+const AddErrorRateSemantics = `
+ALTER TABLE benchmark_runs ADD COLUMN IF NOT EXISTS error_rate_semantics VARCHAR(64);`
 
 const GrafanaMetricsTable = `
 CREATE TABLE IF NOT EXISTS benchmark_metrics (

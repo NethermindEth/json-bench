@@ -78,4 +78,3 @@ func TestValidateSeverity(t *testing.T) {
 		})
 	}
 }
-

@@ -13,14 +13,17 @@ type RPCCall struct {
 
 // Call represents a JSON-RPC method call to benchmark
 type Call struct {
-	Name       string        `yaml:"name"` // Custom name for this call or calls collection
-	Method     string        `yaml:"method"`
-	Params     []interface{} `yaml:"params"`
-	Weight     int           `yaml:"weight"`
-	Calls      []RPCCall     `yaml:"calls,omitempty"`
-	File       string        `yaml:"file,omitempty"`       // Optional: file containing RPC calls
-	FileType   string        `yaml:"file_type,omitempty"`  // Type of file: "json" or "jsonl"
-	Thresholds []string      `yaml:"thresholds,omitempty"` // Optional: request duration thresholds for this endpoint in the format of "p(95) < X". See https://k6.io/docs/using-k6/thresholds/
+	Name     string        `yaml:"name"` // Custom name for this call or calls collection
+	Method   string        `yaml:"method"`
+	Params   []interface{} `yaml:"params"`
+	Weight   int           `yaml:"weight"`
+	Calls    []RPCCall     `yaml:"calls,omitempty"`
+	File     string        `yaml:"file,omitempty"`      // Optional: file containing RPC calls
+	FileType string        `yaml:"file_type,omitempty"` // Type of file: "json" or "jsonl"
+	// Thresholds are pass/fail conditions on this call's latency, written as
+	// "p(99)<600" in milliseconds. Supported statistics: p(50|75|90|95|99|99.9),
+	// avg, min, max, med, count, and rate for the error ratio.
+	Thresholds []string `yaml:"thresholds,omitempty"`
 }
 
 // LoadFile loads calls from a file

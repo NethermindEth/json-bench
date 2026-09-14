@@ -9,7 +9,6 @@ Before burning a long run, over SSH check that the node is fit to measure:
 - RPC responds locally (`curl` an `eth_blockNumber` against the node's local RPC).
 - The node is synced and its head is fresh (compare `eth_getBlockByNumber("latest")` timestamp to now).
 - Enough free disk for run artifacts (a few GB).
-- `k6` is available on the host, or plan to ship a static binary.
 
 ## 2. Build and deploy
 

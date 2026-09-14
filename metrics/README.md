@@ -123,6 +123,21 @@ datasources:
 
 ## Dashboards
 
+Two of these read Prometheus, two read PostgreSQL. Which one a panel uses
+decides what it can show and when it has data.
+
+| Dashboard | Source | Purpose |
+|---|---|---|
+| `benchmark-dashboard.json` | Prometheus (`bench_*`) | Live view of a run: latency, outcomes, JSON-RPC errors, load delivery. |
+| `archive/k6-dashboard.json` | Prometheus (`k6_*`) | The k6-era dashboard, kept for reference. Nothing writes `k6_*` any more, so its panels render empty. Provisioned into an "archive" folder. |
+| `jsonrpc-benchmark-enhanced.json` | Runner API over PostgreSQL | Historic runs across time. Needs `--historic`. |
+| `baseline-comparison.json` | PostgreSQL | Current runs against a stored baseline. |
+
+**[METRICS.md](METRICS.md) is the reference for every `bench_*` series**: its
+labels, its units, what it means, and how each old `k6_*` name maps onto it.
+Read it before writing a panel — the trend families are cumulative from the
+start of a run, which is not what a Prometheus user assumes.
+
 ### Main Dashboard (jsonrpc-benchmark-enhanced.json)
 
 - **Overall Latency Metrics**: Average, P95, P99 latency trends
@@ -246,6 +261,61 @@ SELECT cleanup_old_data(90); -- Keep 90 days of data
 - Grafana health endpoint: `http://localhost:3000/api/health`
 - PostgreSQL connection monitoring
 - Alert delivery verification
+
+## Known issues
+
+These are defects found while replacing the load engine, in parts of the stack
+that work was deliberately not touching. They are recorded here so they are
+found by whoever picks them up rather than rediscovered.
+
+Runs now record what their error rate counted, and both comparison paths check
+it: `CompareRuns` returns a refusal instead of regressions, and
+`CompareToBaseline` returns an error. A run that recorded nothing is reported as
+unverified rather than refused, since an absent value is not proof of a
+mismatch. The remaining gap is that `CompareToSequential` and
+`CompareToRollingAverage` aggregate several runs and do not yet check that the
+window is internally consistent.
+
+- **The simplejson datasource points at the wrong port.** `datasource.yml` sets
+  `http://runner:8080/api/grafana` while the runner's API binds `:8081`, so the
+  targets in `jsonrpc-benchmark-enhanced.json` cannot resolve as provisioned.
+
+- **The provisioned alert rules cannot fire.** They query bare targets such as
+  `avg_latency`, but the API's `parseMetricTarget` requires at least three
+  dot-separated segments (`test_name.client.metric`) and returns nil for
+  anything shorter. All four rules are affected.
+
+- **`full_results` is computed on every run and never stored.** `SaveRun`
+  marshals the whole result into the field, but `InsertRun`'s column list omits
+  it and `GetRun`'s `SELECT` does not read it back. So `CompareRuns` always
+  finds it empty and falls through to the aggregate summary, which means
+  `diffClientMetrics` — the per-client, per-method regression diff — never runs
+  against stored data. The same drift affects `metadata`. Adding both to the
+  INSERT and SELECT would switch that path on; it is left alone here because
+  turning it on changes what the API reports.
+
+- **`GetRun` fabricates p99 and max latency.** They are not stored, so it sets
+  both to the p95 it does have, with a comment saying so. A regression detector
+  comparing "p99" is therefore comparing p95, and `TotalErrors` is re-derived
+  from the success rate rather than read. Any threshold written against p99 in
+  the historic path is not measuring p99.
+
+- **The p99 integration test asserts a shape the schema forbids.** It inserted a
+  NULL `value` into `benchmark_metrics`, which declares the column NOT NULL, so
+  the subtest could only ever fail. It had never run: the suite skips without
+  `BENCH_TEST_POSTGRES_DSN`, which nothing set. The case is now written the way
+  the table actually represents an unmeasured metric — an absent row, which the
+  query's aggregate turns into a SQL NULL — and asserts the thing worth
+  asserting, that an unrecorded p99 does not read back as a real zero. The test
+  still exercises an inline copy of the query rather than the API's own
+  `handleGetRunMethods`, so it does not protect the shipped handler.
+
+- **The dashboard UI still reads `environment.k6Version`.** That field is gone
+  from the Go type; the engine and its version are now recorded in the run
+  manifest (`manifest.json`, and `manifest` in `results.json`) alongside the
+  error-rate semantics. The UI needs a one-line change to read
+  `manifest.engine_version` instead. It renders blank until then, which it
+  already did — the old JSON tag was `k6_version` and never matched.
 
 ## Troubleshooting
 

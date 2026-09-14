@@ -6,6 +6,7 @@ clients:
   - nethermind
 duration: "5m"
 rps: 200
+vus: 100
 calls:
   - name: "eth_call"
     method: "eth_call"
@@ -25,4 +26,4 @@ calls:
     params:
       - "latest"
       - true
-    frequency: 10%
+    weight: 10

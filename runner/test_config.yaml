@@ -16,24 +16,6 @@ storage_config_template: |
     ssl_mode: "disable"
     max_connections: 25
     max_idle_connections: 5
-    connection_max_lifetime: "30m"
-    connection_timeout: "10s"
-    schema: "public"
-    
-    grafana:
-      metrics_table: "benchmark_metrics"
-      runs_table: "benchmark_runs"
-      enable_timescaledb: false
-      chunk_interval: "24h"
-      enable_compression: false
-      compression_after: "7d"
-      
-      retention_policy:
-        metrics_retention: "30d"
-        aggregated_retention: "90d"
-        raw_data_retention: "7d"
-        enable_auto_vacuum: true
-        vacuum_interval: "24h"
 
 # Test Scenarios Configuration
 test_scenarios:

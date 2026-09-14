@@ -143,7 +143,8 @@ def main():
         for s in scenarios:
             f.write(json.dumps(s) + "\n")
 
-    # json-bench benchmark config: one named call per scenario (per-name k6 metrics).
+    # json-bench benchmark config: one named call per scenario, which is what the
+    # per-name metric breakdown keys on.
     with open(os.path.join(OUT_DIR, "ethcallchaos-percategory.yaml"), "w") as f:
         f.write('test_name: "EthCallChaos per-category regression set"\n')
         f.write("clients:\n  - nethermind\n")

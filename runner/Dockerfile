@@ -1,54 +1,31 @@
-# Multi-stage build for Go runner
 FROM golang:1.25.14-alpine AS builder
 
-# Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app
 
-# Copy go mod files
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
 COPY runner/ ./runner/
 
-# Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner
 
-# Final stage - minimal runtime image with k6 (base is alpine)
-FROM grafana/k6:2.1.0
+FROM alpine:3.22
 
-# Use root user for dependencies installation
-USER root
-
-# Refresh base image packages so the pinned grafana/k6:2.1.0 picks up patched
-# libcrypto3/libssl3 from Alpine's update channel. The explicit minimums are not
-# redundant: CI builds with `cache-from: type=gha`, and `--no-cache` only
-# disables apk's index cache, not Docker's layer cache — so a bare `apk upgrade`
-# layer is replayed from cache indefinitely and silently keeps shipping whatever
-# was current when it was first built. Naming the versions changes the layer, so
-# the upgrade re-runs, and fails the build if the patched package is gone rather
-# than publishing a vulnerable image.
 RUN apk --no-cache upgrade && \
-    apk --no-cache add ca-certificates tzdata curl postgresql-client \
-        'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0'
+    apk --no-cache add ca-certificates tzdata curl postgresql-client
 
 WORKDIR /app
 
-# Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
-# Copy binary from builder
 COPY --from=builder /app/jsonrpc-bench-runner /app/jsonrpc-bench-runner
 
-# Create necessary directories and set permissions
 RUN mkdir -p /app/results /app/historic && \
     chown -R appuser:appgroup /app
 
-# Switch to non-root user
 USER appuser
 
-# Default entrypoint
 ENTRYPOINT ["/app/jsonrpc-bench-runner"]

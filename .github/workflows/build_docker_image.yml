@@ -72,7 +72,6 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
-          trivyignores: .trivyignore.yaml
 
       - name: Push image to GHCR
         id: push
