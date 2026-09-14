@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -232,4 +233,79 @@ func TestCompareRunsLeavesTinySamplesUnjudged(t *testing.T) {
 	assert.False(t, diff.Calls[0].Significant)
 	assert.Zero(t, diff.Calls[0].PValue)
 	assert.NotZero(t, diff.Calls[0].MedianShiftPercent, "the shift is still reported")
+}
+
+// Without a client filter the per-call figures pool every target's samples,
+// which is a blend of two things rather than a measurement of either.
+func TestCompareRunsWarnsWhenSeveralTargetsArePooled(t *testing.T) {
+	twoClients := func(seed int64) string {
+		samples := drawSamples(t, "call", 60, 10*time.Millisecond, seed)
+		for i := range samples {
+			if i%2 == 1 {
+				samples[i].Client = "second"
+			}
+		}
+		return writeRun(t, manifest(), samples)
+	}
+
+	baseline, err := LoadRun(twoClients(1))
+	require.NoError(t, err)
+	current, err := LoadRun(twoClients(2))
+	require.NoError(t, err)
+
+	pooled := CompareRuns(baseline, current, ReportOptions{})
+	require.True(t, pooled.Comparable)
+	joined := strings.Join(pooled.Warnings, "\n")
+	assert.Contains(t, joined, "pools them")
+
+	filtered := CompareRuns(baseline, current, ReportOptions{Client: "c"})
+	assert.NotContains(t, strings.Join(filtered.Warnings, "\n"), "pools them",
+		"naming a client resolves it, so there is nothing to warn about")
+}
+
+// A run that was killed, OOMed or filled the disk leaves a sample stream that
+// stops mid-record. Every record before that point is still good, and a run
+// that died is usually the one worth reading.
+func TestLoadRunRecoversATruncatedSampleStream(t *testing.T) {
+	dir := writeRun(t, manifest(), drawSamples(t, "call", 400, 10*time.Millisecond, 1))
+	path := filepath.Join(dir, SampleFilename)
+
+	whole, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, whole[:len(whole)*9/10], 0o600))
+
+	run, err := LoadRun(dir)
+	require.NoError(t, err, "a truncated tail must not cost the whole run")
+	assert.True(t, run.Truncated, "and the report has to say so")
+	assert.NotEmpty(t, run.Samples)
+	assert.Less(t, len(run.Samples), 400)
+
+	assert.EqualValues(t, len(run.Samples), run.Totals(ReportOptions{}).Count)
+}
+
+// A stream with no complete record at all is a different thing: there is
+// nothing to report, so it stays an error.
+func TestLoadRunStillFailsWhenNothingIsReadable(t *testing.T) {
+	dir := writeRun(t, manifest(), drawSamples(t, "call", 5, time.Millisecond, 1))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, SampleFilename), []byte("not gzip"), 0o600))
+
+	_, err := LoadRun(dir)
+	require.Error(t, err)
+}
+
+func TestCompareRunsWarnsAboutATruncatedRun(t *testing.T) {
+	good := writeRun(t, manifest(), drawSamples(t, "call", 100, 10*time.Millisecond, 1))
+	cut := writeRun(t, manifest(), drawSamples(t, "call", 400, 10*time.Millisecond, 2))
+	path := filepath.Join(cut, SampleFilename)
+	whole, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, whole[:len(whole)*9/10], 0o600))
+
+	baseline, err := LoadRun(good)
+	require.NoError(t, err)
+	current, err := LoadRun(cut)
+	require.NoError(t, err)
+
+	diff := CompareRuns(baseline, current, ReportOptions{})
+	assert.Contains(t, strings.Join(diff.Warnings, "\n"), "ends mid-record")
 }

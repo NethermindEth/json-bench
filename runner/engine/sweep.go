@@ -145,6 +145,13 @@ func Sweep(ctx context.Context, cfg *config.Config, opts Options, sweep SweepOpt
 	if len(sweep.Values) < 2 {
 		return nil, fmt.Errorf("a sweep needs at least two values to compare")
 	}
+	// The result table is keyed by setting and carries one figure per point, so
+	// several targets would be reduced to whichever the summary happened to
+	// read. A sweep asks what a setting does to one target; comparing targets is
+	// what a plain benchmark run with several clients is for.
+	if len(cfg.ResolvedClients) != 1 {
+		return nil, fmt.Errorf("a sweep measures one target at a time; %d are configured", len(cfg.ResolvedClients))
+	}
 	if sweep.Repeat <= 0 {
 		sweep.Repeat = 1
 	}
@@ -348,9 +355,15 @@ func summarisePass(pass int, dir string, result *types.BenchmarkResult, client s
 	return out
 }
 
+// pickClient reads the swept target's metrics. The sweep admits exactly one
+// target, so the fallback resolves the single entry rather than an arbitrary
+// one when the configured name and the reported name differ.
 func pickClient(result *types.BenchmarkResult, client string) *types.ClientMetrics {
 	if metrics, ok := result.ClientMetrics[client]; ok {
 		return metrics
+	}
+	if len(result.ClientMetrics) != 1 {
+		return nil
 	}
 	for _, metrics := range result.ClientMetrics {
 		return metrics

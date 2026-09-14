@@ -82,6 +82,11 @@ func reportSingle(dir string) error {
 		})
 	}
 
+	if run.Truncated {
+		logger.Warnf("%s ends mid-record, so this covers only the %d requests that were written "+
+			"before the run stopped", engine.SampleFilename, len(run.Samples))
+	}
+
 	m := run.Manifest
 	fmt.Printf("%s — %s\n", m.TestName, dir)
 	fmt.Printf("  engine %s v%s, seed %d, %s policy, %d rps target, %d concurrent, %s\n",

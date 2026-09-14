@@ -67,3 +67,24 @@ func TestClientWideDistributionMatchesTheKeyedGroups(t *testing.T) {
 	assert.Greater(t, cm.Latency.Max, 40.0, "the slow call's observations are in the client distribution")
 	assert.Less(t, cm.Latency.Min, 2.0, "so are the fast call's")
 }
+
+// ClientMetrics is asked for a client that recorded nothing, which is what a
+// target that never answered looks like.
+func TestClientMetricsForATargetWithNoSamples(t *testing.T) {
+	acc := NewAccumulator()
+	cm := acc.ClientMetrics("never-ran", Delivery{Scheduled: 10})
+	assert.NotNil(t, cm)
+	assert.Zero(t, cm.TotalRequests)
+	assert.Empty(t, cm.Calls)
+	assert.Zero(t, cm.Latency.Count)
+}
+
+// The concatenated client distribution must survive a client whose keyed
+// groups exist but hold no values for a phase.
+func TestPhaseValuesWithNoObservations(t *testing.T) {
+	acc := NewAccumulator()
+	acc.Add(Sample{Client: "c", Name: "n", Method: "m", Status: 200, Outcome: OutcomeOK})
+	cm := acc.ClientMetrics("c", Delivery{})
+	assert.EqualValues(t, 1, cm.Latency.Count)
+	assert.Zero(t, cm.ConnectionMetrics.TLSHandshakeTime, "no TLS observed means zero, not a panic")
+}

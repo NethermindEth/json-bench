@@ -93,12 +93,14 @@ func (m *mux) register(ids []string) (*pending, error) {
 	if m.closed {
 		return nil, m.closedErr()
 	}
-	for _, id := range ids {
+	for i, id := range ids {
 		if _, taken := m.waiting[id]; taken {
 			// Two in-flight requests sharing an id cannot both be answered, and
 			// silently matching one to the other's response would fabricate a
-			// measurement.
-			m.releaseLocked(ids)
+			// measurement. Only the ids claimed above are released: the one that
+			// collided belongs to the other request, and dropping it here would
+			// orphan that request into a timeout it never had.
+			m.releaseLocked(ids[:i])
 			return nil, fmt.Errorf("JSON-RPC id %s is already in flight on this connection", id)
 		}
 		m.waiting[id] = p

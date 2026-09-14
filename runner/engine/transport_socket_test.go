@@ -262,3 +262,28 @@ func TestRPCErrorsAreClassifiedOverSockets(t *testing.T) {
 		})
 	}
 }
+
+// A rejected registration must not disturb the request it collided with.
+func TestRejectedRegistrationLeavesTheVictimIntact(t *testing.T) {
+	m := newMux()
+
+	victim, err := m.register([]string{"1"})
+	require.NoError(t, err)
+
+	// A batch whose second member collides with the in-flight id above.
+	_, err = m.register([]string{"2", "1"})
+	require.Error(t, err, "the colliding batch must be refused")
+
+	// The victim is still in flight and must still receive its answer.
+	m.dispatch([]byte(`{"jsonrpc":"2.0","id":1,"result":"mine"}`))
+	select {
+	case frame := <-victim.done:
+		assert.Contains(t, string(frame), "mine")
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("the in-flight request was orphaned by the rejected one and will now time out")
+	}
+
+	// And the refused request's own id must not have been left claimed.
+	_, err = m.register([]string{"2"})
+	assert.NoError(t, err, "id 2 was never successfully claimed, so it must be free")
+}

@@ -202,3 +202,20 @@ func TestSweepDimensionApplyClearsConflictingLoadShape(t *testing.T) {
 	_, err = SweepBatchSize.apply(&config.Config{}, "-1")
 	assert.Error(t, err)
 }
+
+// The result table carries one figure per setting, so several targets would be
+// reduced to whichever the summary happened to read.
+func TestSweepRefusesSeveralTargets(t *testing.T) {
+	cfg := sweepConfig("http://127.0.0.1:1")
+	cfg.ResolvedClients = append(cfg.ResolvedClients, &types.ClientConfig{
+		Name: "second", URL: "http://127.0.0.1:2",
+	})
+
+	_, err := Sweep(context.Background(), cfg, testOptions(t), SweepOptions{
+		Dimension: SweepRPS,
+		Values:    []string{"100", "200"},
+		OutputDir: t.TempDir(),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "one target at a time")
+}

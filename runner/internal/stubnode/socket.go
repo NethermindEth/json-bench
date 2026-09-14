@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -135,10 +134,14 @@ func (s *Stub) ServeWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer socket.Close()
 
-	ctx := r.Context()
+	// Cancelled when the read loop ends, so an answer still sleeping out a
+	// latency or a hang fault is released instead of holding teardown open for
+	// as long as that fault lasts.
+	ctx, cancel := context.WithCancel(r.Context())
 	var writeMu sync.Mutex
 	var inFlight sync.WaitGroup
 	defer inFlight.Wait()
+	defer cancel()
 
 	for {
 		_, frame, err := socket.ReadMessage()
@@ -190,18 +193,16 @@ func (s *Stub) acceptIPC(listener net.Listener) {
 func (s *Stub) serveIPCConn(socket net.Conn) {
 	defer socket.Close()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	dec := json.NewDecoder(socket)
 	var writeMu sync.Mutex
 	var inFlight sync.WaitGroup
 	defer inFlight.Wait()
+	defer cancel()
 
 	for {
 		var raw json.RawMessage
 		if err := dec.Decode(&raw); err != nil {
-			if err != io.EOF {
-				return
-			}
 			return
 		}
 		inFlight.Add(1)

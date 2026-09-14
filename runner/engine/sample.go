@@ -3,6 +3,7 @@ package engine
 import (
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -207,8 +208,16 @@ func (w *SampleWriter) Path() string {
 	return w.path
 }
 
+// ErrTruncatedSamples reports that a sample stream ended mid-record. A run that
+// was killed, ran out of disk or was OOMed leaves one, and the records written
+// before that point are still good — which matters, because a run that died is
+// usually the one worth looking at.
+var ErrTruncatedSamples = errors.New("the sample stream ends mid-record")
+
 // ReadSamples decodes a sample file back into records, which is what offline
-// re-aggregation and the A/B comparison read.
+// re-aggregation and the A/B comparison read. A truncated tail returns the
+// records that were complete alongside ErrTruncatedSamples, so the caller can
+// decide whether a partial run is worth reading.
 func ReadSamples(r io.Reader) ([]Sample, error) {
 	gz, err := gzip.NewReader(r)
 	if err != nil {
@@ -223,6 +232,9 @@ func ReadSamples(r io.Reader) ([]Sample, error) {
 		if err := dec.Decode(&rec); err != nil {
 			if err == io.EOF {
 				break
+			}
+			if len(out) > 0 {
+				return out, fmt.Errorf("%w after %d records: %v", ErrTruncatedSamples, len(out), err)
 			}
 			return nil, fmt.Errorf("failed to decode sample: %w", err)
 		}

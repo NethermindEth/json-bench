@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,10 @@ type StoredRun struct {
 	Dir      string
 	Manifest types.RunManifest
 	Samples  []Sample
+
+	// Truncated reports that the run's sample stream ended mid-record, so what
+	// follows describes only the part that was written.
+	Truncated bool
 }
 
 // LoadRun reads a run's manifest and samples from an output directory. Retaining
@@ -42,7 +47,12 @@ func LoadRun(dir string) (*StoredRun, error) {
 
 	run.Samples, err = ReadSamples(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s: %w", samplesPath, err)
+		// A stream that stops mid-record still holds every complete record
+		// before it, and a run that died is usually the one worth reading.
+		if !errors.Is(err, ErrTruncatedSamples) {
+			return nil, fmt.Errorf("failed to read %s: %w", samplesPath, err)
+		}
+		run.Truncated = true
 	}
 	if len(run.Samples) == 0 {
 		return nil, fmt.Errorf("%s contains no samples", samplesPath)

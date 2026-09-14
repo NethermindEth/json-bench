@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -77,6 +78,25 @@ func CompareRuns(baseline, current *StoredRun, opts ReportOptions) *RunDiff {
 		return diff
 	}
 	diff.Warnings = comparisonWarnings(baseline, current)
+	for _, run := range []*StoredRun{baseline, current} {
+		if run.Truncated {
+			diff.Warnings = append(diff.Warnings, fmt.Sprintf(
+				"%s ends mid-record and covers only the %d requests written before it stopped",
+				run.Dir, len(run.Samples)))
+		}
+	}
+	if opts.Client == "" {
+		// Without a client filter the per-call figures pool every target's
+		// samples into one distribution, which is a blend of two things rather
+		// than a measurement of either.
+		for _, run := range []*StoredRun{baseline, current} {
+			if names := run.Clients(); len(names) > 1 {
+				diff.Warnings = append(diff.Warnings, fmt.Sprintf(
+					"%s measured %d targets (%s) and no --client was given, so every figure below "+
+						"pools them", run.Dir, len(names), strings.Join(names, ", ")))
+			}
+		}
+	}
 
 	base := indexCalls(baseline.CallReport(opts))
 	curr := indexCalls(current.CallReport(opts))

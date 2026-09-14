@@ -141,6 +141,11 @@ func LoadSequenceCSV(path string) ([]Request, error) {
 	reader.FieldsPerRecord = sequenceColumns
 
 	var out []Request
+	// A repeated id cannot be matched to its answer on a multiplexed transport,
+	// where every request for a target shares one connection and responses are
+	// paired by id. Rejecting it here costs nothing; discovering it mid-run
+	// costs a request that waits for an answer already handed to someone else.
+	seen := make(map[int]int)
 	for row := 1; ; row++ {
 		record, err := reader.Read()
 		if errors.Is(err, io.EOF) {
@@ -153,6 +158,10 @@ func LoadSequenceCSV(path string) ([]Request, error) {
 		if err != nil {
 			return nil, fmt.Errorf("calls file %s row %d has a non-numeric id %q", path, row, record[columnID])
 		}
+		if first, dup := seen[id]; dup {
+			return nil, fmt.Errorf("calls file %s repeats JSON-RPC id %d on rows %d and %d; ids must be unique so a response can be matched to its request", path, id, first, row)
+		}
+		seen[id] = row
 		if record[columnMethod] == "" {
 			return nil, fmt.Errorf("calls file %s row %d has an empty method", path, row)
 		}
