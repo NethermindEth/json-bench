@@ -1,0 +1,16 @@
+test_name: "Whole-block replay with vmTrace and stateDiff"
+description: "trace_replayBlockTransactions over the head block requesting all three traceTypes. The response runs to roughly 100 MB on a 319-transaction block; in the broad suite this coincided with the Nethermind node going unreachable and a k6 heap exhaustion. Isolated and slow-paced to establish whether the client survives it."
+clients:
+  - nethermind
+  - reth
+duration: "120s"
+rps: 1
+vus: 2
+calls:
+  - name: "trace_replayBlockTransactions (trace vmTrace stateDiff)"
+    method: "trace_replayBlockTransactions"
+    params:
+      - "latest"
+      - ["trace", "vmTrace", "stateDiff"]
+    weight: 1
+    thresholds: ["p(99)<600000"]
