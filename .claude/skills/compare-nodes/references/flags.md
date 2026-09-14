@@ -26,6 +26,26 @@ reference/baseline).
 | `--rules <file>` | YAML file with a `comparison:` block (`rules` + optional `block_override`) merged into either input mode. |
 | `--block-override <hex>` | Rewrite `latest`/`pending` tags to this static block and append a block arg to calls that omit one. Overrides config/`--rules`. |
 | `--skip-above-head` | Skip calls pinned to a numeric block above the lowest client head. |
+| `--strict-response-comparison` | Drop the comparator's implicit normalizations (see below). Off by default. |
+
+### `--strict-response-comparison`
+
+For replaying recorded traffic against two builds of the same client, where any
+byte of difference is a finding. It removes three behaviours that no rule can
+switch off, and changes nothing else — explicit `ignore` and
+`numeric_tolerance` rules, the built-in `eth_estimateGas` tolerance and the
+error classification all behave exactly as they do by default:
+
+| Default | Under `--strict-response-comparison` |
+|---|---|
+| `"0x"` equals any all-zero hex string (`0x0`, `0x00`, `0x00…00`), in `result` and inside `error.data` | They are different values. A client that omits a value and one that returns zero are not giving the same answer |
+| JSON numbers decode as `float64`, so two integers above 2⁵³ that differ can compare equal | Numbers are decoded and compared by their literal digits |
+| `--block-override` adds `fromBlock`/`toBlock` to an `eth_getLogs` filter that carries `blockHash`, turning a single-block query into a range query | A filter carrying `blockHash` is sent unchanged |
+
+The run also records, in `comparison-provenance.json`, `strict_response_comparison`
+and a `wire_transformations` list giving the original and effective params of
+every call the block override rewrote — so the request the answers belong to is
+recorded, not only the one the corpus held. That list is written in both modes.
 
 `comparison:` block schema (in `--config` or `--rules`):
 ```yaml

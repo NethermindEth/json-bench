@@ -37,6 +37,7 @@ var (
 	compareFromJSONL        string
 	compareSample           int
 	compareSampleSeed       int64
+	compareStrictResponse   bool
 )
 
 var compareCmd = &cobra.Command{
@@ -69,6 +70,7 @@ func init() {
 	compareCmd.Flags().StringVar(&compareFromJSONL, "from-jsonl", "", "Build the config from a corpus directory (recurses; reads *.jsonl and *.json arrays) instead of --config")
 	compareCmd.Flags().IntVar(&compareSample, "sample", 0, "With --from-jsonl, sample at most N calls per method (0 = all)")
 	compareCmd.Flags().Int64Var(&compareSampleSeed, "sample-seed", 42, "Deterministic seed for --sample")
+	compareCmd.Flags().BoolVar(&compareStrictResponse, "strict-response-comparison", false, "Drop implicit response normalizations: \"0x\" no longer equals an all-zero hex string, integers above 2^53 compare exactly, and --block-override leaves an eth_getLogs filter that carries blockHash alone. Explicit rules are unaffected")
 
 	_ = compareCmd.MarkFlagRequired("clients")
 	_ = compareCmd.MarkFlagRequired("client-refs")
@@ -146,6 +148,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	cfg.RetryBaseDelayMs = int(compareRetryBaseDelay.Milliseconds())
 	cfg.RateLimitRPS = compareRateLimit
 	cfg.SkipAboveHead = compareSkipAboveHead
+	cfg.StrictResponseComparison = compareStrictResponse
 
 	// Layer the --rules file on top of any rules from --config, then apply the
 	// block-override precedence (rules file over config, flag over everything).
