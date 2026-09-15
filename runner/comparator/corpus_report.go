@@ -35,6 +35,10 @@ type CorpusSampling struct {
 // excluded-only and skipped; entries split into unnamed, excluded and loaded;
 // loaded calls split into selected and dropped by sampling. Each split adds up,
 // which is what makes a missing call detectable rather than merely unlikely.
+//
+// EntriesParsed counts every entry read from a file that parsed, including one
+// that turned out not to be a corpus file at all. Only a file that failed to
+// parse contributes no entries, because there were none to read.
 type CorpusTotals struct {
 	FilesScanned      int `json:"files_scanned"`
 	FilesLoaded       int `json:"files_loaded"`
@@ -74,7 +78,7 @@ type CorpusLoadReportDocument struct {
 	Identity      CorpusIdentitySpec `json:"identity"`
 	Sampling      CorpusSampling     `json:"sampling"`
 	Totals        CorpusTotals       `json:"totals"`
-	Files         []CorpusFileReport `json:"files"`
+	Files         []CorpusFileReport `json:"files"` // every file that parsed
 	SkippedFiles  []CorpusSkip       `json:"skipped_files"`
 	Requests      CorpusRequests     `json:"requests"`
 }

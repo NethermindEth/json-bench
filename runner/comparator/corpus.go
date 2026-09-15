@@ -58,8 +58,11 @@ type CorpusSkip struct {
 	Reason string `json:"reason"`
 }
 
-// CorpusFileReport is the per-file accounting of one corpus file that parsed:
-// how many entries it held and what became of them.
+// CorpusFileReport is the per-file accounting of one file that parsed: how many
+// entries it held and what became of them. A file that parsed but named no
+// method appears here with its entries counted as Unnamed, *and* in Skips with
+// the reason — the two answer different questions, and an entry that was read
+// has to be counted whatever the file turned out to be.
 type CorpusFileReport struct {
 	Path     string `json:"path"`
 	Entries  int    `json:"entries"`
@@ -196,13 +199,17 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 			})
 			used++
 		}
+		// Recorded before the skip branch, and for every file that parsed: a file
+		// whose entries name no method still parsed N entries, and throwing that
+		// count away is what would make entries_parsed disagree with the number
+		// of entries actually read.
+		fileReport.Loaded = used
+		report.PerFile = append(report.PerFile, fileReport)
 		if named == 0 {
 			// Parsed, but nothing in it names a method: not a corpus file.
 			report.Skips = append(report.Skips, CorpusSkip{Path: file, Reason: `no entries with a "method" field`})
 			continue
 		}
-		fileReport.Loaded = used
-		report.PerFile = append(report.PerFile, fileReport)
 		if used == 0 {
 			report.Excluded++
 			continue

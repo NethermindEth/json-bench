@@ -312,6 +312,9 @@ func TestCorpusLoadReportAccountsForEveryFileAndCall(t *testing.T) {
 	if totals.EntriesLoaded != 2 {
 		t.Errorf("entries_loaded = %d, want 2 (eth_call, eth_getCode)", totals.EntriesLoaded)
 	}
+	if totals.EntriesUnnamed != 1 {
+		t.Errorf("entries_unnamed = %d, want 1 (the entry in no-method.json)", totals.EntriesUnnamed)
+	}
 	if totals.EntriesExcluded != 2 {
 		t.Errorf("entries_excluded = %d, want 2 (eth_getProof, debug_traceTransaction)", totals.EntriesExcluded)
 	}
@@ -330,8 +333,14 @@ func TestCorpusLoadReportAccountsForEveryFileAndCall(t *testing.T) {
 	for _, file := range doc.Files {
 		byPath[filepath.Base(file.Path)] = file
 	}
-	if len(byPath) != 3 {
-		t.Fatalf("expected 3 parsed files in the report, got %d: %+v", len(byPath), doc.Files)
+	// Four of the five parsed: only filter-queries.json failed to parse at all.
+	// no-method.json is here with its entries counted as unnamed, and also in
+	// skipped_files — the two answer different questions.
+	if len(byPath) != 4 {
+		t.Fatalf("expected 4 parsed files in the report, got %d: %+v", len(byPath), doc.Files)
+	}
+	if nm := byPath["no-method.json"]; nm.Entries != 1 || nm.Unnamed != 1 || nm.Loaded != 0 {
+		t.Errorf("no-method.json = %+v, want 1 entry / 1 unnamed / 0 loaded", nm)
 	}
 	if good := byPath["good.jsonl"]; good.Entries != 2 || good.Loaded != 1 || good.Excluded != 1 {
 		t.Errorf("good.jsonl = %+v, want 2 entries / 1 loaded / 1 excluded", good)
@@ -548,5 +557,57 @@ func TestCorpusLoadRejectsTrailingData(t *testing.T) {
 	}
 	if len(report.Skips) != 1 || filepath.Base(report.Skips[0].Path) != "trailing.json" {
 		t.Fatalf("expected trailing.json to be skipped, got %+v", report.Skips)
+	}
+}
+
+// The report's whole value is that its numbers reconcile, so the invariant it
+// documents is asserted directly rather than inferred from a fixture's counts.
+// The corpus below is deliberately awkward: a good file, a file of entries that
+// name no method, a file of only excluded methods, one that does not parse, and
+// sampling dropping calls from the good one.
+func TestCorpusLoadReportTotalsAddUp(t *testing.T) {
+	lines := ""
+	for i := 0; i < 6; i++ {
+		lines += `{"method":"eth_getBalance","params":["0xabc","0x` + string(rune('0'+i)) + `"]}` + "\n"
+	}
+	dir := writeCorpus(t, map[string]string{
+		"good.jsonl":      lines,
+		"no-method.json":  `[{"fromBlock":"0x1"},{"fromBlock":"0x2"},{"fromBlock":"0x3"}]`,
+		"excluded.jsonl":  `{"method":"eth_getProof","params":[]}` + "\n" + `{"method":"debug_traceCall","params":[]}` + "\n",
+		"unparsable.json": `[[{"fromBlock":0}]]`,
+	})
+
+	_, report, err := LoadCorpusConfig(dir, 2, 42, "")
+	if err != nil {
+		t.Fatalf("LoadCorpusConfig: %v", err)
+	}
+	totals := NewCorpusLoadReportDocument(dir, report).Totals
+
+	if got := totals.FilesLoaded + totals.FilesExcludedOnly + totals.FilesSkipped; got != totals.FilesScanned {
+		t.Errorf("files: %d loaded + %d excluded-only + %d skipped = %d, want files_scanned %d",
+			totals.FilesLoaded, totals.FilesExcludedOnly, totals.FilesSkipped, got, totals.FilesScanned)
+	}
+	if got := totals.EntriesUnnamed + totals.EntriesExcluded + totals.EntriesLoaded; got != totals.EntriesParsed {
+		t.Errorf("entries: %d unnamed + %d excluded + %d loaded = %d, want entries_parsed %d",
+			totals.EntriesUnnamed, totals.EntriesExcluded, totals.EntriesLoaded, got, totals.EntriesParsed)
+	}
+	if got := totals.CallsSelected + totals.CallsSampleDropped; got != totals.EntriesLoaded {
+		t.Errorf("calls: %d selected + %d sample-dropped = %d, want entries_loaded %d",
+			totals.CallsSelected, totals.CallsSampleDropped, got, totals.EntriesLoaded)
+	}
+
+	// And the fixture really does exercise every bucket, or the sums above
+	// would be a tautology over zeroes.
+	for name, got := range map[string]int{
+		"files_scanned":        totals.FilesScanned,
+		"files_skipped":        totals.FilesSkipped,
+		"files_excluded_only":  totals.FilesExcludedOnly,
+		"entries_unnamed":      totals.EntriesUnnamed,
+		"entries_excluded":     totals.EntriesExcluded,
+		"calls_sample_dropped": totals.CallsSampleDropped,
+	} {
+		if got == 0 {
+			t.Errorf("%s is 0: the fixture does not exercise that bucket", name)
+		}
 	}
 }
