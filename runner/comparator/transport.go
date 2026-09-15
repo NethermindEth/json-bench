@@ -66,6 +66,9 @@ type rpcTransport struct {
 	attempts  int
 	baseDelay time.Duration
 	verbose   bool
+	// exactNumbers decodes JSON numbers as json.Number instead of float64.
+	// Set from ComparisonConfig.StrictResponseComparison.
+	exactNumbers bool
 }
 
 // newRPCTransport builds the transport for one client. The rate limit is taken
@@ -79,9 +82,10 @@ func newRPCTransport(cfg *ComparisonConfig, client *types.ClientConfig, attempts
 			Timeout:   time.Duration(cfg.TimeoutSeconds) * time.Second,
 			Transport: freshConnTransport(),
 		},
-		attempts:  attempts,
-		baseDelay: baseDelay,
-		verbose:   cfg.Verbose,
+		attempts:     attempts,
+		baseDelay:    baseDelay,
+		verbose:      cfg.Verbose,
+		exactNumbers: cfg.StrictResponseComparison,
 	}
 
 	rps := cfg.RateLimitRPS
@@ -184,8 +188,8 @@ func (t *rpcTransport) call(method string, params []interface{}) (map[string]int
 			return nil, lastErr
 		}
 
-		var rawResponse map[string]interface{}
-		if err := json.Unmarshal(body, &rawResponse); err != nil {
+		rawResponse, err := t.decodeResponse(body)
+		if err != nil {
 			// A 200 whose body will not parse is a truncated read, not a node
 			// that disagrees. Retry it like any other transport fault — returning
 			// here would spend none of the attempt budget and silently drop the
@@ -201,6 +205,27 @@ func (t *rpcTransport) call(method string, params []interface{}) (map[string]int
 	}
 
 	return nil, lastErr
+}
+
+// decodeResponse parses a JSON-RPC response body. Under strict response
+// comparison the decoder keeps numbers as json.Number, so two integers above
+// 2**53 that differ do not both land on the same float64 and compare equal;
+// json.Number marshals back as the literal digits, so the artifacts are
+// unchanged for every value float64 could already represent.
+func (t *rpcTransport) decodeResponse(body []byte) (map[string]interface{}, error) {
+	var rawResponse map[string]interface{}
+	if !t.exactNumbers {
+		if err := json.Unmarshal(body, &rawResponse); err != nil {
+			return nil, err
+		}
+		return rawResponse, nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&rawResponse); err != nil {
+		return nil, err
+	}
+	return rawResponse, nil
 }
 
 // transportClassForError distinguishes a timeout/cancellation from any other
