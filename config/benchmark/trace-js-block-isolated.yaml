@@ -1,0 +1,27 @@
+{
+  "clients": [
+    "nethermind",
+    "reth"
+  ],
+  "duration": "120s",
+  "rps": 1,
+  "vus": 4,
+  "test_name": "Valid JS tracer on the whole head block only",
+  "description": "debug_traceBlockByNumber(latest) with the same trivial valid JS tracer, alone on the node at 1 rps. 319 transactions means 319 tracer instances per call; run without any other call so a death here is attributable.",
+  "calls": [
+    {
+      "name": "debug_traceBlockByNumber valid JS tracer (319 tx)",
+      "method": "debug_traceBlockByNumber",
+      "params": [
+        "latest",
+        {
+          "tracer": "{data: [], step: function(log, db) { }, fault: function(log, db) { }, result: function(ctx, db) { return this.data.length; }}"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    }
+  ]
+}
