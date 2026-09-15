@@ -97,3 +97,15 @@ and the generated `*.jsonl` files are checked in.
 and fails on RPC errors, null results and empty `eth_call` returns. Run it after
 regenerating a corpus — the mainnet fixtures need a mainnet archive, the
 `-gnosis` fixtures a Gnosis archive.
+
+## Historical single-transaction traces
+
+- Source: mainnet archive node over JSON-RPC (`eth_getBlockByNumber`), no
+  external corpus.
+- Sampling: `random.seed(47)`; blocks drawn uniformly from
+  `25782700-25979000` and `25500000-25780000`, kept when they carry at least
+  50 transactions, 20 distinct blocks per endpoint per range; the request
+  targets the block's last transaction (the deepest prefix), and the
+  whole-block control the block hash.
+- Output: `rpc-calls/trace-historical/<range>/<method-tracer>.jsonl`, consumed
+  by `config/benchmark/trace-transaction-historical.yaml`.
