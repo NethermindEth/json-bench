@@ -1,0 +1,27 @@
+{
+  "clients": [
+    "nethermind",
+    "reth"
+  ],
+  "duration": "120s",
+  "rps": 1,
+  "vus": 4,
+  "test_name": "Valid JS tracer on one transaction only",
+  "description": "debug_traceTransaction with a trivial valid geth-style JS tracer, alone on the node at 1 rps. Isolates the single-engine path: if this survives while the whole-block form kills the node, the fault is per-transaction engine accumulation, not JS tracing as such.",
+  "calls": [
+    {
+      "name": "debug_traceTransaction valid JS tracer (one tx)",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d",
+        {
+          "tracer": "{data: [], step: function(log, db) { }, fault: function(log, db) { }, result: function(ctx, db) { return this.data.length; }}"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    }
+  ]
+}
