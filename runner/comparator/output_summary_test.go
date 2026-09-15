@@ -1,8 +1,14 @@
 package comparator
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+
+	"github.com/jsonrpc-bench/runner/types"
 )
 
 // #2 — --diff-only drops identical calls and truncates large bodies while
@@ -181,5 +187,237 @@ func TestTruncationMarker(t *testing.T) {
 	summary, ok := errMarker["_error"].(map[string]interface{})
 	if !ok || summary["code"] != float64(-32000) {
 		t.Errorf("error marker should keep the code/message summary, got %v", errMarker["_error"])
+	}
+}
+
+// Every entry of the results document names its request by identity and by the
+// wire-level method, so a consumer reconciling a run does not have to strip a
+// loader-invented _variantN suffix or match on array position.
+func TestResultsCarryRequestIdentity(t *testing.T) {
+	node := newRPCFake(t, "0x1", func(req rpcRequest) interface{} { return "0x1" })
+
+	dir := t.TempDir()
+	cfg := &ComparisonConfig{
+		Name:    "identity",
+		Methods: []string{"eth_getBalance_variant1", "eth_getBalance_variant2", "eth_chainId_variant1"},
+		MethodRPCNames: map[string]string{
+			"eth_getBalance_variant1": "eth_getBalance",
+			"eth_getBalance_variant2": "eth_getBalance",
+			"eth_chainId_variant1":    "eth_chainId",
+		},
+		CustomParameters: map[string][]interface{}{
+			"eth_getBalance_variant1": {"0xabc", "0x10"},
+			"eth_getBalance_variant2": {"0xabc", "0x11"},
+			"eth_chainId_variant1":    {},
+		},
+		Clients: []*types.ClientConfig{
+			{Name: "baseline", URL: node.URL},
+			{Name: "candidate", URL: node.URL},
+		},
+		TimeoutSeconds: 5,
+		Concurrency:    2,
+		OutputDir:      dir,
+	}
+	comp, err := NewComparator(cfg)
+	if err != nil {
+		t.Fatalf("NewComparator: %v", err)
+	}
+	if _, err := comp.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	path := filepath.Join(dir, "comparison-results.json")
+	if err := comp.SaveResults(path); err != nil {
+		t.Fatalf("SaveResults: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read results: %v", err)
+	}
+	var doc ComparisonResultsDocument
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("unmarshal results: %v", err)
+	}
+	if len(doc.Results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(doc.Results))
+	}
+
+	ids := map[string]string{}
+	for _, result := range doc.Results {
+		if result.RequestID == "" {
+			t.Errorf("%s has no request_id", result.Method)
+			continue
+		}
+		want, err := RequestID(result.RPCMethod, cfg.CustomParameters[result.Method])
+		if err != nil {
+			t.Fatalf("RequestID: %v", err)
+		}
+		if result.RequestID != want {
+			t.Errorf("%s request_id = %s, want %s", result.Method, result.RequestID, want)
+		}
+		ids[result.Method] = result.RequestID
+	}
+
+	// The identity is of the wire method, not of the variant identifier: two
+	// variants of the same method differ only by their params.
+	if ids["eth_getBalance_variant1"] == ids["eth_getBalance_variant2"] {
+		t.Error("two variants with different params must have different identities")
+	}
+	if doc.Results[0].RPCMethod == "" {
+		t.Error("rpc_method must be recorded alongside the identifier")
+	}
+	for _, result := range doc.Results {
+		if strings.HasSuffix(result.RPCMethod, "_variant1") {
+			t.Errorf("rpc_method = %q, want the wire method", result.RPCMethod)
+		}
+	}
+	if want, _ := RequestID("eth_chainId", nil); ids["eth_chainId_variant1"] != want {
+		t.Errorf("a no-params call's identity = %s, want %s", ids["eth_chainId_variant1"], want)
+	}
+}
+
+// The identity is of the request as the corpus recorded it, not of what the
+// block override put on the wire. It has to be: the manifest a consumer
+// reconciles against was written before any override existed.
+func TestResultIdentityIsOfTheOriginalRequest(t *testing.T) {
+	var mu sync.Mutex
+	var onTheWire [][]interface{}
+	node := newRPCFake(t, "0x1", func(req rpcRequest) interface{} {
+		mu.Lock()
+		onTheWire = append(onTheWire, req.Params)
+		mu.Unlock()
+		return "0x1"
+	})
+
+	dir := t.TempDir()
+	cfg := &ComparisonConfig{
+		Name:             "override-identity",
+		Methods:          []string{"eth_getBalance_variant1"},
+		MethodRPCNames:   map[string]string{"eth_getBalance_variant1": "eth_getBalance"},
+		CustomParameters: map[string][]interface{}{"eth_getBalance_variant1": {"0xabc", "latest"}},
+		BlockOverride:    "0x1406f40",
+		Clients: []*types.ClientConfig{
+			{Name: "baseline", URL: node.URL},
+			{Name: "candidate", URL: node.URL},
+		},
+		TimeoutSeconds: 5,
+		Concurrency:    1,
+		OutputDir:      dir,
+	}
+	comp, err := NewComparator(cfg)
+	if err != nil {
+		t.Fatalf("NewComparator: %v", err)
+	}
+	if _, err := comp.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	results := comp.GetResults()
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	original, err := RequestID("eth_getBalance", []interface{}{"0xabc", "latest"})
+	if err != nil {
+		t.Fatalf("RequestID: %v", err)
+	}
+	effective, err := RequestID("eth_getBalance", []interface{}{"0xabc", "0x1406f40"})
+	if err != nil {
+		t.Fatalf("RequestID: %v", err)
+	}
+	if results[0].RequestID != original {
+		t.Errorf("request_id = %s, want the original %s", results[0].RequestID, original)
+	}
+	if results[0].RequestID == effective {
+		t.Fatal("the fixture is wrong: the two forms must differ")
+	}
+
+	// And the override did happen: the node was asked for the pinned block, not
+	// for "latest". The identity is of the request, the wire carries the call.
+	mu.Lock()
+	defer mu.Unlock()
+	sent := false
+	for _, params := range onTheWire {
+		if len(params) == 2 && params[1] == "0x1406f40" {
+			sent = true
+		}
+	}
+	if !sent {
+		t.Errorf("expected the override on the wire, saw %v", onTheWire)
+	}
+}
+
+// A call dropped by --skip-above-head is named by identity in the provenance,
+// which is the only place it appears at all: it produces no result.
+func TestSkippedCallsCarryRequestIdentity(t *testing.T) {
+	node := newRPCFake(t, "0x1", func(req rpcRequest) interface{} {
+		if req.Method == "eth_blockNumber" {
+			return "0x10"
+		}
+		return "0x1"
+	})
+
+	dir := t.TempDir()
+	cfg := &ComparisonConfig{
+		Name:    "skips",
+		Methods: []string{"eth_getBalance_low", "eth_getBalance_high"},
+		MethodRPCNames: map[string]string{
+			"eth_getBalance_low":  "eth_getBalance",
+			"eth_getBalance_high": "eth_getBalance",
+		},
+		CustomParameters: map[string][]interface{}{
+			"eth_getBalance_low":  {"0xabc", "0x1"},
+			"eth_getBalance_high": {"0xabc", "0xffff"},
+		},
+		SkipAboveHead: true,
+		Clients: []*types.ClientConfig{
+			{Name: "baseline", URL: node.URL},
+			{Name: "candidate", URL: node.URL},
+		},
+		TimeoutSeconds: 5,
+		Concurrency:    1,
+		OutputDir:      dir,
+	}
+	comp, err := NewComparator(cfg)
+	if err != nil {
+		t.Fatalf("NewComparator: %v", err)
+	}
+	if _, err := comp.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	provPath := filepath.Join(dir, "comparison-provenance.json")
+	if err := comp.SaveProvenance(provPath); err != nil {
+		t.Fatalf("SaveProvenance: %v", err)
+	}
+	data, err := os.ReadFile(provPath)
+	if err != nil {
+		t.Fatalf("read provenance: %v", err)
+	}
+	var prov struct {
+		Skipped []struct {
+			Method    string `json:"method"`
+			RPCMethod string `json:"rpc_method"`
+			RequestID string `json:"request_id"`
+			Reason    string `json:"reason"`
+			Block     string `json:"block"`
+		} `json:"skipped"`
+	}
+	if err := json.Unmarshal(data, &prov); err != nil {
+		t.Fatalf("unmarshal provenance: %v", err)
+	}
+	if len(prov.Skipped) != 1 {
+		t.Fatalf("expected 1 skipped call, got %+v", prov.Skipped)
+	}
+	skip := prov.Skipped[0]
+	want, err := RequestID("eth_getBalance", []interface{}{"0xabc", "0xffff"})
+	if err != nil {
+		t.Fatalf("RequestID: %v", err)
+	}
+	if skip.RequestID != want {
+		t.Errorf("skipped request_id = %s, want %s", skip.RequestID, want)
+	}
+	if skip.RPCMethod != "eth_getBalance" {
+		t.Errorf("skipped rpc_method = %q, want eth_getBalance", skip.RPCMethod)
+	}
+	if skip.Method != "eth_getBalance_high" || skip.Reason == "" || skip.Block != "0xffff" {
+		t.Errorf("the existing fields must be unchanged: %+v", skip)
 	}
 }

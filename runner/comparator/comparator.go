@@ -23,8 +23,15 @@ const DefaultDiffOnlyMaxResponseBytes = 4096
 
 // ComparisonResult represents the result of comparing responses from different clients
 type ComparisonResult struct {
-	Method          string                 `json:"method"`
-	Params          []interface{}          `json:"params"`
+	Method string        `json:"method"`
+	Params []interface{} `json:"params"`
+	// RPCMethod is the wire-level method Method resolves to (eth_call for
+	// eth_call_variant1), so a reader does not have to strip the suffix a
+	// loader invented. RequestID identifies this request across tools — see
+	// RequestID; it is computed from the params as supplied, before any block
+	// override rewrites them, so it matches the corpus line the call came from.
+	RPCMethod       string                 `json:"rpc_method"`
+	RequestID       string                 `json:"request_id"`
 	Timestamp       string                 `json:"timestamp"`
 	Responses       map[string]interface{} `json:"responses"`
 	Differences     map[string]interface{} `json:"differences"`
@@ -145,9 +152,11 @@ type wireTransform struct {
 // skippedCall records a call omitted because it pins to a block above the
 // lowest client head (see --skip-above-head).
 type skippedCall struct {
-	Method string `json:"method"`
-	Reason string `json:"reason"`
-	Block  string `json:"block,omitempty"`
+	Method    string `json:"method"`
+	RPCMethod string `json:"rpc_method"`
+	RequestID string `json:"request_id"`
+	Reason    string `json:"reason"`
+	Block     string `json:"block,omitempty"`
 }
 
 // NewComparator creates a new response comparator
@@ -287,9 +296,15 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 	}
 
 	// Create comparison result
+	requestID, idErr := RequestID(rpcMethod, params)
+	if idErr != nil {
+		log.Printf("warning: no request identity for %s: %v", method, idErr)
+	}
 	result := &ComparisonResult{
 		Method:              method,
 		Params:              params,
+		RPCMethod:           rpcMethod,
+		RequestID:           requestID,
 		Timestamp:           time.Now().Format(time.RFC3339),
 		Responses:           responses,
 		Differences:         differences,
@@ -468,10 +483,20 @@ func (c *Comparator) applySkipAboveHead() error {
 		}
 		block, ok := pinnedBlock(rpcMethod, c.config.CustomParameters[method])
 		if ok && block > lowestHead {
+			// The identity is recorded here, where the params are still to
+			// hand: a skipped call is exactly the one a consumer must be able
+			// to name against its approved-omission list, and the result
+			// document it is absent from cannot name it.
+			id, idErr := RequestID(rpcMethod, c.config.CustomParameters[method])
+			if idErr != nil {
+				log.Printf("warning: no request identity for skipped call %s: %v", method, idErr)
+			}
 			c.skipped = append(c.skipped, skippedCall{
-				Method: method,
-				Reason: "pinned block above lowest client head",
-				Block:  fmt.Sprintf("0x%x", block),
+				Method:    method,
+				RPCMethod: rpcMethod,
+				RequestID: id,
+				Reason:    "pinned block above lowest client head",
+				Block:     fmt.Sprintf("0x%x", block),
 			})
 			continue
 		}

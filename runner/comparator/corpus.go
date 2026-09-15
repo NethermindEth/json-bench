@@ -40,22 +40,72 @@ type corpusEntry struct {
 	Params []interface{} `json:"params"`
 }
 
+// corpusCall is one loaded call on its way to selection: the params, the file
+// it came from, and its request identity, carried together so the load report
+// can account for a call that sampling later drops.
+type corpusCall struct {
+	Params    []interface{}
+	Path      string
+	RequestID string
+	IDError   string
+}
+
 // CorpusSkip records a corpus file that could not be used, so the caller can
 // report it. A corpus tree commonly holds files that are not corpora at all
 // (generator inputs, for instance), and one of those must not abort the run.
 type CorpusSkip struct {
-	Path   string
-	Reason string
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
+}
+
+// CorpusFileReport is the per-file accounting of one corpus file that parsed:
+// how many entries it held and what became of them.
+type CorpusFileReport struct {
+	Path     string `json:"path"`
+	Entries  int    `json:"entries"`
+	Unnamed  int    `json:"unnamed"`
+	Excluded int    `json:"excluded"`
+	Loaded   int    `json:"loaded"`
+}
+
+// CorpusRequest names one request by its identity (see RequestID) rather than
+// by its position in a file, so a consumer can reconcile what was selected,
+// excluded and dropped against the manifest that produced the corpus.
+//
+// IdentityError is set, and RequestID empty, only when the params could not be
+// canonicalized at all. It is recorded rather than swallowed: an unidentifiable
+// request must be visible to whatever is reconciling the run.
+type CorpusRequest struct {
+	RequestID     string `json:"request_id"`
+	Method        string `json:"method"`
+	CallID        string `json:"call_id,omitempty"`
+	Path          string `json:"path"`
+	IdentityError string `json:"identity_error,omitempty"`
 }
 
 // CorpusReport describes what a corpus load actually ingested. Excluded counts
 // files whose calls were all dropped by the method exclusions (see
 // corpusExcluded) — expected, unlike a skip.
+//
+// Files, Entries, Excluded and Skips are the counts the log line carries and
+// are unchanged. The rest is the machine-readable accounting written to
+// corpus-load-report.json.
 type CorpusReport struct {
 	Files    int
 	Entries  int
 	Excluded int
 	Skips    []CorpusSkip
+
+	FilesScanned int
+	PerFile      []CorpusFileReport
+
+	Selected         []CorpusRequest
+	ExcludedRequests []CorpusRequest
+	SampleDropped    []CorpusRequest
+
+	Sample        int
+	SampleSeed    int64
+	BlockOverride string
 }
 
 // LoadCorpusConfig builds a ComparisonConfig by ingesting a corpus directory
@@ -99,8 +149,13 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 
 	keepPinnable := blockOverride != ""
 
-	report := &CorpusReport{}
-	byMethod := make(map[string][][]interface{})
+	report := &CorpusReport{
+		FilesScanned:  len(files),
+		Sample:        sample,
+		SampleSeed:    seed,
+		BlockOverride: blockOverride,
+	}
+	byMethod := make(map[string][]corpusCall)
 	order := make([]string, 0)
 	for _, file := range files {
 		entries, err := readCorpusFile(walkRoot, file)
@@ -108,22 +163,37 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 			report.Skips = append(report.Skips, CorpusSkip{Path: file, Reason: err.Error()})
 			continue
 		}
+		fileReport := CorpusFileReport{Path: file, Entries: len(entries)}
 		used, named := 0, 0
 		for _, entry := range entries {
 			if entry.Method == "" {
+				fileReport.Unnamed++
 				continue
 			}
 			named++
-			if isCorpusExcluded(entry.Method, keepPinnable) {
-				continue
-			}
 			if entry.Params == nil {
 				entry.Params = []interface{}{}
+			}
+			id, idErr := requestIDOf(entry.Method, entry.Params)
+			if isCorpusExcluded(entry.Method, keepPinnable) {
+				fileReport.Excluded++
+				report.ExcludedRequests = append(report.ExcludedRequests, CorpusRequest{
+					RequestID:     id,
+					Method:        entry.Method,
+					Path:          file,
+					IdentityError: idErr,
+				})
+				continue
 			}
 			if _, seen := byMethod[entry.Method]; !seen {
 				order = append(order, entry.Method)
 			}
-			byMethod[entry.Method] = append(byMethod[entry.Method], entry.Params)
+			byMethod[entry.Method] = append(byMethod[entry.Method], corpusCall{
+				Params:    entry.Params,
+				Path:      file,
+				RequestID: id,
+				IDError:   idErr,
+			})
 			used++
 		}
 		if named == 0 {
@@ -131,6 +201,8 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 			report.Skips = append(report.Skips, CorpusSkip{Path: file, Reason: `no entries with a "method" field`})
 			continue
 		}
+		fileReport.Loaded = used
+		report.PerFile = append(report.PerFile, fileReport)
 		if used == 0 {
 			report.Excluded++
 			continue
@@ -154,21 +226,53 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 	}
 
 	for _, method := range order {
-		calls := sampleCalls(byMethod[method], sample, rng)
-		for i, params := range calls {
+		chosen, dropped := sampleCalls(byMethod[method], sample, rng)
+		for i, call := range chosen {
 			identifier := fmt.Sprintf("%s_variant%d", method, i+1)
 			cfg.Methods = append(cfg.Methods, identifier)
 			cfg.MethodRPCNames[identifier] = method
-			cfg.CustomParameters[identifier] = params
+			cfg.CustomParameters[identifier] = call.Params
+			report.Selected = append(report.Selected, CorpusRequest{
+				RequestID:     call.RequestID,
+				Method:        method,
+				CallID:        identifier,
+				Path:          call.Path,
+				IdentityError: call.IDError,
+			})
+		}
+		for _, call := range dropped {
+			report.SampleDropped = append(report.SampleDropped, CorpusRequest{
+				RequestID:     call.RequestID,
+				Method:        method,
+				Path:          call.Path,
+				IdentityError: call.IDError,
+			})
 		}
 	}
 
 	return cfg, report, nil
 }
 
+// requestIDOf returns the request identity, or an empty identity and the reason
+// it could not be computed. A call whose params came from JSON always has one;
+// a config-supplied param that is not representable as JSON does not, and that
+// has to be reported rather than silently become the empty string.
+func requestIDOf(method string, params []interface{}) (string, string) {
+	id, err := RequestID(method, params)
+	if err != nil {
+		return "", err.Error()
+	}
+	return id, ""
+}
+
 // readCorpusFile parses one corpus file. A .json file is a JSON array of
 // entries; a .jsonl file is one entry per line. root is the operator-supplied
 // corpus directory the path was discovered under.
+//
+// Numbers are decoded with UseNumber, so a numeric param keeps the digits the
+// corpus recorded. Through float64 a param above 2^53 would be re-emitted as a
+// different number on the wire, and its canonical form — hence its request
+// identity — would stop matching the producer's.
 func readCorpusFile(root, path string) ([]corpusEntry, error) {
 	safePath, err := config.SafeReadPathUnder(root, path)
 	if err != nil {
@@ -181,8 +285,13 @@ func readCorpusFile(root, path string) ([]corpusEntry, error) {
 
 	if strings.HasSuffix(path, ".json") {
 		var entries []corpusEntry
-		if err := json.Unmarshal(data, &entries); err != nil {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber()
+		if err := dec.Decode(&entries); err != nil {
 			return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+		}
+		if dec.More() {
+			return nil, fmt.Errorf("failed to parse %s: trailing data after the top-level array", path)
 		}
 		return entries, nil
 	}
@@ -196,7 +305,9 @@ func readCorpusFile(root, path string) ([]corpusEntry, error) {
 			continue
 		}
 		var entry corpusEntry
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		dec := json.NewDecoder(strings.NewReader(line))
+		dec.UseNumber()
+		if err := dec.Decode(&entry); err != nil {
 			return nil, fmt.Errorf("failed to parse %s: %w", path, err)
 		}
 		entries = append(entries, entry)
@@ -209,22 +320,31 @@ func readCorpusFile(root, path string) ([]corpusEntry, error) {
 
 // sampleCalls returns at most n calls, chosen with a seeded shuffle so the
 // selection is reproducible, preserving original order within the selection.
-func sampleCalls(calls [][]interface{}, n int, rng *rand.Rand) [][]interface{} {
+// The calls it did not choose are returned too, in original order, so the load
+// report can account for every call the corpus held.
+func sampleCalls(calls []corpusCall, n int, rng *rand.Rand) (chosen, dropped []corpusCall) {
 	if n <= 0 || len(calls) <= n {
-		return calls
+		return calls, nil
 	}
 	idx := make([]int, len(calls))
 	for i := range idx {
 		idx[i] = i
 	}
 	rng.Shuffle(len(idx), func(i, j int) { idx[i], idx[j] = idx[j], idx[i] })
-	chosen := idx[:n]
-	sort.Ints(chosen)
-	out := make([][]interface{}, 0, n)
-	for _, i := range chosen {
-		out = append(out, calls[i])
+	keep := make(map[int]struct{}, n)
+	for _, i := range idx[:n] {
+		keep[i] = struct{}{}
 	}
-	return out
+	chosen = make([]corpusCall, 0, n)
+	dropped = make([]corpusCall, 0, len(calls)-n)
+	for i, call := range calls {
+		if _, ok := keep[i]; ok {
+			chosen = append(chosen, call)
+			continue
+		}
+		dropped = append(dropped, call)
+	}
+	return chosen, dropped
 }
 
 func isCorpusExcluded(method string, keepPinnable bool) bool {

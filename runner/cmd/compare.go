@@ -126,6 +126,18 @@ func runCompare(cmd *cobra.Command, args []string) error {
 		var report *comparator.CorpusReport
 		cfg, report, err = comparator.LoadCorpusConfig(compareFromJSONL, compareSample, compareSampleSeed, effectiveBlockOverride)
 		logCorpusReport(compareFromJSONL, report)
+		// Written before the load error is returned, and written even when the
+		// load failed: a corpus that yielded nothing is precisely the case a
+		// consumer has to fail closed on, and it can only do that if the
+		// accounting exists.
+		if writeErr := comparator.SaveCorpusLoadReport(outputDir, compareFromJSONL, report); writeErr != nil {
+			if err == nil {
+				return writeErr
+			}
+			logger.Errorf("%v", writeErr)
+		} else {
+			logger.Infof("Corpus load report saved to %s", corpusLoadReportPath())
+		}
 		if err != nil {
 			return fmt.Errorf("failed to build config from corpus: %w", err)
 		}
@@ -187,6 +199,12 @@ func logCorpusReport(dir string, report *comparator.CorpusReport) {
 	}
 	logger.Infof("corpus %s: loaded %d calls from %d files, %d files held only excluded methods, %d files skipped",
 		dir, report.Entries, report.Files, report.Excluded, len(report.Skips))
+}
+
+// corpusLoadReportPath names the fourth compare output for the tests and for
+// anything that has to find it without reconstructing the join.
+func corpusLoadReportPath() string {
+	return filepath.Join(outputDir, comparator.CorpusLoadReportFilename)
 }
 
 // applyDiffOnlyDefaults makes --diff-only the obvious "small report" switch: if
