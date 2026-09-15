@@ -83,3 +83,12 @@ vulnerabilities:
     purls: ["pkg:golang/google.golang.org/grpc@v1.81.1"]
     statement: "gRPC-Go xDS RBAC and HTTP/2 issues vendored into the prebuilt k6 binary; needs grpc 1.82.1."
     expired_at: 2026-12-01
+  - id: CVE-2026-84445
+    purls: ["pkg:golang/google.golang.org/grpc@v1.81.1"]
+    statement: >-
+      gRPC-Go xDS server crash on requests missing the :authority and Host
+      headers, vendored into the prebuilt k6 binary; needs grpc 1.82.2 or
+      1.83.2, and k6 2.2.0 still ships 1.83.0. Server-side xDS only — k6's gRPC
+      module is a client and this suite benchmarks JSON-RPC over HTTP, so no
+      gRPC server is ever listening.
+    expired_at: 2026-12-01

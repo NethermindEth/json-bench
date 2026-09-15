@@ -1,0 +1,60 @@
+test_name: "Historical single-transaction tracing"
+description: "Cold single-transaction traces deep in mainnet history: the last transaction of 20 distinct blocks per endpoint per range, every block with at least 50 transactions, sampled with a fixed seed. Two block ranges are reported separately so a node that carries the per-transaction changeset index (FlatDb.HistoryTransactionIndexEnabled) over one range and not the other can be compared against itself: the upper range 25782700-25979000 is the indexed one on the reference archive node, the lower range 25500000-25780000 is not. debug_traceBlockByHash over the same blocks is the whole-block control, which the index does not touch. Requires an archive node with state for every sampled block; all fixtures are more than 256 blocks below head. Names carry no commas - k6 builds threshold sub-metric names from them."
+clients:
+  - nethermind
+duration: "600s"
+rps: 1
+vus: 16
+calls:
+  # --- 25782700-25979000 ---
+  - name: "debug_traceTransaction callTracer upper range"
+    file: "./rpc-calls/trace-historical/blocks-25782700-25979000/debug_traceTransaction-callTracer.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceTransaction prestateTracer upper range"
+    file: "./rpc-calls/trace-historical/blocks-25782700-25979000/debug_traceTransaction-prestateTracer.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "trace_transaction upper range"
+    file: "./rpc-calls/trace-historical/blocks-25782700-25979000/trace_transaction.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "trace_replayTransaction trace stateDiff upper range"
+    file: "./rpc-calls/trace-historical/blocks-25782700-25979000/trace_replayTransaction-trace-stateDiff.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceBlockByHash callTracer whole block upper range"
+    file: "./rpc-calls/trace-historical/blocks-25782700-25979000/debug_traceBlockByHash-callTracer.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  # --- 25500000-25780000 ---
+  - name: "debug_traceTransaction callTracer lower range"
+    file: "./rpc-calls/trace-historical/blocks-25500000-25780000/debug_traceTransaction-callTracer.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceTransaction prestateTracer lower range"
+    file: "./rpc-calls/trace-historical/blocks-25500000-25780000/debug_traceTransaction-prestateTracer.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "trace_transaction lower range"
+    file: "./rpc-calls/trace-historical/blocks-25500000-25780000/trace_transaction.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "trace_replayTransaction trace stateDiff lower range"
+    file: "./rpc-calls/trace-historical/blocks-25500000-25780000/trace_replayTransaction-trace-stateDiff.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "debug_traceBlockByHash callTracer whole block lower range"
+    file: "./rpc-calls/trace-historical/blocks-25500000-25780000/debug_traceBlockByHash-callTracer.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
