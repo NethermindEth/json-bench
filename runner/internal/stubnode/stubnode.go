@@ -648,7 +648,9 @@ func (s *Stub) releaseWorker() {
 func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 	var requests []rpcRequest
 	if err := json.Unmarshal(body, &requests); err != nil {
-		s.record("batch", OutcomeBadInput)
+		// The one case with no member count to spread over: how many calls the
+		// array was meant to carry is exactly what could not be read.
+		s.record("", OutcomeBadInput)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"jsonrpc": "2.0", "id": nil,
 			"error": map[string]any{"code": -32700, "message": "stubnode: parse error"},
@@ -656,8 +658,9 @@ func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 		return
 	}
 
+	// An empty array carries no calls, so it adds nothing to a tally counted in
+	// calls.
 	if len(requests) == 0 {
-		s.record("batch", OutcomeBadInput)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"jsonrpc": "2.0", "id": nil,
 			"error": map[string]any{"code": -32600, "message": "stubnode: empty batch"},
@@ -666,9 +669,10 @@ func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 	}
 
 	// A node with a batch limit rejects the whole array with one error object,
-	// not with an array of them.
+	// not with an array of them. The refusal is every member's refusal, and it
+	// is a JSON-RPC error, which is the class the caller reads off the -32600.
 	if s.cfg.Node.MaxBatchSize > 0 && len(requests) > s.cfg.Node.MaxBatchSize {
-		s.record("batch", OutcomeBadInput)
+		s.recordBatchOutcome(requests, OutcomeRPCError)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"jsonrpc": "2.0", "id": nil,
 			"error": map[string]any{
@@ -680,7 +684,7 @@ func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 	}
 
 	if !s.acquireWorker(r.Context()) {
-		s.record("batch", OutcomeTimeout)
+		s.recordBatchOutcome(requests, OutcomeTimeout)
 		return
 	}
 	defer s.releaseWorker()
@@ -688,14 +692,13 @@ func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 	// One service time for the whole round trip, taken from the slowest member,
 	// which is what a node processing a batch actually costs its caller.
 	var slowest time.Duration
-	responses := make([]map[string]any, 0, len(requests))
+	keys := make([]uint64, 0, len(requests))
 	for _, req := range requests {
-		method := s.methodConfig(req.Method)
 		key := requestKey(req.ID, body)
-		if d := s.latency(method.Latency, req.Method, key); d > slowest {
+		if d := s.latency(s.methodConfig(req.Method).Latency, req.Method, key); d > slowest {
 			slowest = d
 		}
-		responses = append(responses, s.batchMember(req, method, key))
+		keys = append(keys, key)
 	}
 
 	if slowest > 0 {
@@ -704,14 +707,33 @@ func (s *Stub) serveBatch(w http.ResponseWriter, r *http.Request, body []byte) {
 		select {
 		case <-timer.C:
 		case <-r.Context().Done():
+			s.recordBatchOutcome(requests, OutcomeTimeout)
 			return
 		}
+	}
+
+	responses := make([]map[string]any, 0, len(requests))
+	for i, req := range requests {
+		responses = append(responses, s.batchMember(req, s.methodConfig(req.Method), keys[i]))
 	}
 
 	for i, j := 0, len(responses)-1; i < j; i, j = i+1, j-1 {
 		responses[i], responses[j] = responses[j], responses[i]
 	}
 	writeJSON(w, http.StatusOK, responses)
+}
+
+// recordBatchOutcome counts something that befell a batch as a whole: it is
+// recorded once per call the batch carried, against that call's own method.
+//
+// That is the unit a served batch is already counted in, and the unit the load
+// engine records a whole-batch answer in — a rejection of the array is every
+// member's rejection. Counting the batch once instead left the tally short by
+// N-1 per batch and attributed it to a method name no caller had asked for.
+func (s *Stub) recordBatchOutcome(members []rpcRequest, outcome Outcome) {
+	for _, req := range members {
+		s.record(req.Method, outcome)
+	}
 }
 
 // batchMember resolves one call inside a batch and records its outcome.

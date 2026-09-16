@@ -22,12 +22,22 @@ type ipcConn struct {
 	mu      sync.Mutex
 	socket  net.Conn
 	mux     *mux
+	dial    *ipcDial
 	writeMu sync.Mutex
 	closed  bool
 }
 
+// ipcDial is one connection attempt several requests are waiting on. See
+// wsDial: the fields are written before done is closed and read only after.
+type ipcDial struct {
+	done    chan struct{}
+	socket  net.Conn
+	elapsed time.Duration
+	err     error
+}
+
 func newIPCConn(path string, timeout time.Duration) *ipcConn {
-	return &ipcConn{path: path, timeout: timeout, mux: newMux()}
+	return &ipcConn{path: path, timeout: timeout}
 }
 
 // maxUnixPath is the smallest sun_path any supported platform offers: macOS
@@ -45,34 +55,78 @@ func checkIPCPath(path string) error {
 	return nil
 }
 
+// connect returns the live socket and the mux belonging to it. The mux is per
+// socket: a reader blocked on a socket that has since been replaced must not be
+// able to fail the requests running over its replacement.
 func (c *ipcConn) connect(ctx context.Context) (net.Conn, *mux, Phases, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	for {
+		c.mu.Lock()
+		if c.closed {
+			c.mu.Unlock()
+			return nil, nil, Phases{}, errConnectionClosed
+		}
+		if c.socket != nil {
+			socket, m := c.socket, c.mux
+			c.mu.Unlock()
+			return socket, m, Phases{}, nil
+		}
+		if inProgress := c.dial; inProgress != nil {
+			// Waiting on the attempt rather than on c.mu, which a context
+			// cannot interrupt.
+			c.mu.Unlock()
+			select {
+			case <-inProgress.done:
+				if inProgress.err != nil {
+					return nil, nil, Phases{}, inProgress.err
+				}
+				continue
+			case <-ctx.Done():
+				return nil, nil, Phases{}, ctx.Err()
+			}
+		}
 
-	if c.closed {
-		return nil, nil, Phases{}, errConnectionClosed
+		if err := checkIPCPath(c.path); err != nil {
+			c.mu.Unlock()
+			return nil, nil, Phases{}, err
+		}
+
+		current := &ipcDial{done: make(chan struct{})}
+		c.dial = current
+		c.mu.Unlock()
+
+		dialer := &net.Dialer{Timeout: c.timeout}
+		start := time.Now()
+		current.socket, current.err = dialer.DialContext(ctx, "unix", c.path)
+		current.elapsed = time.Since(start)
+		if current.err != nil {
+			current.err = fmt.Errorf("failed to connect to the IPC socket %s: %w", c.path, current.err)
+		}
+
+		var m *mux
+		c.mu.Lock()
+		c.dial = nil
+		if current.err == nil {
+			if c.closed {
+				current.err = errConnectionClosed
+			} else {
+				m = newMux()
+				c.socket = current.socket
+				c.mux = m
+				go c.read(current.socket, m)
+			}
+		}
+		c.mu.Unlock()
+		close(current.done)
+
+		if current.err != nil {
+			if current.socket != nil {
+				current.socket.Close()
+			}
+			return nil, nil, Phases{}, current.err
+		}
+
+		return current.socket, m, Phases{Connecting: current.elapsed}, nil
 	}
-	if c.socket != nil {
-		return c.socket, c.mux, Phases{}, nil
-	}
-
-	if err := checkIPCPath(c.path); err != nil {
-		return nil, nil, Phases{}, err
-	}
-
-	dialer := &net.Dialer{Timeout: c.timeout}
-	start := time.Now()
-	socket, err := dialer.DialContext(ctx, "unix", c.path)
-	if err != nil {
-		return nil, nil, Phases{}, fmt.Errorf("failed to connect to the IPC socket %s: %w", c.path, err)
-	}
-	elapsed := time.Since(start)
-
-	c.mux.reset()
-	c.socket = socket
-	go c.read(socket, c.mux)
-
-	return socket, c.mux, Phases{Connecting: elapsed}, nil
 }
 
 // read decodes the stream of JSON values the node writes back. A node does not
@@ -100,6 +154,7 @@ func (c *ipcConn) dropIfCurrent(socket net.Conn) {
 	defer c.mu.Unlock()
 	if c.socket == socket {
 		c.socket = nil
+		c.mux = nil
 		socket.Close()
 	}
 }
@@ -136,6 +191,8 @@ func (c *ipcConn) do(ctx context.Context, payload []byte) attempt {
 
 	if writeErr != nil {
 		m.release(ids)
+		// Closing the socket wakes its reader, which is what fails the requests
+		// still waiting on this connection instead of leaving them to time out.
 		c.dropIfCurrent(socket)
 		return attempt{
 			phases:    Phases{Connecting: setup.Connecting, Sending: sent.Sub(sendStart)},
@@ -156,6 +213,7 @@ func (c *ipcConn) Close() error {
 	c.mu.Lock()
 	socket := c.socket
 	c.socket = nil
+	c.mux = nil
 	c.closed = true
 	c.mu.Unlock()
 

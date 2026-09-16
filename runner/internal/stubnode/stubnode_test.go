@@ -1,6 +1,7 @@
 package stubnode
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -331,4 +332,139 @@ func TestBatchResponses(t *testing.T) {
 		_, body := postBatch(t, srv.URL, `[]`)
 		assert.Contains(t, string(body), "empty batch")
 	})
+}
+
+// The stub's tally is what an engine's own figures are reconciled against, so
+// a batch has to count in the unit the engine counts it in: one entry per call
+// it carried, in the class that befell them. A served batch of two records two;
+// an abandoned one records two timeouts, not one phantom request and not
+// nothing.
+func TestAnAbandonedBatchCountsEveryCallItCarried(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Default.Latency = &Latency{Kind: LatencyFixed, MS: 200}
+	stub, err := New(cfg)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+
+	response, keepOpen := stub.Answer(ctx,
+		[]byte(`[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_getLogs"}]`))
+
+	assert.Nil(t, response, "the client went away mid-answer, so there is nothing to send")
+	assert.True(t, keepOpen)
+
+	stats := stub.Stats()
+	assert.EqualValues(t, 2, stats.Total, "a batch of two counts as two, whatever befell it")
+	assert.EqualValues(t, 1, stats.ByMethod["eth_call"][OutcomeTimeout])
+	assert.EqualValues(t, 1, stats.ByMethod["eth_getLogs"][OutcomeTimeout])
+	assert.Zero(t, stats.ByMethod["eth_call"][OutcomeOK], "nothing was answered")
+}
+
+// The same for the HTTP path, which had the same defect and has to keep the
+// same rule: the two transports are reconciled against each other.
+func TestAnAbandonedBatchCountsEveryCallItCarriedOverHTTP(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Default.Latency = &Latency{Kind: LatencyFixed, MS: 200}
+	srv, stub := serve(t, cfg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL, strings.NewReader(
+		`[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_getLogs"}]`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	//nolint:bodyclose // the request is abandoned on purpose, so there is no body
+	_, err = http.DefaultClient.Do(req)
+	require.Error(t, err, "the client goes away before the node answers")
+
+	// The handler notices its context is done on its own schedule.
+	require.Eventually(t, func() bool { return stub.Stats().Total == 2 }, time.Second, 10*time.Millisecond,
+		"a batch of two counts as two over HTTP as well: %v", stub.Stats())
+	assert.EqualValues(t, 1, stub.Stats().ByMethod["eth_call"][OutcomeTimeout])
+	assert.EqualValues(t, 1, stub.Stats().ByMethod["eth_getLogs"][OutcomeTimeout])
+}
+
+// A batch holds a serving slot for its whole round trip over a socket, as it
+// does over HTTP. Without that the socket transports were the one way past the
+// node's own concurrency limit.
+func TestBatchesOverSocketsRespectTheConcurrencyLimit(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Node.ConcurrencyLimit = 1
+	cfg.Default.Latency = &Latency{Kind: LatencyFixed, MS: 60}
+	stub, err := New(cfg)
+	require.NoError(t, err)
+
+	batch := []byte(`[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_call"}]`)
+
+	var wg sync.WaitGroup
+	start := time.Now()
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			response, _ := stub.Answer(context.Background(), batch)
+			assert.NotNil(t, response)
+		}()
+	}
+	wg.Wait()
+
+	assert.GreaterOrEqual(t, time.Since(start), 120*time.Millisecond,
+		"two batches were served at once by a node that serves one thing at a time")
+	assert.EqualValues(t, 4, stub.Stats().Total)
+}
+
+// A batch refused as a whole is refused for every call it carried, and the two
+// transports have to say so identically: an engine reconciled against this
+// tally over a socket and over HTTP is reading the same node.
+func TestAWholeBatchRefusalCountsEveryCallItCarried(t *testing.T) {
+	batch := `[{"jsonrpc":"2.0","id":1,"method":"eth_call"},{"jsonrpc":"2.0","id":2,"method":"eth_getLogs"}]`
+
+	config := func() Config {
+		cfg := DefaultConfig()
+		cfg.Node.MaxBatchSize = 1
+		return cfg
+	}
+
+	t.Run("over a socket", func(t *testing.T) {
+		stub, err := New(config())
+		require.NoError(t, err)
+
+		response, keepOpen := stub.Answer(context.Background(), []byte(batch))
+		require.NotNil(t, response)
+		assert.True(t, keepOpen)
+		assert.Contains(t, string(response), `"code":-32600`)
+
+		assertRefusedBatchTally(t, stub.Stats())
+	})
+
+	t.Run("over HTTP", func(t *testing.T) {
+		srv, stub := serve(t, config())
+
+		resp, err := http.Post(srv.URL, "application/json", strings.NewReader(batch))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		out, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(out), `"code":-32600`)
+
+		assertRefusedBatchTally(t, stub.Stats())
+	})
+}
+
+// The tally a refused batch of two must leave, whichever transport carried it:
+// one entry per call, against the method that call asked for, in the class the
+// caller reads off a -32600.
+func assertRefusedBatchTally(t *testing.T, stats Stats) {
+	t.Helper()
+	assert.EqualValues(t, 2, stats.Total, "a refusal of a batch of two is two calls refused")
+	assert.EqualValues(t, 1, stats.ByMethod["eth_call"][OutcomeRPCError])
+	assert.EqualValues(t, 1, stats.ByMethod["eth_getLogs"][OutcomeRPCError])
+	assert.NotContains(t, stats.ByMethod, "batch", "no caller asked for a method called batch")
+	assert.NotContains(t, stats.ByMethod, "", "every call in a refused batch names its own method")
 }

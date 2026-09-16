@@ -874,10 +874,6 @@ export function SystemMetricsPanel({
                   <span className="font-medium">{data.environment.goVersion}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">K6 Version</span>
-                  <span className="font-medium">{data.environment.k6Version}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Network Type</span>
                   <span className="font-medium">{data.environment.networkType}</span>
                 </div>

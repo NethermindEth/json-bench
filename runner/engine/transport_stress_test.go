@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/jsonrpc-bench/runner/internal/stubnode"
+	"github.com/jsonrpc-bench/runner/types"
 )
 
 // The mux is written to from every dispatch slot at once while a reader
@@ -72,24 +76,66 @@ func TestMuxDoesNotLeakWaiters(t *testing.T) {
 }
 
 // A run must survive the node hanging up mid-flight and keep measuring.
+//
+// A reconnect gets its own mux, so the generation that died and the generation
+// replacing it cannot interfere: the reader of the dead socket may still be
+// blocked in a read when the new one is already carrying requests.
 func TestSocketRunSurvivesTheNodeHangingUp(t *testing.T) {
-	m := newMux()
-	first, err := m.register([]string{"1"})
+	stale := newMux()
+	first, err := stale.register([]string{"1"})
 	require.NoError(t, err)
 
-	m.fail(errConnectionClosed)
+	live := newMux()
+	second, err := live.register([]string{"1"})
+	require.NoError(t, err, "the same id is free again once the connection is re-established")
+
+	// The dead socket's reader finally wakes and reports what it saw. That must
+	// reach its own generation's requests and nothing else.
+	stale.fail(errConnectionClosed)
 	assert.Nil(t, <-first.done)
 
-	// Reconnecting resets the mux, and requests flow again.
-	m.reset()
-	second, err := m.register([]string{"1"})
-	require.NoError(t, err, "the same id is free again once the connection is re-established")
-	m.dispatch([]byte(`{"jsonrpc":"2.0","id":1,"result":"after reconnect"}`))
-
+	live.dispatch([]byte(`{"jsonrpc":"2.0","id":1,"result":"after reconnect"}`))
 	select {
 	case frame := <-second.done:
 		assert.Contains(t, string(frame), "after reconnect")
 	case <-time.After(time.Second):
 		t.Fatal("no answer after reconnect")
+	}
+
+	_, err = live.register([]string{"2"})
+	assert.NoError(t, err, "the live connection must still take requests after the dead one failed")
+}
+
+// Go's transport does not run every trace callback on the goroutine that called
+// Do, and it does not finish them before Do returns: a request that queued a
+// dial and was then handed a connection freed from the pool proceeds while its
+// own dial goroutine is still running, and that goroutine still reports the
+// connection it is opening. The request has by then already read its timings.
+//
+// What produces it is concurrency with a pool that keeps releasing connections,
+// which is every run this engine does.
+func TestHTTPTimingsAreSafeWhenADialLosesThePoolRace(t *testing.T) {
+	srv := stubServer(t, stubnode.Config{
+		Default: stubnode.Method{Latency: &stubnode.Latency{Kind: stubnode.LatencyFixed, MS: 1}},
+	})
+
+	const concurrency = 300
+	tgt, err := newTarget(&types.ClientConfig{Name: "stub", URL: srv.URL}, concurrency, DefaultTransportOptions())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tgt.Close() })
+
+	for round := 0; round < 5; round++ {
+		var wg sync.WaitGroup
+		for i := 0; i < concurrency; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				payload := []byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"eth_call","params":[]}`, i))
+				res := tgt.do(context.Background(), payload)
+				assert.NoError(t, res.err)
+				assert.GreaterOrEqual(t, res.phases.Blocked, time.Duration(0))
+			}(i)
+		}
+		wg.Wait()
 	}
 }

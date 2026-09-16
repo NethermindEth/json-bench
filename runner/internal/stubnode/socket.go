@@ -74,6 +74,8 @@ func (s *Stub) Answer(ctx context.Context, body []byte) (response []byte, keepOp
 func (s *Stub) answerBatch(ctx context.Context, body []byte) ([]byte, bool) {
 	var raw []json.RawMessage
 	if err := json.Unmarshal(body, &raw); err != nil {
+		// The one case with no member count to spread over: how many calls the
+		// array was meant to carry is exactly what could not be read.
 		s.record("", OutcomeBadInput)
 		return mustJSON(map[string]any{
 			"jsonrpc": "2.0", "id": nil,
@@ -81,19 +83,57 @@ func (s *Stub) answerBatch(ctx context.Context, body []byte) ([]byte, bool) {
 		}), true
 	}
 
+	// One service time for the whole round trip, taken from the slowest member.
+	// It is worked out before anything is recorded: the members are only
+	// resolved, and so only counted, once the sleep has completed and the
+	// answer is about to go out. Counting them first left the stub claiming to
+	// have served a batch it abandoned when the client went away.
+	var slowest int64
+	members := make([]rpcRequest, 0, len(raw))
+	keys := make([]uint64, 0, len(raw))
+	for _, member := range raw {
+		var req rpcRequest
+		if err := json.Unmarshal(member, &req); err != nil || req.Method == "" {
+			// A member with no method has no latency to contribute and nothing
+			// to resolve; the zero request below is what marks it as such.
+			members = append(members, rpcRequest{})
+			keys = append(keys, 0)
+			continue
+		}
+		key := requestKey(req.ID, member)
+		if d := int64(s.latency(s.methodConfig(req.Method).Latency, req.Method, key)); d > slowest {
+			slowest = d
+		}
+		members = append(members, req)
+		keys = append(keys, key)
+	}
+
 	if limit := s.cfg.Node.MaxBatchSize; limit > 0 && len(raw) > limit {
-		s.record("", OutcomeRPCError)
+		s.recordBatchOutcome(members, OutcomeRPCError)
 		return mustJSON(map[string]any{
 			"jsonrpc": "2.0", "id": nil,
 			"error": map[string]any{"code": -32600, "message": "stubnode: batch too large"},
 		}), true
 	}
 
-	responses := make([]map[string]any, 0, len(raw))
-	var slowest int64
-	for _, member := range raw {
-		var req rpcRequest
-		if err := json.Unmarshal(member, &req); err != nil || req.Method == "" {
+	// A batch holds one of the node's serving slots for the whole round trip,
+	// as the HTTP path does. Without this the socket transports were the only
+	// way past Node.ConcurrencyLimit, so nothing measured over them could be
+	// reconciled against the node's own capacity.
+	if !s.acquireWorker(ctx) {
+		s.recordBatchOutcome(members, OutcomeTimeout)
+		return nil, true
+	}
+	defer s.releaseWorker()
+
+	if !s.sleepFor(ctx, slowest) {
+		s.recordBatchOutcome(members, OutcomeTimeout)
+		return nil, true
+	}
+
+	responses := make([]map[string]any, 0, len(members))
+	for i, req := range members {
+		if req.Method == "" {
 			s.record("", OutcomeBadInput)
 			responses = append(responses, map[string]any{
 				"jsonrpc": "2.0", "id": nil,
@@ -101,16 +141,7 @@ func (s *Stub) answerBatch(ctx context.Context, body []byte) ([]byte, bool) {
 			})
 			continue
 		}
-		key := requestKey(req.ID, member)
-		method := s.methodConfig(req.Method)
-		if d := int64(s.latency(method.Latency, req.Method, key)); d > slowest {
-			slowest = d
-		}
-		responses = append(responses, s.batchMember(req, method, key))
-	}
-
-	if !s.sleepFor(ctx, slowest) {
-		return nil, true
+		responses = append(responses, s.batchMember(req, s.methodConfig(req.Method), keys[i]))
 	}
 
 	// Answered in reverse on purpose: the spec promises no ordering, so a client

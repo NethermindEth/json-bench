@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptrace"
+	"sync"
 	"time"
 
 	"github.com/jsonrpc-bench/runner/types"
@@ -203,7 +204,7 @@ func (h *httpConn) do(ctx context.Context, payload []byte) attempt {
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return attempt{phases: tr.phases(time.Time{}), reused: tr.reused, sentBytes: sent, err: err}
+		return attempt{phases: tr.phases(time.Time{}), reused: tr.connectionReused(), sentBytes: sent, err: err}
 	}
 	defer resp.Body.Close()
 
@@ -211,7 +212,7 @@ func (h *httpConn) do(ctx context.Context, payload []byte) attempt {
 	done := time.Now()
 	if readErr != nil {
 		return attempt{
-			status: resp.StatusCode, phases: tr.phases(done), reused: tr.reused, sentBytes: sent,
+			status: resp.StatusCode, phases: tr.phases(done), reused: tr.connectionReused(), sentBytes: sent,
 			err: fmt.Errorf("failed to read response body: %w", readErr),
 		}
 	}
@@ -220,15 +221,21 @@ func (h *httpConn) do(ctx context.Context, payload []byte) attempt {
 		status:    resp.StatusCode,
 		body:      body,
 		phases:    tr.phases(done),
-		reused:    tr.reused,
+		reused:    tr.connectionReused(),
 		sentBytes: sent,
 	}
 }
 
-// tracer records the transition points httptrace reports for one request. The
-// callbacks all fire before Do returns, on the calling goroutine's request, so
-// plain fields are sufficient.
+// tracer records the transition points httptrace reports for one request.
+//
+// The callbacks do not all run on the goroutine that called Do, and they do not
+// all run before it returns: Go's transport dials on a goroutine of its own and
+// writes the request from the connection's write loop, and a request that got a
+// pooled connection or failed early returns while those are still going. So the
+// fields are guarded — the alternative was a data race on every dial that lost
+// the pool race.
 type tracer struct {
+	mu        sync.Mutex
 	getConn   time.Time
 	gotConn   time.Time
 	dnsStart  time.Time
@@ -242,22 +249,39 @@ type tracer struct {
 	reused    bool
 }
 
+func (tr *tracer) mark(field *time.Time) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	*field = time.Now()
+}
+
+// markFirst keeps the earliest of several reports. A dial walks the addresses
+// the name resolved to, so connecting starts once and finishes once per
+// attempt, and the span that matters is the whole walk.
+func (tr *tracer) markFirst(field *time.Time) {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	if field.IsZero() {
+		*field = time.Now()
+	}
+}
+
 func (tr *tracer) clientTrace() *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
-		GetConn:  func(string) { tr.getConn = time.Now() },
-		DNSStart: func(httptrace.DNSStartInfo) { tr.dnsStart = time.Now() },
-		DNSDone:  func(httptrace.DNSDoneInfo) { tr.dnsDone = time.Now() },
-		ConnectStart: func(string, string) {
-			if tr.connStart.IsZero() {
-				tr.connStart = time.Now()
-			}
+		GetConn:           func(string) { tr.mark(&tr.getConn) },
+		DNSStart:          func(httptrace.DNSStartInfo) { tr.mark(&tr.dnsStart) },
+		DNSDone:           func(httptrace.DNSDoneInfo) { tr.mark(&tr.dnsDone) },
+		ConnectStart:      func(string, string) { tr.markFirst(&tr.connStart) },
+		ConnectDone:       func(string, string, error) { tr.mark(&tr.connDone) },
+		TLSHandshakeStart: func() { tr.mark(&tr.tlsStart) },
+		TLSHandshakeDone:  func(tls.ConnectionState, error) { tr.mark(&tr.tlsDone) },
+		GotConn: func(info httptrace.GotConnInfo) {
+			tr.mu.Lock()
+			defer tr.mu.Unlock()
+			tr.gotConn, tr.reused = time.Now(), info.Reused
 		},
-		ConnectDone:          func(string, string, error) { tr.connDone = time.Now() },
-		TLSHandshakeStart:    func() { tr.tlsStart = time.Now() },
-		TLSHandshakeDone:     func(tls.ConnectionState, error) { tr.tlsDone = time.Now() },
-		GotConn:              func(info httptrace.GotConnInfo) { tr.gotConn, tr.reused = time.Now(), info.Reused },
-		WroteRequest:         func(httptrace.WroteRequestInfo) { tr.wrote = time.Now() },
-		GotFirstResponseByte: func() { tr.firstByte = time.Now() },
+		WroteRequest:         func(httptrace.WroteRequestInfo) { tr.mark(&tr.wrote) },
+		GotFirstResponseByte: func() { tr.mark(&tr.firstByte) },
 	}
 }
 
@@ -270,6 +294,8 @@ func (tr *tracer) clientTrace() *httptrace.ClientTrace {
 //	waiting          WroteRequest         -> GotFirstResponseByte
 //	receiving        GotFirstResponseByte -> last byte read
 func (tr *tracer) phases(done time.Time) Phases {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
 	return Phases{
 		Blocked:    span(tr.getConn, tr.gotConn),
 		DNS:        span(tr.dnsStart, tr.dnsDone),
@@ -279,6 +305,12 @@ func (tr *tracer) phases(done time.Time) Phases {
 		Waiting:    span(tr.wrote, tr.firstByte),
 		Receiving:  span(tr.firstByte, done),
 	}
+}
+
+func (tr *tracer) connectionReused() bool {
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	return tr.reused
 }
 
 func basicAuthValue(username, password string) string {

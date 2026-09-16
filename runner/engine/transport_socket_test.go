@@ -2,10 +2,12 @@ package engine
 
 import (
 	"context"
+	"net"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -286,4 +288,263 @@ func TestRejectedRegistrationLeavesTheVictimIntact(t *testing.T) {
 	// And the refused request's own id must not have been left claimed.
 	_, err = m.register([]string{"2"})
 	assert.NoError(t, err, "id 2 was never successfully claimed, so it must be free")
+}
+
+// A reconnect must get a mux of its own. The reader of the socket that died may
+// still be blocked in a read when the replacement is already carrying requests,
+// and when it finally wakes it reports the failure it saw — which must reach
+// its own generation's requests and nothing else.
+func TestReconnectDoesNotInheritTheDeadConnectionsMux(t *testing.T) {
+	_, wsURL, _, _ := socketStub(t, stubnode.DefaultConfig())
+
+	w := newWebSocketConn(wsURL, nil, 5*time.Second, TransportOptions{})
+	t.Cleanup(func() { _ = w.Close() })
+
+	first, stale, _, err := w.connect(context.Background())
+	require.NoError(t, err)
+
+	// What a failed write does: forget the socket so the next request dials.
+	w.dropIfCurrent(first)
+
+	second, live, _, err := w.connect(context.Background())
+	require.NoError(t, err)
+	require.NotSame(t, first, second, "a dropped socket must not be handed out again")
+	require.NotSame(t, stale, live, "the new connection must match responses on its own state")
+
+	p, err := live.register([]string{"1"})
+	require.NoError(t, err)
+
+	stale.fail(errConnectionClosed)
+
+	live.dispatch([]byte(`{"jsonrpc":"2.0","id":1,"result":"answered"}`))
+	select {
+	case frame := <-p.done:
+		require.NotNil(t, frame, "the live connection was failed by the dead one's reader")
+		assert.Contains(t, string(frame), "answered")
+	case <-time.After(time.Second):
+		t.Fatal("the request on the live connection was never answered")
+	}
+
+	_, err = live.register([]string{"2"})
+	assert.NoError(t, err, "the live connection must still take requests")
+}
+
+// blackhole accepts connections and never answers, which is how a node that is
+// listening but not serving behaves: the handshake runs to its timeout.
+func blackhole(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	var mu sync.Mutex
+	var held []net.Conn
+	t.Cleanup(func() {
+		listener.Close()
+		mu.Lock()
+		defer mu.Unlock()
+		for _, conn := range held {
+			conn.Close()
+		}
+	})
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			held = append(held, conn)
+			mu.Unlock()
+		}
+	}()
+
+	return "ws://" + listener.Addr().String()
+}
+
+// Requests arriving while a handshake is in flight wait on its result, not on a
+// mutex. Queueing on the mutex made one unreachable target cost a multiple of
+// the handshake timeout: every waiting request paid for a fresh dial of its
+// own, one after another, and no request deadline could cut that short.
+func TestADeadTargetDoesNotSerialiseItsDials(t *testing.T) {
+	const handshakeTimeout = 400 * time.Millisecond
+	const vus = 8
+
+	w := newWebSocketConn(blackhole(t), nil, handshakeTimeout, TransportOptions{})
+	t.Cleanup(func() { _ = w.Close() })
+
+	errs := make(chan error, vus)
+	var wg sync.WaitGroup
+	start := time.Now()
+	for i := 0; i < vus; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, _, err := w.connect(context.Background())
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	elapsed := time.Since(start)
+
+	for i := 0; i < vus; i++ {
+		assert.Error(t, <-errs, "a node that never completes the handshake cannot be reached")
+	}
+	assert.Less(t, elapsed, vus/2*handshakeTimeout,
+		"the dials serialised: %d requests took %s against a handshake timeout of %s",
+		vus, elapsed, handshakeTimeout)
+}
+
+// A request waiting on someone else's handshake still answers to its own
+// deadline, which a mutex could not do.
+func TestAWaitingRequestKeepsItsOwnDeadlineDuringADial(t *testing.T) {
+	w := newWebSocketConn(blackhole(t), nil, 10*time.Second, TransportOptions{})
+	t.Cleanup(func() { _ = w.Close() })
+
+	go func() { _, _, _, _ = w.connect(context.Background()) }()
+
+	// Long enough that the goroutine above is the one dialling.
+	time.Sleep(50 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, _, _, err := w.connect(ctx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(start), 2*time.Second,
+		"the request waited out the handshake instead of its own deadline")
+}
+
+// A refusal must never be charged to a request the node answered. When the
+// requests in flight are not alike, the frame cannot be told from one belonging
+// to any of them, and guessing would record a failure against a call that
+// succeeded, discard that call's real answer, and still leave the refused call
+// to time out: one refusal becoming two failures and a lost success.
+func TestARefusalIsDroppedRatherThanChargedToADifferentShape(t *testing.T) {
+	m := newMux()
+
+	batch, err := m.register([]string{"1", "2"})
+	require.NoError(t, err)
+	single, err := m.register([]string{"3"})
+	require.NoError(t, err)
+
+	m.dispatch([]byte(`{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"batch too large"}}`))
+
+	select {
+	case <-single.done:
+		t.Fatal("the refusal was charged to a request of a different shape")
+	case <-batch.done:
+		t.Fatal("the refusal was charged to a request that may not have caused it")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// Both are still in flight, so both still receive their own answers. The
+	// success that the guess would have discarded is the reason for the rule.
+	m.dispatch([]byte(`{"jsonrpc":"2.0","id":3,"result":"mine"}`))
+	assert.Contains(t, string(<-single.done), "mine")
+
+	m.dispatch([]byte(`[{"jsonrpc":"2.0","id":1,"result":"a"},{"jsonrpc":"2.0","id":2,"result":"b"}]`))
+	assert.Contains(t, string(<-batch.done), `"id":1`)
+}
+
+// A node that rejects a request before reading its id answers with "id": null.
+// There is nothing to match on, so while every request in flight is alike — the
+// same batch size, refused alike — the frame goes to the one that has been
+// waiting longest, reporting the node's own error rather than a timeout for an
+// answer that did arrive.
+func TestNullIDErrorIsDeliveredRatherThanDropped(t *testing.T) {
+	m := newMux()
+	first, err := m.register([]string{"1"})
+	require.NoError(t, err)
+	second, err := m.register([]string{"2"})
+	require.NoError(t, err)
+
+	m.dispatch([]byte(`{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"batch too large"}}`))
+
+	select {
+	case frame := <-first.done:
+		assert.Contains(t, string(frame), "-32600")
+	case <-time.After(time.Second):
+		t.Fatal("the node's error was dropped and the request will now time out")
+	}
+
+	// The request that was not given it is still in flight and still matched.
+	m.dispatch([]byte(`{"jsonrpc":"2.0","id":2,"result":"mine"}`))
+	assert.Contains(t, string(<-second.done), "mine")
+}
+
+// A frame carrying no id that is not one of those two refusals is not a
+// response to a request: a notification, or the connection-level errors geth
+// and erigon push down the socket. Handing one to a waiting request would fail
+// a call the node never refused, and leave the real culprit to time out — one
+// failure recorded as two, against the wrong call.
+func TestUnattributableFramesThatAnswerNothingAreStillDropped(t *testing.T) {
+	for name, frame := range map[string]string{
+		"a notification":             `{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0xabc"}}`,
+		"a null result":              `{"jsonrpc":"2.0","id":null,"result":null}`,
+		"an internal error":          `{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"internal error"}}`,
+		"a write timeout":            `{"jsonrpc":"2.0","id":null,"error":{"code":-32000,"message":"write timeout"}}`,
+		"a connection-level message": `{"jsonrpc":"2.0","id":null,"error":{"code":-32001,"message":"message too large"}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := newMux()
+			p, err := m.register([]string{"1"})
+			require.NoError(t, err)
+
+			m.dispatch([]byte(frame))
+
+			select {
+			case <-p.done:
+				t.Fatal("a frame that answered nothing was delivered to a waiting request")
+			case <-time.After(50 * time.Millisecond):
+			}
+		})
+	}
+}
+
+// A batch over the node's own limit is refused with one error object and a null
+// id, which is the shape that has to survive the whole way to the report.
+func TestABatchOverTheNodesLimitIsReportedAsTheErrorItIs(t *testing.T) {
+	const batchSize = 5
+
+	for _, transport := range []string{"websocket", "ipc"} {
+		t.Run(transport, func(t *testing.T) {
+			cfg := stubnode.DefaultConfig()
+			cfg.Default.Latency = &stubnode.Latency{Kind: stubnode.LatencyFixed, MS: 1}
+			cfg.Node.MaxBatchSize = 2
+
+			// A stub of its own per transport, so its tally describes this run
+			// and can be held against what the client reported.
+			_, wsURL, ipcURL, stub := socketStub(t, cfg)
+			url := wsURL
+			if transport == "ipc" {
+				url = ipcURL
+			}
+
+			runCfg := socketRunConfig(url)
+			runCfg.Duration = "1s"
+			runCfg.RPS = 60
+			runCfg.BatchSize = batchSize
+
+			result, _, err := Run(context.Background(), runCfg, testOptions(t))
+			require.NoError(t, err)
+
+			client := result.ClientMetrics["stub"]
+			require.NotZero(t, client.TotalRequests)
+			assert.NotZero(t, client.ErrorTypes["rpc_code_-32600"],
+				"the node's batch-limit error was recorded as something else: %v", client.ErrorTypes)
+			assert.Zero(t, client.Outcomes[string(OutcomeTimeout)],
+				"a refused batch is an answer, not a timeout")
+
+			// Both sides count a whole-batch refusal in calls, so they agree on
+			// how many were refused. The tolerance is one batch: the run can
+			// end with one in flight, which the node has refused and the client
+			// has not yet read.
+			refusedByTheNode := stub.Stats().ByMethod["eth_call"][stubnode.OutcomeRPCError]
+			assert.InDelta(t, refusedByTheNode, client.ErrorTypes["rpc_code_-32600"], batchSize,
+				"the node refused %d calls and the client recorded %d",
+				refusedByTheNode, client.ErrorTypes["rpc_code_-32600"])
+		})
+	}
 }

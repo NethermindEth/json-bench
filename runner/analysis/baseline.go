@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -349,6 +350,25 @@ func (bm *baselineManager) DeleteBaseline(ctx context.Context, name string) erro
 	return nil
 }
 
+// semanticsOfBaselineRun reads what the baseline's run counted as an error.
+//
+// The baselines table outlives the run rows it points at, so a retention job or
+// a manual delete leaves a baseline whose run is gone. That makes the semantics
+// unknown, which is the unverified case — the same as a run that never recorded
+// them — rather than a reason to refuse every comparison against that baseline
+// from then on. Any other lookup failure is still a failure: an unreachable
+// database is not evidence that the run measured something else.
+func semanticsOfBaselineRun(run *types.HistoricRun, lookupErr error) (semantics string, missing bool, err error) {
+	switch {
+	case errors.Is(lookupErr, storage.ErrRunNotFound):
+		return "", true, nil
+	case lookupErr != nil:
+		return "", false, lookupErr
+	default:
+		return run.ErrorRateSemantics, false, nil
+	}
+}
+
 // CompareToBaseline compares a run against a specific baseline
 func (bm *baselineManager) CompareToBaseline(ctx context.Context, runID, baselineName string) (*BaselineComparison, error) {
 	bm.log.WithFields(logrus.Fields{
@@ -376,11 +396,18 @@ func (bm *baselineManager) CompareToBaseline(ctx context.Context, runID, baselin
 	// And that they measured the same thing. The error rate feeds every
 	// regression verdict below, so comparing across a change in what it counts
 	// reports a regression when nothing about the target moved.
-	baselineRun, err := bm.storage.GetHistoricRun(ctx, baseline.RunID)
+	baselineRun, lookupErr := bm.storage.GetHistoricRun(ctx, baseline.RunID)
+	baselineSemantics, missing, err := semanticsOfBaselineRun(baselineRun, lookupErr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the baseline's run %s: %w", baseline.RunID, err)
 	}
-	comparability := types.CompareSemantics(baselineRun.ErrorRateSemantics, run.ErrorRateSemantics)
+	if missing {
+		bm.log.WithFields(logrus.Fields{
+			"baseline_name": sanitize.LogValue(baselineName),
+			"baseline_run":  sanitize.LogValue(baseline.RunID),
+		}).Warn("The baseline's run is no longer stored, so what its error rate counted could not be checked")
+	}
+	comparability := types.CompareSemantics(baselineSemantics, run.ErrorRateSemantics)
 	if !comparability.Comparable {
 		return nil, fmt.Errorf("%w: %s", types.ErrIncomparableRuns, comparability.Reason)
 	}

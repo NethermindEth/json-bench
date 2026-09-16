@@ -392,7 +392,11 @@ const Version = "1"
 // on every run so a later comparison can refuse to read a semantics change as
 // a regression: JSON-RPC errors arrive as HTTP 200 and an HTTP-only pipeline
 // could not see them, so the same node measured both ways looks worse.
-const ErrorRateSemanticsRPCAware = "http_and_jsonrpc_errors"
+//
+// It is the constant the comparability gate reads, not a second copy of its
+// value: two literals that have to stay equal would make every stored run
+// incomparable with every new one the moment one of them was edited.
+const ErrorRateSemanticsRPCAware = types.ErrorRateSemanticsRPCAware
 
 // IdentifyTargets probes the configured clients without running any load. The
 // rate search uses it to identify the targets once, rather than once per probe.

@@ -56,6 +56,53 @@ func envelopeID(raw json.RawMessage) string {
 	return id
 }
 
+// JSON-RPC's two "the request could not be read" codes. The spec says an id
+// MUST be null only when the server failed to detect it — a parse error or an
+// invalid request — so these are the codes a frame with no id can legitimately
+// be answering a request with. A node refusing a batch over its own limit
+// answers -32600.
+const (
+	codeInvalidRequest = -32600
+	codeParseError     = -32700
+)
+
+// refusesTheRequestItself reports whether a frame is one of those two: an error
+// the node raised about the shape of what it was sent, rather than about what
+// the call asked for.
+//
+// It is deliberately narrow. Any other error carrying no id is not a response
+// to a request at all — geth and erigon push connection-level errors down the
+// socket that way — and handing one of those to a waiting request would fail a
+// call the node never refused.
+func refusesTheRequestItself(payload []byte) bool {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) == 0 {
+		return false
+	}
+	if trimmed[0] == '[' {
+		var members []json.RawMessage
+		if err := json.Unmarshal(trimmed, &members); err != nil {
+			return false
+		}
+		for _, member := range members {
+			if refusesTheRequestItself(member) {
+				return true
+			}
+		}
+		return false
+	}
+
+	var envelope struct {
+		Error *struct {
+			Code int `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(trimmed, &envelope); err != nil || envelope.Error == nil {
+		return false
+	}
+	return envelope.Error.Code == codeInvalidRequest || envelope.Error.Code == codeParseError
+}
+
 // writeDeadline is when a send must have completed by: the request's own
 // deadline when it has one, the transport timeout otherwise.
 func writeDeadline(ctx context.Context, timeout time.Duration) time.Time {
@@ -71,6 +118,7 @@ func writeDeadline(ctx context.Context, timeout time.Duration) time.Time {
 // pending is one in-flight request waiting for its answer.
 type pending struct {
 	ids  []string
+	seq  uint64
 	done chan []byte
 	once sync.Once
 }
@@ -79,10 +127,14 @@ func (p *pending) deliver(frame []byte) {
 	p.once.Do(func() { p.done <- frame })
 }
 
-// mux matches responses to requests over a connection that carries many at once.
+// mux matches responses to requests over a connection that carries many at
+// once. One mux belongs to one socket: a reconnect gets a fresh one, so a
+// reader still blocked on the socket it was given cannot fail requests that
+// now belong to the connection replacing it.
 type mux struct {
 	mu       sync.Mutex
 	waiting  map[string]*pending
+	nextSeq  uint64
 	closed   bool
 	closeErr error
 }
@@ -103,7 +155,7 @@ func (m *mux) register(ids []string) (*pending, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
-		return nil, m.closedErr()
+		return nil, m.closedErrLocked()
 	}
 	for i, id := range ids {
 		if _, taken := m.waiting[id]; taken {
@@ -117,6 +169,8 @@ func (m *mux) register(ids []string) (*pending, error) {
 		}
 		m.waiting[id] = p
 	}
+	m.nextSeq++
+	p.seq = m.nextSeq
 	return p, nil
 }
 
@@ -145,6 +199,13 @@ func (m *mux) dispatch(frame []byte) {
 			break
 		}
 	}
+	if target == nil && len(ids) == 0 && refusesTheRequestItself(frame) {
+		// A node that could not read the id it should answer with — a parse
+		// error, or a batch over its own limit — answers "id": null. There is
+		// nothing to match on, so dropping the frame would report the node's
+		// answer as a timeout, which is the one thing it certainly was not.
+		target = m.refusalTargetLocked()
+	}
 	if target != nil {
 		m.releaseLocked(target.ids)
 	}
@@ -153,6 +214,44 @@ func (m *mux) dispatch(frame []byte) {
 	if target != nil {
 		target.deliver(frame)
 	}
+}
+
+// refusalTargetLocked picks the request an unattributable refusal belongs to,
+// or nil when that cannot be told.
+//
+// It is the request waiting longest, but only while every request in flight
+// carries the same number of calls. A node refusing on the shape of what it was
+// sent refuses them all alike, so each gets a frame of its own and both the
+// count and the call it lands on come out right.
+//
+// Once the shapes differ the frame is indistinguishable from one belonging to a
+// request the node did answer, and guessing is worse than dropping it: the
+// refusal would be recorded against a call that succeeded, that call's real
+// answer would arrive to find its ids released and be discarded, and the call
+// the node actually refused would still time out. One refusal would become two
+// failures and a lost success.
+//
+// Refusing to guess unless exactly one request is in flight would close that
+// too, but it would also undo the fix it exists for: the first moment two
+// requests overlap, both refusals are dropped, and the timeouts they turn into
+// hold the in-flight slots open so that nothing is ever the sole waiter again.
+// One transient overlap would poison the rest of the run.
+func (m *mux) refusalTargetLocked() *pending {
+	calls := -1
+	var oldest *pending
+	for _, p := range m.waiting {
+		// A batch is registered under every id it carries, so the count of
+		// claimed ids is the number of calls in flight for that request.
+		if calls < 0 {
+			calls = len(p.ids)
+		} else if len(p.ids) != calls {
+			return nil
+		}
+		if oldest == nil || p.seq < oldest.seq {
+			oldest = p
+		}
+	}
+	return oldest
 }
 
 // fail wakes every pending request, which is what a closed connection means for
@@ -179,19 +278,16 @@ func (m *mux) fail(err error) {
 }
 
 func (m *mux) closedErr() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.closedErrLocked()
+}
+
+func (m *mux) closedErrLocked() error {
 	if m.closeErr != nil {
 		return m.closeErr
 	}
 	return errConnectionClosed
-}
-
-// reset clears the closed state so the connection can be re-established.
-func (m *mux) reset() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.closed = false
-	m.closeErr = nil
-	m.waiting = make(map[string]*pending)
 }
 
 // await blocks for this request's answer, the deadline, or the connection

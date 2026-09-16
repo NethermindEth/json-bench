@@ -134,7 +134,8 @@ func (cr *ClientRegistry) validateConfig(config types.ClientsConfig) error {
 		// The URL decides the transport, so the same rule the engine dispatches
 		// on decides what is configurable. Restating it here is what made every
 		// ws:// and ipc:// endpoint unreachable while the engine supported them.
-		if _, err := types.TransportKindFor(client.URL); err != nil {
+		transport, err := types.TransportKindFor(client.URL)
+		if err != nil {
 			return fmt.Errorf("client %s has an unusable URL: %w", client.Name, err)
 		}
 
@@ -142,6 +143,13 @@ func (cr *ClientRegistry) validateConfig(config types.ClientsConfig) error {
 		if client.Auth != nil {
 			if err := validateAuthConfig(client.Auth); err != nil {
 				return fmt.Errorf("client %s has invalid auth configuration: %w", client.Name, err)
+			}
+			// Auth is applied as request headers, and a Unix socket has no
+			// header layer to carry them. Accepting the block and ignoring it
+			// is how a run benchmarks an endpoint it never authenticated to.
+			if transport == types.TransportIPC {
+				return fmt.Errorf("client %s is reached over IPC, which carries no headers, so its auth block cannot be applied; "+
+					"a Unix socket is authorised by its file permissions", client.Name)
 			}
 		}
 

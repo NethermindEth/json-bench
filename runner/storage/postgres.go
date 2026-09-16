@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,12 @@ import (
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/types"
 )
+
+// ErrRunNotFound reports that no run row carries the given id. A caller that
+// can carry on without the run — a comparison whose baseline row outlived the
+// run it points at, for instance — has to be able to tell that apart from the
+// database being unreachable.
+var ErrRunNotFound = errors.New("run not found")
 
 // Database handles PostgreSQL operations for historic storage
 type Database struct {
@@ -144,7 +151,7 @@ func (d *Database) GetRun(id string) (*types.HistoricRun, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("run not found: %s", id)
+			return nil, fmt.Errorf("%w: %s", ErrRunNotFound, id)
 		}
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}

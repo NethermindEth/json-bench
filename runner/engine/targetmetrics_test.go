@@ -168,6 +168,37 @@ func TestScraperIsSkippedWithoutAMetricsURL(t *testing.T) {
 		"a client with no metrics_url reports nothing, which is not the same as reporting zero")
 }
 
+// --no-target-metrics clears the pattern list, and nothing selected has to mean
+// nothing read. A run disables this because the endpoint is slow or behind
+// auth, so scraping it and then filtering everything away is the one outcome
+// the flag is asking to avoid.
+func TestNoSelectedPatternsReadsNothing(t *testing.T) {
+	srv := stubServer(t, stubnode.Config{
+		Default: stubnode.Method{Latency: &stubnode.Latency{Kind: stubnode.LatencyFixed, MS: 1}},
+	})
+
+	var scrapes atomic.Int64
+	metrics := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		scrapes.Add(1)
+		fmt.Fprint(w, "# TYPE process_open_fds gauge\nprocess_open_fds 12\n")
+	}))
+	t.Cleanup(metrics.Close)
+
+	cfg := runConfig(srv.URL, []*config.Call{
+		{Name: "eth_call", Method: "eth_call", Params: []any{}, Weight: 1},
+	}, func(c *config.Config) { c.Duration = "1s"; c.RPS = 20; c.VUs = 5 })
+	cfg.ResolvedClients[0].MetricsURL = metrics.URL
+
+	opts := testOptions(t)
+	opts.TargetMetrics = TargetMetricsOptions{Interval: 50 * time.Millisecond, Patterns: nil}
+
+	result, _, err := Run(context.Background(), cfg, opts)
+	require.NoError(t, err)
+
+	assert.Zero(t, scrapes.Load(), "the node's metrics endpoint was read with nothing selected to read from it")
+	assert.Nil(t, result.ClientMetrics["stub"].TargetMetrics)
+}
+
 // The point of reading the node's own metrics: its figures and the client's
 // have to agree about the same run.
 func TestRunCorrelatesTheNodesOwnMetrics(t *testing.T) {

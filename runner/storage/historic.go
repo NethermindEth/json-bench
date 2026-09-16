@@ -667,7 +667,7 @@ func (h *HistoricStorage) DeleteHistoricRun(ctx context.Context, runID string) e
 		return fmt.Errorf("rows affected: %w", err)
 	}
 	if rows == 0 {
-		return fmt.Errorf("run not found: %s", runID)
+		return fmt.Errorf("%w: %s", ErrRunNotFound, runID)
 	}
 
 	if err := tx.Commit(); err != nil {

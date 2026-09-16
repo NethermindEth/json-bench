@@ -238,6 +238,14 @@ func (rs *runState) startPusher(ctx context.Context, opts Options, log *logrus.L
 // metrics_url are scraped; the rest simply report nothing, which is
 // distinguishable from reporting zero.
 func (rs *runState) startTargetScrapers(ctx context.Context, cfg *config.Config, opts Options, log *logrus.Logger) func() {
+	// With nothing selected every family a scrape returned would be filtered
+	// away, so the only thing left of it would be the request the node served
+	// during the measurement. That is what --no-target-metrics is asking not to
+	// happen.
+	if len(opts.TargetMetrics.Patterns) == 0 {
+		return func() {}
+	}
+
 	scrapers := make(map[string]*TargetScraper)
 	for _, client := range cfg.ResolvedClients {
 		if client.MetricsURL == "" {

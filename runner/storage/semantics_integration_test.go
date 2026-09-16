@@ -141,3 +141,17 @@ func TestCompareRunsProceedsWhenSemanticsMatch(t *testing.T) {
 	assert.True(t, comparison.Comparability.Verified)
 	assert.NotContains(t, comparison.Summary, "Refused")
 }
+
+// A missing run has to be distinguishable from a database that cannot answer.
+// The baselines table outlives the run rows it points at, so a comparison whose
+// baseline run was deleted degrades to unverified instead of failing outright —
+// which it can only do if it can tell the two errors apart.
+func TestAMissingRunIsReportedAsNotFound(t *testing.T) {
+	db := semanticsTestDB(t)
+	database := &Database{db: db, log: logrus.New()}
+
+	_, err := database.GetRun("semantics-never-inserted")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrRunNotFound)
+	assert.Contains(t, err.Error(), "not found", "the API maps this text to a 404")
+}

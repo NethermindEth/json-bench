@@ -291,6 +291,13 @@ transport so a comparison can see it:
   are protocol-level — `rpc_error`, `rpc_null`, `timeout`, `transport` — work
   exactly as they do over HTTP.
 
+`auth` and `headers` reach the node as request headers, which an HTTP request and
+a WebSocket handshake both carry. **A Unix socket has none**, so an `auth` block
+on an `ipc://` client is rejected when the config loads rather than accepted and
+then ignored — a run that silently dropped its credentials would benchmark
+whatever the node answers an unauthenticated caller. A Unix socket is authorised
+by its file permissions.
+
 Do not compare latency across transports: IPC skips the TCP and HTTP framing that
 HTTP pays for, which is the point of using it. Compare a transport against
 itself.
@@ -365,7 +372,8 @@ vus: 20
 
 `rps` stays a rate of *requests*, so batches go out at `rps/batch_size` and two
 runs at different batch sizes offer the node the same work. `--batch-size`
-overrides the config, which is the quick way to sweep it.
+overrides the config, which is the quick way to sweep it, and `--batch-size 0`
+turns batching off for one run of a config that sets it.
 
 What the numbers mean changes:
 

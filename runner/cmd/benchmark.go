@@ -88,6 +88,21 @@ func init() {
 		"Group requests into JSON-RPC batches of this size, overriding batch_size in the config. rps stays a rate of requests, so batches go out at rps/batch-size")
 }
 
+// applyBatchSize overrides the config's batch size with --batch-size. It acts
+// on whether the flag was given rather than on its value: --batch-size 0 is how
+// batching is turned off for one run of a config that sets it, and a negative
+// value has to reach validation rather than be silently ignored.
+func applyBatchSize(cfg *config.Config, size int, given bool) error {
+	if !given {
+		return nil
+	}
+	cfg.BatchSize = size
+	if err := config.Revalidate(cfg); err != nil {
+		return fmt.Errorf("--batch-size %d does not fit this config: %w", size, err)
+	}
+	return nil
+}
+
 func runBenchmark(cmd *cobra.Command, args []string) error {
 	configureLogger()
 
@@ -113,11 +128,8 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if benchmarkBatchSize > 0 {
-		cfg.BatchSize = benchmarkBatchSize
-		if err := config.Revalidate(cfg); err != nil {
-			return fmt.Errorf("--batch-size %d does not fit this config: %w", benchmarkBatchSize, err)
-		}
+	if err := applyBatchSize(cfg, benchmarkBatchSize, cmd.Flags().Changed("batch-size")); err != nil {
+		return err
 	}
 
 	if cfg.UsesCallsFile() {
@@ -193,6 +205,8 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	if len(benchmarkTargetMetrics) > 0 {
 		opts.TargetMetrics.Patterns = benchmarkTargetMetrics
 	}
+	// Nothing selected means nothing scraped: no endpoint is read at all,
+	// rather than read and then filtered away.
 	if benchmarkNoTargetMetrics {
 		opts.TargetMetrics.Patterns = nil
 	}

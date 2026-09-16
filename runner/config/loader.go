@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
@@ -133,46 +134,38 @@ func (cl *ConfigLoader) LoadWithBackwardCompatibility(filename string) (*Config,
 
 // loadOldStyleConfig handles configurations with embedded client definitions
 // Note: data should already have environment variables substituted
+//
+// The document is split rather than decoded into a struct mirroring Config:
+// `clients` is separated from the rest and the rest is decoded by Config
+// itself, so a field added to Config reaches this path too. A mirror struct
+// silently dropped whatever nobody remembered to add to it, and dropping
+// `warmup` or `batch_size` means running a different benchmark than the file
+// asked for.
 func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
-	// Define a structure that can hold both old and new style configurations
-	type oldStyleConfig struct {
-		TestName    string               `yaml:"test_name"`
-		Description string               `yaml:"description"`
-		Clients     []types.ClientConfig `yaml:"clients"` // Old style: embedded clients
-		Duration    string               `yaml:"duration"`
-		RPS         int                  `yaml:"rps"`
-		Iterations  int                  `yaml:"iterations"`
-		VUs         int                  `yaml:"vus"`
-		Seed        int64                `yaml:"seed"`
-		Calls       []*Call              `yaml:"calls"`
-		CallsFile   string               `yaml:"calls_file"`
+	clientsDoc, rest, err := splitEmbeddedClients(data)
+	if err != nil {
+		return nil, err
 	}
 
-	var oldConfig oldStyleConfig
-	if err := UnmarshalStrict(data, &oldConfig); err != nil {
+	var embedded struct {
+		Clients []types.ClientConfig `yaml:"clients"`
+	}
+	if err := UnmarshalStrict(clientsDoc, &embedded); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal the embedded clients: %w", err)
+	}
+
+	newConfig := &Config{}
+	if err := UnmarshalStrict(rest, newConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal old-style config: %w", err)
 	}
-
-	// Convert to new style config
-	newConfig := &Config{
-		TestName:        oldConfig.TestName,
-		Description:     oldConfig.Description,
-		Duration:        oldConfig.Duration,
-		RPS:             oldConfig.RPS,
-		Iterations:      oldConfig.Iterations,
-		VUs:             oldConfig.VUs,
-		Seed:            oldConfig.Seed,
-		Calls:           oldConfig.Calls,
-		CallsFile:       oldConfig.CallsFile,
-		ClientRefs:      make([]string, 0, len(oldConfig.Clients)),
-		ResolvedClients: make([]*types.ClientConfig, 0, len(oldConfig.Clients)),
-	}
+	newConfig.ClientRefs = make([]string, 0, len(embedded.Clients))
+	newConfig.ResolvedClients = make([]*types.ClientConfig, 0, len(embedded.Clients))
 
 	// If we have a client registry, register the embedded clients
 	if cl.clientRegistry != nil {
 		// Create a temporary clients config
 		tempClientsConfig := types.ClientsConfig{
-			Clients: oldConfig.Clients,
+			Clients: embedded.Clients,
 		}
 
 		// Load the embedded clients into the registry
@@ -182,8 +175,8 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 	}
 
 	// Add client references and resolved clients
-	for i := range oldConfig.Clients {
-		client := &oldConfig.Clients[i]
+	for i := range embedded.Clients {
+		client := &embedded.Clients[i]
 		newConfig.ClientRefs = append(newConfig.ClientRefs, client.Name)
 		newConfig.ResolvedClients = append(newConfig.ResolvedClients, client)
 	}
@@ -203,4 +196,89 @@ func (cl *ConfigLoader) loadOldStyleConfig(data []byte) (*Config, error) {
 	}
 
 	return newConfig, nil
+}
+
+// splitEmbeddedClients returns the document twice over: once with everything
+// but the `clients` block blanked out, and once with only that block blanked.
+// Both halves keep every other byte on the line the file had it on, so whichever
+// decoder rejects a key reports the line the reader will find it on.
+// Re-serialising the halves instead cost nothing but the line numbers, which
+// then pointed into generated text nobody had written.
+func splitEmbeddedClients(data []byte) (clientsDoc, rest []byte, err error) {
+	from, to, ok := blockLinesOf(data, "clients")
+	if !ok {
+		return reserialiseAround(data, "clients")
+	}
+
+	lines := bytes.Split(data, []byte("\n"))
+	blankedTo := func(want bool) []byte {
+		kept := make([][]byte, len(lines))
+		for i, line := range lines {
+			if inside := i+1 >= from && i+1 <= to; inside == want {
+				kept[i] = line
+			}
+		}
+		return bytes.Join(kept, []byte("\n"))
+	}
+	return blankedTo(true), blankedTo(false), nil
+}
+
+// blockLinesOf finds the lines one top-level key and its value occupy: from the
+// key's own line to the line before the next key. It reports false unless the
+// document is a block mapping whose top-level keys each start a line of their
+// own, which is the only shape a line range means anything for.
+func blockLinesOf(data []byte, key string) (from, to int, ok bool) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil || len(doc.Content) == 0 {
+		return 0, 0, false
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode || root.Style != 0 {
+		return 0, 0, false
+	}
+
+	keysOnLine := make(map[int]int, len(root.Content)/2)
+	target := -1
+	for i := 0; i < len(root.Content); i += 2 {
+		keysOnLine[root.Content[i].Line]++
+		if root.Content[i].Value == key {
+			target = i
+		}
+	}
+	if target < 0 {
+		return 0, 0, false
+	}
+
+	from = root.Content[target].Line
+	if keysOnLine[from] != 1 {
+		return 0, 0, false
+	}
+	to = bytes.Count(data, []byte("\n")) + 1
+	if next := target + 2; next < len(root.Content) {
+		to = root.Content[next].Line - 1
+	}
+	return from, to, from <= to
+}
+
+// reserialiseAround splits a document whose lines cannot be divided — a
+// top-level flow mapping has no line per key. The halves come back as generated
+// YAML, so the line numbers in an error about them are lost; loading the file
+// still beats refusing it over its layout.
+func reserialiseAround(data []byte, key string) (withKey, without []byte, err error) {
+	var document map[string]any
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	withKey, err = yaml.Marshal(map[string]any{key: document[key]})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to re-read %s: %w", key, err)
+	}
+
+	delete(document, key)
+	without, err = yaml.Marshal(document)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to re-read the config: %w", err)
+	}
+	return withKey, without, nil
 }

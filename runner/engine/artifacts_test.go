@@ -9,6 +9,7 @@ import (
 
 	"github.com/jsonrpc-bench/runner/config"
 	"github.com/jsonrpc-bench/runner/internal/stubnode"
+	"github.com/jsonrpc-bench/runner/types"
 )
 
 // The two failures the previous pipeline could not report have to be visible in
@@ -147,7 +148,10 @@ func TestResultRecordsHowTheRunWasProduced(t *testing.T) {
 	m := result.Manifest
 	assert.Equal(t, "native", m.Engine)
 	assert.Equal(t, Version, m.EngineVersion)
-	assert.Equal(t, ErrorRateSemanticsRPCAware, m.ErrorRateSemantics)
+	// Against the constant the comparability gate reads, not the engine's own
+	// name for it: a second literal that drifted would make every stored run
+	// incomparable with every new one.
+	assert.Equal(t, types.ErrorRateSemanticsRPCAware, m.ErrorRateSemantics)
 	assert.EqualValues(t, 4242, m.Seed)
 	assert.Equal(t, string(SaturationDrop), m.Saturation)
 	assert.Equal(t, 20, m.TargetRPS)

@@ -2,9 +2,9 @@ package generator
 
 import (
 	"fmt"
+	"html/template"
 	"os"
 	"sort"
-	"text/template"
 	"time"
 
 	"github.com/jsonrpc-bench/runner/config"
@@ -131,22 +131,6 @@ const htmlReportTemplate = `
             font-size: 1.5em;
             margin-bottom: 20px;
             color: var(--dark-color);
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 400px;
-            margin-bottom: 20px;
-        }
-        
-        .chart-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 30px;
-        }
-        
-        .time-series-container {
-            height: 500px;
         }
         
         .table-section {
@@ -282,11 +266,6 @@ const htmlReportTemplate = `
             color: var(--dark-color);
         }
         
-        .heatmap-container {
-            overflow-x: auto;
-            margin-bottom: 20px;
-        }
-        
         .comparison-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -353,16 +332,11 @@ const htmlReportTemplate = `
                 grid-template-columns: 1fr;
             }
             
-            .chart-grid {
-                grid-template-columns: 1fr;
-            }
-            
             .comparison-grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
 </head>
 <body>
     <div class="header">
@@ -402,8 +376,15 @@ const htmlReportTemplate = `
             <h2 class="section-title">Load delivery</h2>
             {{if .AnyShortfall}}
             <p style="color:#9c3520;font-weight:600;">
-                At least one client was offered less load than requested. The latency figures
-                above describe only the requests that were actually sent.
+                At least one client was offered less load than requested: requests were dropped
+                rather than sent. The latency figures above describe only the requests that were
+                actually sent.
+            </p>
+            {{end}}
+            {{if .AnyLate}}
+            <p style="color:#8a5300;font-weight:600;">
+                At least one client sent every scheduled request, but some went out later than
+                scheduled: the endpoint was slower than the requested rate. See Max dispatch delay.
             </p>
             {{end}}
             <table>
@@ -435,17 +416,17 @@ const htmlReportTemplate = `
         <div class="table-section">
             <h2 class="chart-title">Detailed Results</h2>
             <div class="tabs">
-                {{range $index, $client := .ClientMetrics}}
-                <button class="tab {{if eq $index 0}}active{{end}}" onclick="showTab('{{$client.Name}}', this)">
+                {{range $index, $client := .Clients}}
+                <button class="tab {{if eq $index 0}}active{{end}}" onclick="showTab({{$index}}, this)">
                     {{$client.Name}}
                 </button>
                 {{end}}
             </div>
             
-            {{range $index, $client := .ClientMetrics}}
-            <div id="tab-{{$client.Name}}" class="tab-content {{if eq $index 0}}active{{end}}">
+            {{range $index, $client := .Clients}}
+            <div id="tab-{{$index}}" class="tab-content {{if eq $index 0}}active{{end}}">
                 <h3>{{$client.Name}} Performance Metrics</h3>
-                
+
                 <!-- Client Summary -->
                 <div class="environment-info" style="margin: 20px 0;">
                     <div class="env-item">
@@ -454,19 +435,16 @@ const htmlReportTemplate = `
                     </div>
                     <div class="env-item">
                         <span class="env-label">Success Rate</span>
-                        <span class="env-value">{{printf "%.2f" (sub 100.0 $client.ErrorRate)}}%</span>
-                    </div>
-                    <div class="env-item">
-                        <span class="env-label">Avg Connections</span>
-                        <span class="env-value">{{$client.ConnectionMetrics.ActiveConnections}}</span>
+                        <span class="env-value">{{printf "%.2f" $client.SuccessRate}}%</span>
                     </div>
                     <div class="env-item">
                         <span class="env-label">Connection Reuse</span>
-                        <span class="env-value">{{printf "%.1f" $client.ConnectionMetrics.ConnectionReuse}}%</span>
+                        <span class="env-value">{{printf "%.1f" $client.ConnectionReuse}}%</span>
                     </div>
                 </div>
-                
-                <!-- Method Performance Table -->
+
+                <!-- One row per call, not per method: several calls can drive one
+                     method, and the method key alone hides what they measured. -->
                 <table>
                     <thead>
                         <tr>
@@ -490,30 +468,30 @@ const htmlReportTemplate = `
                         </tr>
                     </thead>
                     <tbody>
-                        {{range $method, $metrics := $client.Methods}}
+                        {{range $call := $client.Calls}}
                         <tr>
-                            <td>{{if index $.EndpointNames $method}}{{index $.EndpointNames $method}}{{end}}</td>
-                            <td><strong>{{$method}}</strong></td>
-                            <td>{{$metrics.Count}}</td>
+                            <td>{{$call.Name}}</td>
+                            <td><strong>{{$call.Method}}</strong></td>
+                            <td>{{$call.Count}}</td>
                             <td>
-                                {{if ge $metrics.SuccessRate 99.0}}
-                                <span class="badge badge-success">{{printf "%.1f" $metrics.SuccessRate}}%</span>
-                                {{else if ge $metrics.SuccessRate 95.0}}
-                                <span class="badge badge-warning">{{printf "%.1f" $metrics.SuccessRate}}%</span>
+                                {{if ge $call.SuccessRate 99.0}}
+                                <span class="badge badge-success">{{printf "%.1f" $call.SuccessRate}}%</span>
+                                {{else if ge $call.SuccessRate 95.0}}
+                                <span class="badge badge-warning">{{printf "%.1f" $call.SuccessRate}}%</span>
                                 {{else}}
-                                <span class="badge badge-danger">{{printf "%.1f" $metrics.SuccessRate}}%</span>
+                                <span class="badge badge-danger">{{printf "%.1f" $call.SuccessRate}}%</span>
                                 {{end}}
                             </td>
-                            <td>{{printf "%.1f" $metrics.Min}}</td>
-                            <td>{{printf "%.1f" $metrics.P50}}</td>
-                            <td>{{printf "%.1f" $metrics.P75}}</td>
-                            <td>{{printf "%.1f" $metrics.P90}}</td>
-                            <td>{{printf "%.1f" $metrics.P95}}</td>
-                            <td>{{printf "%.1f" $metrics.P99}}</td>
-                            <td>{{printf "%.1f" $metrics.P999}}</td>
-                            <td>{{printf "%.1f" $metrics.Max}}</td>
-                            <td>{{printf "%.1f" $metrics.StdDev}}</td>
-                            <td>{{printf "%.1f" $metrics.CoeffVar}}%</td>
+                            <td>{{printf "%.1f" $call.Min}}</td>
+                            <td>{{printf "%.1f" $call.P50}}</td>
+                            <td>{{printf "%.1f" $call.P75}}</td>
+                            <td>{{printf "%.1f" $call.P90}}</td>
+                            <td>{{printf "%.1f" $call.P95}}</td>
+                            <td>{{printf "%.1f" $call.P99}}</td>
+                            <td>{{printf "%.1f" $call.P999}}</td>
+                            <td>{{printf "%.1f" $call.Max}}</td>
+                            <td>{{printf "%.1f" $call.StdDev}}</td>
+                            <td>{{printf "%.1f" $call.CoeffVar}}%</td>
                         </tr>
                         {{end}}
                     </tbody>
@@ -597,12 +575,7 @@ const htmlReportTemplate = `
     </div>
     
     <script>
-        // Chart default options
-        Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-        Chart.defaults.color = '#666';
-        
-        // Tab switching
-        function showTab(tabName, element) {
+        function showTab(index, element) {
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
             });
@@ -610,7 +583,7 @@ const htmlReportTemplate = `
                 tab.classList.remove('active');
             });
             
-            document.getElementById('tab-' + tabName).classList.add('active');
+            document.getElementById('tab-' + index).classList.add('active');
             element.classList.add('active');
         }
     </script>
@@ -645,10 +618,18 @@ type reportData struct {
 	// Delivery is the per-client offered-load accounting. A run that could not
 	// offer its requested rate has to say so here, because the latency figures
 	// beside it describe only the requests that went out.
-	Delivery     []clientDelivery
+	Delivery []clientDelivery
+
+	// AnyShortfall is set when a client was offered less than it was asked to
+	// offer: requests were dropped rather than sent. AnyLate is the separate,
+	// milder case of every request going out but some of them behind schedule,
+	// which the engine also reports separately — reading it as a shortfall put
+	// the red banner above a table showing Scheduled == Sent.
 	AnyShortfall bool
-	BestClient   string
-	BestScore    float64
+	AnyLate      bool
+
+	BestClient string
+	BestScore  float64
 
 	// Environment
 	Environment types.EnvironmentInfo
@@ -658,15 +639,7 @@ type reportData struct {
 	PerformanceScore map[string]float64
 	Recommendations  []string
 
-	// Client data
-	ClientMetrics []*types.ClientMetrics
-	ClientNames   []string
-	MethodNames   []string
-	EndpointNames map[string]string // Map of method to custom names
-
-	// Colors
-	ChartColors      []string
-	ChartColorsAlpha []string
+	Clients []clientReport
 }
 
 // GenerateUltimateHTMLReport generates the ultimate HTML report with all advanced features
@@ -678,9 +651,6 @@ func GenerateHTMLReport(cfg *config.Config, result *types.BenchmarkResult, outpu
 	// Create template with custom functions
 	funcMap := template.FuncMap{
 		"printf": fmt.Sprintf,
-		"sub": func(a, b float64) float64 {
-			return a - b
-		},
 	}
 
 	tmpl, err := template.New("report").Funcs(funcMap).Parse(htmlReportTemplate)
@@ -715,14 +685,6 @@ func preparereportData(cfg *config.Config, result *types.BenchmarkResult) *repor
 		Comparison:       result.Comparison,
 		PerformanceScore: result.PerformanceScore,
 		Recommendations:  result.Recommendations,
-		EndpointNames:    make(map[string]string),
-	}
-
-	// Populate methods names from config
-	for _, call := range cfg.Calls {
-		if call.Name != "" {
-			data.EndpointNames[call.Name] = call.Name
-		}
 	}
 
 	// Calculate summary metrics
@@ -735,9 +697,9 @@ func preparereportData(cfg *config.Config, result *types.BenchmarkResult) *repor
 		totalSuccess += client.TotalRequests - client.TotalErrors
 		totalP95 += client.Latency.P95
 		clientCount++
-		data.ClientMetrics = append(data.ClientMetrics, client)
-		data.ClientNames = append(data.ClientNames, client.Name)
+		data.Clients = append(data.Clients, clientReportFor(client))
 	}
+	sort.Slice(data.Clients, func(i, j int) bool { return data.Clients[i].Name < data.Clients[j].Name })
 
 	data.TotalRequests = totalRequests
 	data.TotalSuccess = totalSuccess
@@ -751,8 +713,11 @@ func preparereportData(cfg *config.Config, result *types.BenchmarkResult) *repor
 	for _, client := range result.ClientMetrics {
 		d := client.Delivery
 		data.ActualRPS += d.AchievedRPS
-		if !d.Complete() {
+		if d.Dropped > 0 {
 			data.AnyShortfall = true
+		}
+		if d.Late > 0 {
+			data.AnyLate = true
 		}
 		data.Delivery = append(data.Delivery, clientDelivery{
 			Name:             client.Name,
@@ -775,37 +740,60 @@ func preparereportData(cfg *config.Config, result *types.BenchmarkResult) *repor
 		data.BestScore = result.Comparison.WinnerScore
 	}
 
-	// Extract method names
-	methodMap := make(map[string]bool)
-	for _, client := range result.ClientMetrics {
-		for method := range client.Methods {
-			methodMap[method] = true
-		}
-	}
-	for method := range methodMap {
-		data.MethodNames = append(data.MethodNames, method)
-	}
-
-	// Chart colors
-	data.ChartColors = []string{
-		"'rgb(54, 162, 235)'",
-		"'rgb(255, 99, 132)'",
-		"'rgb(75, 192, 192)'",
-		"'rgb(255, 205, 86)'",
-		"'rgb(153, 102, 255)'",
-		"'rgb(255, 159, 64)'",
-	}
-
-	data.ChartColorsAlpha = []string{
-		"'rgba(54, 162, 235, 0.2)'",
-		"'rgba(255, 99, 132, 0.2)'",
-		"'rgba(75, 192, 192, 0.2)'",
-		"'rgba(255, 205, 86, 0.2)'",
-		"'rgba(153, 102, 255, 0.2)'",
-		"'rgba(255, 159, 64, 0.2)'",
-	}
-
 	return data
+}
+
+// clientReport is one client's tab in the report.
+type clientReport struct {
+	Name            string
+	TotalRequests   int64
+	SuccessRate     float64
+	ConnectionReuse float64
+	Calls           []callRow
+}
+
+// callRow is one row of a client's breakdown. It is keyed on the call the
+// config declared rather than on the RPC method: a run can drive one method
+// through several parameter shapes, and then the method alone collapses the
+// only dimension it was measuring.
+type callRow struct {
+	Name   string
+	Method string
+	types.MetricSummary
+}
+
+func clientReportFor(client *types.ClientMetrics) clientReport {
+	report := clientReport{
+		Name:            client.Name,
+		TotalRequests:   client.TotalRequests,
+		SuccessRate:     100 - client.ErrorRate,
+		ConnectionReuse: client.ConnectionMetrics.ConnectionReuse,
+	}
+
+	// The per-method breakdown is the fallback for a result recorded without
+	// the per-call one, where the method is all there is to name a row by.
+	breakdown := client.Calls
+	if len(breakdown) == 0 {
+		breakdown = client.MethodDetails
+	}
+	for key, metrics := range breakdown {
+		if metrics == nil {
+			continue
+		}
+		row := callRow{Name: metrics.Name, Method: metrics.Method, MetricSummary: metrics.MetricSummary}
+		if row.Name == "" {
+			row.Name = key
+		}
+		report.Calls = append(report.Calls, row)
+	}
+	sort.Slice(report.Calls, func(i, j int) bool {
+		if report.Calls[i].Name != report.Calls[j].Name {
+			return report.Calls[i].Name < report.Calls[j].Name
+		}
+		return report.Calls[i].Method < report.Calls[j].Method
+	})
+
+	return report
 }
 
 // clientDelivery is one client's offered-load accounting, for the report table.

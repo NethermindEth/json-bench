@@ -168,7 +168,6 @@ export interface EnvironmentInfo {
   cpuCores: number
   totalMemoryGB: number
   goVersion: string
-  k6Version: string
   networkType: string
   region: string
   availability: string
