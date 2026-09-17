@@ -16,7 +16,9 @@ go run ./rpc-calls/scripts/generate-trace-historical \
   --rpc http://127.0.0.1:8545 --write-config config/benchmark/trace-mine.yaml
 
 go run ./runner benchmark \
-  --config config/benchmark/trace-mine.yaml --clients <your clients.yaml>
+  --config config/benchmark/trace-mine-single.yaml --clients <your clients.yaml>
+go run ./runner benchmark \
+  --config config/benchmark/trace-mine-block.yaml --clients <your clients.yaml>
 ```
 
 Run it against the node you are about to benchmark. With `--write-config` it
@@ -30,6 +32,7 @@ reports.
 | flag | default | meaning |
 | --- | --- | --- |
 | `--rpc` | `http://127.0.0.1:8545` | endpoint to mint the corpus from |
+| `--metrics` | `` | metrics endpoint of the same node; mints inside the transaction index's covered range when the node reports one |
 | `--output-dir` | `rpc-calls/trace-historical` | parent directory; the corpus lands in `blocks-<lowest>-<highest>` under it |
 | `--blocks` | `20` | blocks to sample, one request per block per family |
 | `--min-tx` | `50` | skip blocks with fewer transactions than this |
@@ -55,7 +58,8 @@ go run ./rpc-calls/scripts/generate-trace-historical \
   --rpc http://127.0.0.1:8545 --rps 10,25,50,100,200 --duration 60s \
   --write-config config/benchmark/trace-mine.yaml
 
-for config in config/benchmark/trace-mine-rps*.yaml; do
+for config in config/benchmark/trace-mine-single-rps*.yaml \
+              config/benchmark/trace-mine-block-rps*.yaml; do
   go run ./runner benchmark --config "$config" --clients <your clients.yaml>
 done
 ```
@@ -68,6 +72,17 @@ Raise `--vus` alongside the rate when the calls are slow: k6 cannot offer more
 requests per second than its virtual users can hold open, so a whole-block trace
 taking a second caps at one request per second per user however high the rate is
 set. The reported request rate, not the configured one, is what the node served.
+
+## Two shapes, measured apart
+
+The configs come in pairs: `-single` carries the four single-transaction
+families, `-block` carries the whole-block trace. Run single first.
+
+They are kept apart because the runner gives a client one k6 scenario, not one
+per call. In a single config the whole-block traces take the virtual users the
+single-transaction traces need, and a whole block costs an order of magnitude
+more, so the percentiles describe a mixture that is neither one thing nor the
+other.
 
 ## Output
 
@@ -84,6 +99,28 @@ Five files, the same names and request shapes as the checked-in corpus:
 The last transaction of a block is the worst case for a node that has to replay
 the transactions ahead of the one asked for, which is what makes it the request
 worth measuring.
+
+## Staying inside the transaction index
+
+A node can carry history it has not indexed per transaction: an archive that
+turned the index on keeps retrofitting backwards for as long as it takes, and
+until it finishes, the blocks below the retrofit are served by replaying the
+transactions ahead of the one asked for. That is a different code path at a
+different cost, so a corpus straying outside the index measures a mixture of
+the two and compares nothing.
+
+Pass `--metrics` and the range comes from the node:
+
+```bash
+go run ./rpc-calls/scripts/generate-trace-historical \
+  --rpc http://127.0.0.1:8545 --metrics http://127.0.0.1:8008/metrics \
+  --write-config config/benchmark/trace-mine.yaml
+```
+
+It reads `nethermind_transaction_changeset_index_from` and `..._to` and samples
+between them. A node that publishes no such range falls back to the floor, and
+`--from` still overrides everything. On a node whose history begins at its sync
+pivot the two coincide, so the flag changes nothing there.
 
 ## How the floor is found
 

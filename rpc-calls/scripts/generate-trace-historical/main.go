@@ -15,6 +15,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -117,10 +118,12 @@ type config struct {
 	rates       string
 	vus         int
 	duration    string
+	metricsURL  string
 }
 
 func main() {
 	rpcURL := flag.String("rpc", "http://127.0.0.1:8545", "JSON-RPC endpoint to mint the corpus from")
+	metricsURL := flag.String("metrics", "", "Prometheus metrics endpoint of the same node; when it reports a transaction index, the corpus is minted inside that index's covered range")
 	outputDir := flag.String("output-dir", "rpc-calls/trace-historical", "parent directory; the corpus lands in blocks-<lowest>-<highest> under it")
 	blocks := flag.Int("blocks", 20, "blocks to sample, one request per block per family")
 	minTx := flag.Int("min-tx", 50, "skip blocks with fewer transactions than this")
@@ -144,7 +147,7 @@ func main() {
 	cfg := config{
 		outputDir: *outputDir, blocks: *blocks, minTx: *minTx, headLag: *headLag,
 		from: *from, to: *to, seed: *seed, writeConfig: *writeConfig, clientName: *clientName,
-		rates: *rates, vus: *vus, duration: *duration,
+		rates: *rates, vus: *vus, duration: *duration, metricsURL: *metricsURL,
 	}
 
 	if err := run(c, cfg); err != nil {
@@ -167,6 +170,19 @@ func run(c *client, cfg config) error {
 		top = head - cfg.headLag
 	}
 	bottom := cfg.from
+	if bottom == 0 && cfg.metricsURL != "" {
+		indexFrom, indexTo, err := indexCoverage(c.http, cfg.metricsURL)
+		if err != nil {
+			return err
+		}
+		if indexFrom > 0 {
+			bottom = indexFrom
+			if indexTo < top {
+				top = indexTo
+			}
+			slog.Info("the node reports a transaction index; minting inside it", "from", indexFrom, "to", indexTo)
+		}
+	}
 	if bottom == 0 {
 		if bottom, err = discoverFloor(c, top); err != nil {
 			return err
@@ -230,52 +246,80 @@ func run(c *client, cfg config) error {
 	return nil
 }
 
-// writeBenchmarkConfigs renders one config per offered rate. A single rate keeps
-// the path as given, so the common case stays one file; a sweep suffixes the rate,
-// because the rate is the only thing that differs between the runs being compared.
+// writeBenchmarkConfigs renders one config per shape per offered rate. The two
+// shapes are kept apart because the runner gives a client one scenario, not one
+// per call: mixed into a single config, whole-block traces take the virtual users
+// that the single-transaction traces need, and neither number means anything. A
+// single rate leaves the rate out of the name, since then only the shape differs.
 func writeBenchmarkConfigs(cfg config, dir string, lowest, highest uint64) ([]string, error) {
 	var written []string
 	rates := strings.Split(cfg.rates, ",")
-	for _, rate := range rates {
-		rate = strings.TrimSpace(rate)
-		parsed, err := strconv.Atoi(rate)
-		if err != nil || parsed <= 0 {
-			return nil, fmt.Errorf("--rps %q: every rate must be a positive whole number", cfg.rates)
-		}
+	for _, shape := range shapes {
+		for _, rate := range rates {
+			rate = strings.TrimSpace(rate)
+			parsed, err := strconv.Atoi(rate)
+			if err != nil || parsed <= 0 {
+				return nil, fmt.Errorf("--rps %q: every rate must be a positive whole number", cfg.rates)
+			}
 
-		path := cfg.writeConfig
-		if len(rates) > 1 {
-			extension := filepath.Ext(path)
-			path = fmt.Sprintf("%s-rps%d%s", strings.TrimSuffix(path, extension), parsed, extension)
+			extension := filepath.Ext(cfg.writeConfig)
+			path := fmt.Sprintf("%s-%s%s", strings.TrimSuffix(cfg.writeConfig, extension), shape.suffix, extension)
+			if len(rates) > 1 {
+				path = fmt.Sprintf("%s-rps%d%s", strings.TrimSuffix(path, extension), parsed, extension)
+			}
+			if err := writeBenchmarkConfig(cfg, dir, path, shape, parsed, lowest, highest); err != nil {
+				return nil, err
+			}
+			written = append(written, path)
 		}
-		if err := writeBenchmarkConfig(cfg, dir, path, parsed, lowest, highest); err != nil {
-			return nil, err
-		}
-		written = append(written, path)
 	}
 	return written, nil
+}
+
+// A shape is a set of calls that cost the same order of magnitude, so that one
+// run's percentiles describe one thing. Single transactions come first: they are
+// what the index exists for, and what a node answers most of.
+type benchmarkShape struct {
+	suffix  string
+	summary string
+	calls   []benchmarkCall
+}
+
+type benchmarkCall struct{ name, file string }
+
+var shapes = []benchmarkShape{
+	{
+		suffix:  "single",
+		summary: "Cold single-transaction traces",
+		calls: []benchmarkCall{
+			{"debug_traceTransaction callTracer", "debug_traceTransaction-callTracer"},
+			{"debug_traceTransaction prestateTracer", "debug_traceTransaction-prestateTracer"},
+			{"trace_transaction", "trace_transaction"},
+			{"trace_replayTransaction trace stateDiff", "trace_replayTransaction-trace-stateDiff"},
+		},
+	},
+	{
+		suffix:  "block",
+		summary: "Cold whole-block traces",
+		calls:   []benchmarkCall{{"debug_traceBlockByHash callTracer whole block", "debug_traceBlockByHash-callTracer"}},
+	},
 }
 
 // writeBenchmarkConfig renders the same five calls the checked-in
 // trace-transaction-historical.yaml carries, against the corpus just written,
 // so that minting and running are one step and no path is edited by hand.
-func writeBenchmarkConfig(cfg config, dir, path string, rate int, lowest, highest uint64) error {
+func writeBenchmarkConfig(cfg config, dir, path string, shape benchmarkShape, rate int, lowest, highest uint64) error {
 	var b strings.Builder
-	fmt.Fprintf(&b, "test_name: \"Historical single-transaction tracing %d-%d\"\n", lowest, highest)
-	fmt.Fprintf(&b, "description: \"Cold single-transaction traces over blocks %d-%d, minted from the node under test: "+
-		"the last transaction of %d distinct blocks per endpoint, every block with at least %d transactions, sampled with seed %d. "+
-		"debug_traceBlockByHash over the same blocks is the whole-block control. "+
-		"Names carry no commas - k6 builds threshold sub-metric names from them.\"\n", lowest, highest, cfg.blocks, cfg.minTx, cfg.seed)
+	fmt.Fprintf(&b, "test_name: %q\n", fmt.Sprintf("Historical %s tracing %d-%d", shape.suffix, lowest, highest))
+	fmt.Fprintf(&b, "description: \"%s over blocks %d-%d, minted from the node under test: "+
+		"%d distinct blocks, every block with at least %d transactions, sampled with seed %d. "+
+		"The request targets the block's last transaction, the deepest prefix a node has to resolve. "+
+		"Names carry no commas - k6 builds threshold sub-metric names from them.\"\n",
+		shape.summary, lowest, highest, cfg.blocks, cfg.minTx, cfg.seed)
 	fmt.Fprintf(&b, "clients:\n  - %s\n", cfg.clientName)
 	fmt.Fprintf(&b, "duration: %q\nrps: %d\nvus: %d\ncalls:\n", cfg.duration, rate, cfg.vus)
 
-	for _, call := range []struct{ name, file string }{
-		{"debug_traceTransaction callTracer", "debug_traceTransaction-callTracer"},
-		{"debug_traceTransaction prestateTracer", "debug_traceTransaction-prestateTracer"},
-		{"trace_transaction", "trace_transaction"},
-		{"trace_replayTransaction trace stateDiff", "trace_replayTransaction-trace-stateDiff"},
-		{"debug_traceBlockByHash callTracer whole block", "debug_traceBlockByHash-callTracer"},
-	} {
+	for _, call := range shape.calls {
 		fmt.Fprintf(&b, "  - name: %q\n", call.name)
 		fmt.Fprintf(&b, "    file: \"./%s\"\n", filepath.ToSlash(filepath.Join(dir, call.file+".jsonl")))
 		b.WriteString("    file_type: \"jsonl\"\n    weight: 1\n    thresholds: [\"p(99)<600000\"]\n")
@@ -287,6 +331,51 @@ func writeBenchmarkConfig(cfg config, dir, path string, rate int, lowest, highes
 		}
 	}
 	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// indexCoverage reads the range the node's per-transaction index covers. Outside
+// it a trace is answered by replaying the transactions ahead of the one asked
+// for, which is a different code path at a different cost, so a corpus that
+// strays outside measures a mixture of the two and compares nothing. Zero means
+// the node publishes no such range, and the floor decides the range instead.
+func indexCoverage(client *http.Client, url string) (uint64, uint64, error) {
+	response, err := client.Get(url)
+	if err != nil {
+		return 0, 0, fmt.Errorf("metrics %s: %w", url, err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return 0, 0, fmt.Errorf("metrics %s: %w", url, err)
+	}
+
+	from := gauge(string(body), "nethermind_transaction_changeset_index_from")
+	to := gauge(string(body), "nethermind_transaction_changeset_index_to")
+	if from == 0 || to <= from {
+		return 0, 0, nil
+	}
+	return from, to, nil
+}
+
+// gauge reads one unlabelled Prometheus gauge, which is how a node publishes a
+// block height: one sample, no labels, a float that is a whole number.
+func gauge(body, name string) uint64 {
+	for _, line := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(line, name) {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 || (fields[0] != name && !strings.HasPrefix(fields[0], name+"{")) {
+			continue
+		}
+		value, err := strconv.ParseFloat(fields[len(fields)-1], 64)
+		if err != nil || value <= 0 {
+			continue
+		}
+		return uint64(value)
+	}
+	return 0
 }
 
 // discoverFloor binary searches the lowest height whose state the node still
