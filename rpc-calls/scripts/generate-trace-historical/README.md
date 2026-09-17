@@ -39,8 +39,35 @@ reports.
 | `--seed` | `1` | PRNG seed, so the same node and range mint the same corpus |
 | `--write-config` | `` | also write a benchmark config pointing at the corpus |
 | `--client` | `nethermind` | client name the written config benchmarks; must match an entry in your `clients.yaml` |
+| `--rps` | `1` | offered rate per call; a comma-separated list writes one config per rate |
+| `--vus` | `16` | concurrent virtual users the written config allows |
+| `--duration` | `600s` | how long the written config runs each rate |
 | `--timeout` | `120s` | per-request timeout |
 | `--attempts` | `4` | attempts per request; only transport faults are retried |
+
+## Throughput
+
+One rate measures latency under a fixed offered load. To find where a node
+saturates, pass several and run them in turn:
+
+```bash
+go run ./rpc-calls/scripts/generate-trace-historical \
+  --rpc http://127.0.0.1:8545 --rps 10,25,50,100,200 --duration 60s \
+  --write-config config/benchmark/trace-mine.yaml
+
+for config in config/benchmark/trace-mine-rps*.yaml; do
+  go run ./runner benchmark --config "$config" --clients <your clients.yaml>
+done
+```
+
+Each rate gets its own config, suffixed with it, since the rate is the only
+thing that differs between the runs being compared. Saturation shows up as the
+first rate where errors appear or p99 leaves the trend.
+
+Raise `--vus` alongside the rate when the calls are slow: k6 cannot offer more
+requests per second than its virtual users can hold open, so a whole-block trace
+taking a second caps at one request per second per user however high the rate is
+set. The reported request rate, not the configured one, is what the node served.
 
 ## Output
 

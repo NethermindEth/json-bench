@@ -114,6 +114,9 @@ type config struct {
 	seed        uint64
 	writeConfig string
 	clientName  string
+	rates       string
+	vus         int
+	duration    string
 }
 
 func main() {
@@ -127,6 +130,9 @@ func main() {
 	seed := flag.Uint64("seed", 1, "PRNG seed, so the same node and range mint the same corpus")
 	writeConfig := flag.String("write-config", "", "also write a benchmark config pointing at the corpus, ready for `runner benchmark`")
 	clientName := flag.String("client", "nethermind", "client name the written config benchmarks; must match an entry in your clients.yaml")
+	rates := flag.String("rps", "1", "offered rate per call for the written config; a comma-separated list writes one config per rate, for a throughput sweep")
+	vus := flag.Int("vus", 16, "concurrent virtual users the written config allows")
+	duration := flag.String("duration", "600s", "how long the written config runs each rate")
 	timeout := flag.Duration("timeout", 120*time.Second, "per-request timeout")
 	attempts := flag.Int("attempts", 4, "attempts per request; only transport faults are retried")
 	flag.Parse()
@@ -138,6 +144,7 @@ func main() {
 	cfg := config{
 		outputDir: *outputDir, blocks: *blocks, minTx: *minTx, headLag: *headLag,
 		from: *from, to: *to, seed: *seed, writeConfig: *writeConfig, clientName: *clientName,
+		rates: *rates, vus: *vus, duration: *duration,
 	}
 
 	if err := run(c, cfg); err != nil {
@@ -211,18 +218,48 @@ func run(c *client, cfg config) error {
 		fmt.Printf("to have one written for you.\n")
 		return nil
 	}
-	if err := writeBenchmarkConfig(cfg, dir, sampled[0].number, sampled[len(sampled)-1].number); err != nil {
+	written, err := writeBenchmarkConfigs(cfg, dir, sampled[0].number, sampled[len(sampled)-1].number)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("benchmark config written to %s, run it with\n", cfg.writeConfig)
-	fmt.Printf("  go run ./runner benchmark --config %s --clients <your clients.yaml>\n", cfg.writeConfig)
+	for _, path := range written {
+		fmt.Printf("benchmark config written to %s\n", path)
+	}
+	fmt.Printf("run %s with\n", map[bool]string{true: "them in turn", false: "it"}[len(written) > 1])
+	fmt.Printf("  go run ./runner benchmark --config %s --clients <your clients.yaml>\n", written[0])
 	return nil
+}
+
+// writeBenchmarkConfigs renders one config per offered rate. A single rate keeps
+// the path as given, so the common case stays one file; a sweep suffixes the rate,
+// because the rate is the only thing that differs between the runs being compared.
+func writeBenchmarkConfigs(cfg config, dir string, lowest, highest uint64) ([]string, error) {
+	var written []string
+	rates := strings.Split(cfg.rates, ",")
+	for _, rate := range rates {
+		rate = strings.TrimSpace(rate)
+		parsed, err := strconv.Atoi(rate)
+		if err != nil || parsed <= 0 {
+			return nil, fmt.Errorf("--rps %q: every rate must be a positive whole number", cfg.rates)
+		}
+
+		path := cfg.writeConfig
+		if len(rates) > 1 {
+			extension := filepath.Ext(path)
+			path = fmt.Sprintf("%s-rps%d%s", strings.TrimSuffix(path, extension), parsed, extension)
+		}
+		if err := writeBenchmarkConfig(cfg, dir, path, parsed, lowest, highest); err != nil {
+			return nil, err
+		}
+		written = append(written, path)
+	}
+	return written, nil
 }
 
 // writeBenchmarkConfig renders the same five calls the checked-in
 // trace-transaction-historical.yaml carries, against the corpus just written,
 // so that minting and running are one step and no path is edited by hand.
-func writeBenchmarkConfig(cfg config, dir string, lowest, highest uint64) error {
+func writeBenchmarkConfig(cfg config, dir, path string, rate int, lowest, highest uint64) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "test_name: \"Historical single-transaction tracing %d-%d\"\n", lowest, highest)
 	fmt.Fprintf(&b, "description: \"Cold single-transaction traces over blocks %d-%d, minted from the node under test: "+
@@ -230,7 +267,7 @@ func writeBenchmarkConfig(cfg config, dir string, lowest, highest uint64) error 
 		"debug_traceBlockByHash over the same blocks is the whole-block control. "+
 		"Names carry no commas - k6 builds threshold sub-metric names from them.\"\n", lowest, highest, cfg.blocks, cfg.minTx, cfg.seed)
 	fmt.Fprintf(&b, "clients:\n  - %s\n", cfg.clientName)
-	b.WriteString("duration: \"600s\"\nrps: 1\nvus: 16\ncalls:\n")
+	fmt.Fprintf(&b, "duration: %q\nrps: %d\nvus: %d\ncalls:\n", cfg.duration, rate, cfg.vus)
 
 	for _, call := range []struct{ name, file string }{
 		{"debug_traceTransaction callTracer", "debug_traceTransaction-callTracer"},
@@ -244,12 +281,12 @@ func writeBenchmarkConfig(cfg config, dir string, lowest, highest uint64) error 
 		b.WriteString("    file_type: \"jsonl\"\n    weight: 1\n    thresholds: [\"p(99)<600000\"]\n")
 	}
 
-	if parent := filepath.Dir(cfg.writeConfig); parent != "." {
+	if parent := filepath.Dir(path); parent != "." {
 		if err := os.MkdirAll(parent, 0o755); err != nil {
 			return err
 		}
 	}
-	return os.WriteFile(cfg.writeConfig, []byte(b.String()), 0o644)
+	return os.WriteFile(path, []byte(b.String()), 0o644)
 }
 
 // discoverFloor binary searches the lowest height whose state the node still
