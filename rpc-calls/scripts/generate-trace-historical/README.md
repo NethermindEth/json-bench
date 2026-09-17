@@ -12,10 +12,16 @@ measures nothing. This generator finds the floor itself and samples above it.
 ## Quick start
 
 ```bash
-go run ./rpc-calls/scripts/generate-trace-historical --rpc http://127.0.0.1:8545
+go run ./rpc-calls/scripts/generate-trace-historical \
+  --rpc http://127.0.0.1:8545 --write-config config/benchmark/trace-mine.yaml
+
+go run ./runner benchmark \
+  --config config/benchmark/trace-mine.yaml --clients <your clients.yaml>
 ```
 
-Run it against the node you are about to benchmark, then point a copy of
+Run it against the node you are about to benchmark. With `--write-config` it
+writes the benchmark config as well, already pointing at the corpus it just
+minted, so nothing is edited by hand. Without it, point a copy of
 `config/benchmark/trace-transaction-historical.yaml` at the directory it
 reports.
 
@@ -31,6 +37,8 @@ reports.
 | `--from` | `0` | lowest block to sample; `0` discovers the node's floor |
 | `--to` | `0` | highest block to sample; `0` uses head minus `--head-lag` |
 | `--seed` | `1` | PRNG seed, so the same node and range mint the same corpus |
+| `--write-config` | `` | also write a benchmark config pointing at the corpus |
+| `--client` | `nethermind` | client name the written config benchmarks; must match an entry in your `clients.yaml` |
 | `--timeout` | `120s` | per-request timeout |
 | `--attempts` | `4` | attempts per request; only transport faults are retried |
 

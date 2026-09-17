@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -104,13 +105,15 @@ type outRecord struct {
 }
 
 type config struct {
-	outputDir string
-	blocks    int
-	minTx     int
-	headLag   uint64
-	from      uint64
-	to        uint64
-	seed      uint64
+	outputDir   string
+	blocks      int
+	minTx       int
+	headLag     uint64
+	from        uint64
+	to          uint64
+	seed        uint64
+	writeConfig string
+	clientName  string
 }
 
 func main() {
@@ -122,6 +125,8 @@ func main() {
 	from := flag.Uint64("from", 0, "lowest block to sample; 0 discovers the node's floor")
 	to := flag.Uint64("to", 0, "highest block to sample; 0 uses head minus head-lag")
 	seed := flag.Uint64("seed", 1, "PRNG seed, so the same node and range mint the same corpus")
+	writeConfig := flag.String("write-config", "", "also write a benchmark config pointing at the corpus, ready for `runner benchmark`")
+	clientName := flag.String("client", "nethermind", "client name the written config benchmarks; must match an entry in your clients.yaml")
 	timeout := flag.Duration("timeout", 120*time.Second, "per-request timeout")
 	attempts := flag.Int("attempts", 4, "attempts per request; only transport faults are retried")
 	flag.Parse()
@@ -130,7 +135,10 @@ func main() {
 	transport.IdleConnTimeout = 5 * time.Second
 
 	c := &client{url: *rpcURL, http: &http.Client{Timeout: *timeout, Transport: transport}, attempts: *attempts}
-	cfg := config{outputDir: *outputDir, blocks: *blocks, minTx: *minTx, headLag: *headLag, from: *from, to: *to, seed: *seed}
+	cfg := config{
+		outputDir: *outputDir, blocks: *blocks, minTx: *minTx, headLag: *headLag,
+		from: *from, to: *to, seed: *seed, writeConfig: *writeConfig, clientName: *clientName,
+	}
 
 	if err := run(c, cfg); err != nil {
 		slog.Error("generate", "error", err)
@@ -198,9 +206,50 @@ func run(c *client, cfg config) error {
 		fmt.Printf("%-48s %d records\n", filepath.Base(path), len(records))
 	}
 	fmt.Printf("\ncorpus written to %s\n", dir)
-	fmt.Printf("point the `file:` entries of a benchmark config at it, for example a copy of\n")
-	fmt.Printf("config/benchmark/trace-transaction-historical.yaml with its paths replaced.\n")
+	if cfg.writeConfig == "" {
+		fmt.Printf("point the `file:` entries of a benchmark config at it, or pass --write-config\n")
+		fmt.Printf("to have one written for you.\n")
+		return nil
+	}
+	if err := writeBenchmarkConfig(cfg, dir, sampled[0].number, sampled[len(sampled)-1].number); err != nil {
+		return err
+	}
+	fmt.Printf("benchmark config written to %s, run it with\n", cfg.writeConfig)
+	fmt.Printf("  go run ./runner benchmark --config %s --clients <your clients.yaml>\n", cfg.writeConfig)
 	return nil
+}
+
+// writeBenchmarkConfig renders the same five calls the checked-in
+// trace-transaction-historical.yaml carries, against the corpus just written,
+// so that minting and running are one step and no path is edited by hand.
+func writeBenchmarkConfig(cfg config, dir string, lowest, highest uint64) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "test_name: \"Historical single-transaction tracing %d-%d\"\n", lowest, highest)
+	fmt.Fprintf(&b, "description: \"Cold single-transaction traces over blocks %d-%d, minted from the node under test: "+
+		"the last transaction of %d distinct blocks per endpoint, every block with at least %d transactions, sampled with seed %d. "+
+		"debug_traceBlockByHash over the same blocks is the whole-block control. "+
+		"Names carry no commas - k6 builds threshold sub-metric names from them.\"\n", lowest, highest, cfg.blocks, cfg.minTx, cfg.seed)
+	fmt.Fprintf(&b, "clients:\n  - %s\n", cfg.clientName)
+	b.WriteString("duration: \"600s\"\nrps: 1\nvus: 16\ncalls:\n")
+
+	for _, call := range []struct{ name, file string }{
+		{"debug_traceTransaction callTracer", "debug_traceTransaction-callTracer"},
+		{"debug_traceTransaction prestateTracer", "debug_traceTransaction-prestateTracer"},
+		{"trace_transaction", "trace_transaction"},
+		{"trace_replayTransaction trace stateDiff", "trace_replayTransaction-trace-stateDiff"},
+		{"debug_traceBlockByHash callTracer whole block", "debug_traceBlockByHash-callTracer"},
+	} {
+		fmt.Fprintf(&b, "  - name: %q\n", call.name)
+		fmt.Fprintf(&b, "    file: \"./%s\"\n", filepath.ToSlash(filepath.Join(dir, call.file+".jsonl")))
+		b.WriteString("    file_type: \"jsonl\"\n    weight: 1\n    thresholds: [\"p(99)<600000\"]\n")
+	}
+
+	if parent := filepath.Dir(cfg.writeConfig); parent != "." {
+		if err := os.MkdirAll(parent, 0o755); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(cfg.writeConfig, []byte(b.String()), 0o644)
 }
 
 // discoverFloor binary searches the lowest height whose state the node still
