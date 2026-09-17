@@ -1,12 +1,19 @@
 # Findings in usr/bin/k6 — the load generator binary that grafana/k6 ships
 # prebuilt. Nine are Go stdlib issues, one is golang.org/x/text, one is
-# golang.org/x/crypto and two are google.golang.org/grpc, all vendored into that
-# binary. The stdlib set needs Go 1.26.6; k6 2.1.0 is built with Go 1.26.4 and
-# 2.2.0, the newest release, with 1.26.5, and 2.2.0 also still ships
-# x/crypto 0.54.0 and grpc 1.83.0 against fixes in 0.55.0 and 1.83.1 — so no
-# available tag clears the set and nothing in this repo rebuilds that binary.
-# They stay suppressed until Grafana publishes a k6 built on patched
+# golang.org/x/crypto and three are google.golang.org/grpc, all vendored into
+# that binary. The stdlib set needs Go 1.26.6; k6 2.1.0 is built with Go 1.26.4
+# and 2.2.0, the newest release, with 1.26.5, and 2.2.0 also still ships
+# x/crypto 0.54.0 and grpc 1.83.0 against fixes in 0.55.0, 1.83.1 and 1.83.2 —
+# so no available tag clears the set and nothing in this repo rebuilds that
+# binary. They stay suppressed until Grafana publishes a k6 built on patched
 # dependencies.
+#
+# The grpc three are the closest to lapsing: k6 `master` (checked 2026-09-14
+# against grafana/k6 go.mod) is already on grpc 1.83.2, which clears all three,
+# so the k6 release after 2.2.0 should remove the need for them. Note that
+# grpc is not a dependency of this repository at all — it appears nowhere in
+# go.mod or go.sum — so there is no version of it here to raise; the only lever
+# is the base image.
 #
 # Scoped by purl, not by path: Trivy leaves PkgPath empty for Go-binary findings,
 # so a path scope silently matches nothing. The purl pins each entry to the exact
@@ -78,6 +85,16 @@ vulnerabilities:
       the prebuilt k6 binary; needs grpc 1.83.1. Server-side only, driven by an
       attacker's inbound streams — k6's gRPC module is a client and this suite
       benchmarks JSON-RPC over HTTP, so no gRPC server is ever listening.
+    expired_at: 2026-12-01
+  - id: CVE-2026-84445
+    purls: ["pkg:golang/google.golang.org/grpc@v1.81.1"]
+    statement: >-
+      gRPC-Go xDS servers panic on a request carrying neither `:authority` nor
+      `Host` (GHSA-2v4p-qf9q-27wj), vendored into the prebuilt k6 binary; needs
+      grpc 1.82.2 or 1.83.2. Reachable only in a server built with
+      `xds.NewGRPCServer()` — k6's gRPC module is a client, this suite
+      benchmarks JSON-RPC over HTTP, and the image listens on no gRPC port at
+      all, let alone an xDS-configured one.
     expired_at: 2026-12-01
   - id: GHSA-hrxh-6v49-42gf
     purls: ["pkg:golang/google.golang.org/grpc@v1.81.1"]

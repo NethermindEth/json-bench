@@ -22,12 +22,15 @@ var blockArgIndex = map[string]int{
 // appends a block argument to calls that omit one, so archive nodes at
 // different heads can be compared deterministically. The input params are not
 // mutated. Methods without a known block argument are returned unchanged.
-func applyBlockOverride(method string, params []interface{}, block string) []interface{} {
+//
+// strict guards an eth_getLogs filter that already addresses a block by hash;
+// see applyBlockOverrideGetLogs.
+func applyBlockOverride(method string, params []interface{}, block string, strict bool) []interface{} {
 	if block == "" {
 		return params
 	}
 	if method == "eth_getLogs" {
-		return applyBlockOverrideGetLogs(params, block)
+		return applyBlockOverrideGetLogs(params, block, strict)
 	}
 	idx, ok := blockArgIndex[method]
 	if !ok {
@@ -51,13 +54,26 @@ func setBlockArg(params []interface{}, idx int, block string) []interface{} {
 
 // applyBlockOverrideGetLogs pins the filter's fromBlock/toBlock to block when
 // they are missing or a rewritable tag.
-func applyBlockOverrideGetLogs(params []interface{}, block string) []interface{} {
+//
+// A filter carrying blockHash already names exactly one block, and blockHash
+// is mutually exclusive with a range: adding fromBlock/toBlock turns a
+// single-block query into a range query, which is a different request from the
+// one the caller recorded. Under strict response comparison such a filter is
+// left alone, so a hash-addressed call replays as itself. The default is
+// unchanged, because a caller that is not comparing recorded traffic may be
+// relying on the range being supplied.
+func applyBlockOverrideGetLogs(params []interface{}, block string, strict bool) []interface{} {
 	if len(params) == 0 {
 		return params
 	}
 	filter, ok := params[0].(map[string]interface{})
 	if !ok {
 		return params
+	}
+	if strict {
+		if _, byHash := filter["blockHash"]; byHash {
+			return params
+		}
 	}
 	newFilter := make(map[string]interface{}, len(filter)+2)
 	for k, v := range filter {
