@@ -246,52 +246,80 @@ func run(c *client, cfg config) error {
 	return nil
 }
 
-// writeBenchmarkConfigs renders one config per offered rate. A single rate keeps
-// the path as given, so the common case stays one file; a sweep suffixes the rate,
-// because the rate is the only thing that differs between the runs being compared.
+// writeBenchmarkConfigs renders one config per shape per offered rate. The two
+// shapes are kept apart because the runner gives a client one scenario, not one
+// per call: mixed into a single config, whole-block traces take the virtual users
+// that the single-transaction traces need, and neither number means anything. A
+// single rate leaves the rate out of the name, since then only the shape differs.
 func writeBenchmarkConfigs(cfg config, dir string, lowest, highest uint64) ([]string, error) {
 	var written []string
 	rates := strings.Split(cfg.rates, ",")
-	for _, rate := range rates {
-		rate = strings.TrimSpace(rate)
-		parsed, err := strconv.Atoi(rate)
-		if err != nil || parsed <= 0 {
-			return nil, fmt.Errorf("--rps %q: every rate must be a positive whole number", cfg.rates)
-		}
+	for _, shape := range shapes {
+		for _, rate := range rates {
+			rate = strings.TrimSpace(rate)
+			parsed, err := strconv.Atoi(rate)
+			if err != nil || parsed <= 0 {
+				return nil, fmt.Errorf("--rps %q: every rate must be a positive whole number", cfg.rates)
+			}
 
-		path := cfg.writeConfig
-		if len(rates) > 1 {
-			extension := filepath.Ext(path)
-			path = fmt.Sprintf("%s-rps%d%s", strings.TrimSuffix(path, extension), parsed, extension)
+			extension := filepath.Ext(cfg.writeConfig)
+			path := fmt.Sprintf("%s-%s%s", strings.TrimSuffix(cfg.writeConfig, extension), shape.suffix, extension)
+			if len(rates) > 1 {
+				path = fmt.Sprintf("%s-rps%d%s", strings.TrimSuffix(path, extension), parsed, extension)
+			}
+			if err := writeBenchmarkConfig(cfg, dir, path, shape, parsed, lowest, highest); err != nil {
+				return nil, err
+			}
+			written = append(written, path)
 		}
-		if err := writeBenchmarkConfig(cfg, dir, path, parsed, lowest, highest); err != nil {
-			return nil, err
-		}
-		written = append(written, path)
 	}
 	return written, nil
+}
+
+// A shape is a set of calls that cost the same order of magnitude, so that one
+// run's percentiles describe one thing. Single transactions come first: they are
+// what the index exists for, and what a node answers most of.
+type benchmarkShape struct {
+	suffix  string
+	summary string
+	calls   []benchmarkCall
+}
+
+type benchmarkCall struct{ name, file string }
+
+var shapes = []benchmarkShape{
+	{
+		suffix:  "single",
+		summary: "Cold single-transaction traces",
+		calls: []benchmarkCall{
+			{"debug_traceTransaction callTracer", "debug_traceTransaction-callTracer"},
+			{"debug_traceTransaction prestateTracer", "debug_traceTransaction-prestateTracer"},
+			{"trace_transaction", "trace_transaction"},
+			{"trace_replayTransaction trace stateDiff", "trace_replayTransaction-trace-stateDiff"},
+		},
+	},
+	{
+		suffix:  "block",
+		summary: "Cold whole-block traces",
+		calls:   []benchmarkCall{{"debug_traceBlockByHash callTracer whole block", "debug_traceBlockByHash-callTracer"}},
+	},
 }
 
 // writeBenchmarkConfig renders the same five calls the checked-in
 // trace-transaction-historical.yaml carries, against the corpus just written,
 // so that minting and running are one step and no path is edited by hand.
-func writeBenchmarkConfig(cfg config, dir, path string, rate int, lowest, highest uint64) error {
+func writeBenchmarkConfig(cfg config, dir, path string, shape benchmarkShape, rate int, lowest, highest uint64) error {
 	var b strings.Builder
-	fmt.Fprintf(&b, "test_name: \"Historical single-transaction tracing %d-%d\"\n", lowest, highest)
-	fmt.Fprintf(&b, "description: \"Cold single-transaction traces over blocks %d-%d, minted from the node under test: "+
-		"the last transaction of %d distinct blocks per endpoint, every block with at least %d transactions, sampled with seed %d. "+
-		"debug_traceBlockByHash over the same blocks is the whole-block control. "+
-		"Names carry no commas - k6 builds threshold sub-metric names from them.\"\n", lowest, highest, cfg.blocks, cfg.minTx, cfg.seed)
+	fmt.Fprintf(&b, "test_name: %q\n", fmt.Sprintf("Historical %s tracing %d-%d", shape.suffix, lowest, highest))
+	fmt.Fprintf(&b, "description: \"%s over blocks %d-%d, minted from the node under test: "+
+		"%d distinct blocks, every block with at least %d transactions, sampled with seed %d. "+
+		"The request targets the block's last transaction, the deepest prefix a node has to resolve. "+
+		"Names carry no commas - k6 builds threshold sub-metric names from them.\"\n",
+		shape.summary, lowest, highest, cfg.blocks, cfg.minTx, cfg.seed)
 	fmt.Fprintf(&b, "clients:\n  - %s\n", cfg.clientName)
 	fmt.Fprintf(&b, "duration: %q\nrps: %d\nvus: %d\ncalls:\n", cfg.duration, rate, cfg.vus)
 
-	for _, call := range []struct{ name, file string }{
-		{"debug_traceTransaction callTracer", "debug_traceTransaction-callTracer"},
-		{"debug_traceTransaction prestateTracer", "debug_traceTransaction-prestateTracer"},
-		{"trace_transaction", "trace_transaction"},
-		{"trace_replayTransaction trace stateDiff", "trace_replayTransaction-trace-stateDiff"},
-		{"debug_traceBlockByHash callTracer whole block", "debug_traceBlockByHash-callTracer"},
-	} {
+	for _, call := range shape.calls {
 		fmt.Fprintf(&b, "  - name: %q\n", call.name)
 		fmt.Fprintf(&b, "    file: \"./%s\"\n", filepath.ToSlash(filepath.Join(dir, call.file+".jsonl")))
 		b.WriteString("    file_type: \"jsonl\"\n    weight: 1\n    thresholds: [\"p(99)<600000\"]\n")

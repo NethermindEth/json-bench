@@ -16,7 +16,9 @@ go run ./rpc-calls/scripts/generate-trace-historical \
   --rpc http://127.0.0.1:8545 --write-config config/benchmark/trace-mine.yaml
 
 go run ./runner benchmark \
-  --config config/benchmark/trace-mine.yaml --clients <your clients.yaml>
+  --config config/benchmark/trace-mine-single.yaml --clients <your clients.yaml>
+go run ./runner benchmark \
+  --config config/benchmark/trace-mine-block.yaml --clients <your clients.yaml>
 ```
 
 Run it against the node you are about to benchmark. With `--write-config` it
@@ -56,7 +58,8 @@ go run ./rpc-calls/scripts/generate-trace-historical \
   --rpc http://127.0.0.1:8545 --rps 10,25,50,100,200 --duration 60s \
   --write-config config/benchmark/trace-mine.yaml
 
-for config in config/benchmark/trace-mine-rps*.yaml; do
+for config in config/benchmark/trace-mine-single-rps*.yaml \
+              config/benchmark/trace-mine-block-rps*.yaml; do
   go run ./runner benchmark --config "$config" --clients <your clients.yaml>
 done
 ```
@@ -69,6 +72,17 @@ Raise `--vus` alongside the rate when the calls are slow: k6 cannot offer more
 requests per second than its virtual users can hold open, so a whole-block trace
 taking a second caps at one request per second per user however high the rate is
 set. The reported request rate, not the configured one, is what the node served.
+
+## Two shapes, measured apart
+
+The configs come in pairs: `-single` carries the four single-transaction
+families, `-block` carries the whole-block trace. Run single first.
+
+They are kept apart because the runner gives a client one k6 scenario, not one
+per call. In a single config the whole-block traces take the virtual users the
+single-transaction traces need, and a whole block costs an order of magnitude
+more, so the percentiles describe a mixture that is neither one thing nor the
+other.
 
 ## Output
 
