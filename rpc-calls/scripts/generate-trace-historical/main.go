@@ -15,6 +15,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
@@ -117,10 +118,12 @@ type config struct {
 	rates       string
 	vus         int
 	duration    string
+	metricsURL  string
 }
 
 func main() {
 	rpcURL := flag.String("rpc", "http://127.0.0.1:8545", "JSON-RPC endpoint to mint the corpus from")
+	metricsURL := flag.String("metrics", "", "Prometheus metrics endpoint of the same node; when it reports a transaction index, the corpus is minted inside that index's covered range")
 	outputDir := flag.String("output-dir", "rpc-calls/trace-historical", "parent directory; the corpus lands in blocks-<lowest>-<highest> under it")
 	blocks := flag.Int("blocks", 20, "blocks to sample, one request per block per family")
 	minTx := flag.Int("min-tx", 50, "skip blocks with fewer transactions than this")
@@ -144,7 +147,7 @@ func main() {
 	cfg := config{
 		outputDir: *outputDir, blocks: *blocks, minTx: *minTx, headLag: *headLag,
 		from: *from, to: *to, seed: *seed, writeConfig: *writeConfig, clientName: *clientName,
-		rates: *rates, vus: *vus, duration: *duration,
+		rates: *rates, vus: *vus, duration: *duration, metricsURL: *metricsURL,
 	}
 
 	if err := run(c, cfg); err != nil {
@@ -167,6 +170,19 @@ func run(c *client, cfg config) error {
 		top = head - cfg.headLag
 	}
 	bottom := cfg.from
+	if bottom == 0 && cfg.metricsURL != "" {
+		indexFrom, indexTo, err := indexCoverage(c.http, cfg.metricsURL)
+		if err != nil {
+			return err
+		}
+		if indexFrom > 0 {
+			bottom = indexFrom
+			if indexTo < top {
+				top = indexTo
+			}
+			slog.Info("the node reports a transaction index; minting inside it", "from", indexFrom, "to", indexTo)
+		}
+	}
 	if bottom == 0 {
 		if bottom, err = discoverFloor(c, top); err != nil {
 			return err
@@ -287,6 +303,51 @@ func writeBenchmarkConfig(cfg config, dir, path string, rate int, lowest, highes
 		}
 	}
 	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// indexCoverage reads the range the node's per-transaction index covers. Outside
+// it a trace is answered by replaying the transactions ahead of the one asked
+// for, which is a different code path at a different cost, so a corpus that
+// strays outside measures a mixture of the two and compares nothing. Zero means
+// the node publishes no such range, and the floor decides the range instead.
+func indexCoverage(client *http.Client, url string) (uint64, uint64, error) {
+	response, err := client.Get(url)
+	if err != nil {
+		return 0, 0, fmt.Errorf("metrics %s: %w", url, err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return 0, 0, fmt.Errorf("metrics %s: %w", url, err)
+	}
+
+	from := gauge(string(body), "nethermind_transaction_changeset_index_from")
+	to := gauge(string(body), "nethermind_transaction_changeset_index_to")
+	if from == 0 || to <= from {
+		return 0, 0, nil
+	}
+	return from, to, nil
+}
+
+// gauge reads one unlabelled Prometheus gauge, which is how a node publishes a
+// block height: one sample, no labels, a float that is a whole number.
+func gauge(body, name string) uint64 {
+	for _, line := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(line, name) {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 || (fields[0] != name && !strings.HasPrefix(fields[0], name+"{")) {
+			continue
+		}
+		value, err := strconv.ParseFloat(fields[len(fields)-1], 64)
+		if err != nil || value <= 0 {
+			continue
+		}
+		return uint64(value)
+	}
+	return 0
 }
 
 // discoverFloor binary searches the lowest height whose state the node still
