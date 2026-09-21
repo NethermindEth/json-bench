@@ -15,22 +15,11 @@ import (
 	"github.com/jsonrpc-bench/runner/config"
 )
 
-// corpusExcluded lists methods that are unsuitable for cross-client archive
-// correctness comparison: proofs are not always stored, and head-dependent
-// methods diverge legitimately between nodes at different heads. The debug_
-// namespace is excluded by prefix. eth_feeHistory is excluded only when no
-// block override is set — with a static newestBlock it is deterministic (see
-// isCorpusExcluded).
-var corpusExcluded = map[string]struct{}{
-	"eth_getProof":             {},
-	"eth_gasPrice":             {},
-	"eth_syncing":              {},
-	"eth_blockNumber":          {},
-	"eth_maxPriorityFeePerGas": {},
-}
-
 // corpusPinnable lists methods excluded by default but kept when a block
-// override pins them to a static block.
+// override pins them to a static block. The rest of the default method policy
+// lives in DefaultCorpusExclusions (corpus_exclusions.go) and can be narrowed
+// per run with --corpus-exclude; this rule cannot, because without an override
+// eth_feeHistory's newestBlock is resolved against each node's own head.
 var corpusPinnable = map[string]struct{}{
 	"eth_feeHistory": {},
 }
@@ -88,7 +77,7 @@ type CorpusRequest struct {
 
 // CorpusReport describes what a corpus load actually ingested. Excluded counts
 // files whose calls were all dropped by the method exclusions (see
-// corpusExcluded) — expected, unlike a skip.
+// CorpusExclusions) — expected, unlike a skip.
 //
 // Files, Entries, Excluded and Skips are the counts the log line carries and
 // are unchanged. The rest is the machine-readable accounting written to
@@ -109,17 +98,29 @@ type CorpusReport struct {
 	Sample        int
 	SampleSeed    int64
 	BlockOverride string
+
+	// Exclusions is the policy that produced ExcludedRequests, recorded so
+	// the load report states the effective list rather than implying the
+	// default.
+	Exclusions CorpusExclusions
 }
 
 // LoadCorpusConfig builds a ComparisonConfig by ingesting a corpus directory
-// recursively. It reads both line-delimited *.jsonl files and *.json files
-// holding a JSON array of {method, params} objects. When sample > 0 at most
-// that many calls per method are kept, chosen deterministically from seed.
-// Excluded methods (see corpusExcluded and the debug_ prefix) are dropped;
-// pinnable methods like eth_feeHistory are kept when blockOverride is set.
-// A file that does not parse as corpus entries is skipped and reported rather
-// than failing the load, which only happens when nothing usable was found.
+// recursively under the default exclusion policy (DefaultCorpusExclusions).
+// See LoadCorpusConfigWithExclusions.
 func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) (*ComparisonConfig, *CorpusReport, error) {
+	return LoadCorpusConfigWithExclusions(dir, sample, seed, blockOverride, DefaultCorpusExclusions())
+}
+
+// LoadCorpusConfigWithExclusions builds a ComparisonConfig by ingesting a corpus
+// directory recursively. It reads both line-delimited *.jsonl files and *.json
+// files holding a JSON array of {method, params} objects. When sample > 0 at
+// most that many calls per method are kept, chosen deterministically from
+// seed. Methods the exclusions name are dropped; pinnable methods like
+// eth_feeHistory are kept when blockOverride is set. A file that does not
+// parse as corpus entries is skipped and reported rather than failing the
+// load, which only happens when nothing usable was found.
+func LoadCorpusConfigWithExclusions(dir string, sample int, seed int64, blockOverride string, exclusions CorpusExclusions) (*ComparisonConfig, *CorpusReport, error) {
 	// Resolve the root through any symlink before walking: WalkDir does not
 	// follow a symlinked root, so a linked corpus directory would otherwise look
 	// empty. Reading files under the resolved root also keeps the containment
@@ -157,6 +158,7 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 		Sample:        sample,
 		SampleSeed:    seed,
 		BlockOverride: blockOverride,
+		Exclusions:    exclusions,
 	}
 	byMethod := make(map[string][]corpusCall)
 	order := make([]string, 0)
@@ -178,7 +180,7 @@ func LoadCorpusConfig(dir string, sample int, seed int64, blockOverride string) 
 				entry.Params = []interface{}{}
 			}
 			id, idErr := requestIDOf(entry.Method, entry.Params)
-			if isCorpusExcluded(entry.Method, keepPinnable) {
+			if exclusions.Excludes(entry.Method, keepPinnable) {
 				fileReport.Excluded++
 				report.ExcludedRequests = append(report.ExcludedRequests, CorpusRequest{
 					RequestID:     id,
@@ -352,17 +354,4 @@ func sampleCalls(calls []corpusCall, n int, rng *rand.Rand) (chosen, dropped []c
 		dropped = append(dropped, call)
 	}
 	return chosen, dropped
-}
-
-func isCorpusExcluded(method string, keepPinnable bool) bool {
-	if strings.HasPrefix(method, "debug_") {
-		return true
-	}
-	if _, ok := corpusExcluded[method]; ok {
-		return true
-	}
-	if _, ok := corpusPinnable[method]; ok {
-		return !keepPinnable
-	}
-	return false
 }

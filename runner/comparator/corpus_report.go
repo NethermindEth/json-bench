@@ -77,6 +77,7 @@ type CorpusLoadReportDocument struct {
 	CorpusDir     string             `json:"corpus_dir"`
 	Identity      CorpusIdentitySpec `json:"identity"`
 	Sampling      CorpusSampling     `json:"sampling"`
+	Policy        CorpusPolicy       `json:"policy"`
 	Totals        CorpusTotals       `json:"totals"`
 	Files         []CorpusFileReport `json:"files"` // every file that parsed
 	SkippedFiles  []CorpusSkip       `json:"skipped_files"`
@@ -85,8 +86,9 @@ type CorpusLoadReportDocument struct {
 
 // NewCorpusLoadReportDocument assembles the document from a load report. A nil
 // report means the corpus directory could not be read at all; the document is
-// still produced, with zero totals, because a consumer that fails closed on a
-// missing report should see a corpus of zero files rather than nothing.
+// still produced, with zero totals and an empty policy (no load ran, so no
+// policy was applied), because a consumer that fails closed on a missing
+// report should see a corpus of zero files rather than nothing.
 func NewCorpusLoadReportDocument(dir string, report *CorpusReport) CorpusLoadReportDocument {
 	doc := CorpusLoadReportDocument{
 		SchemaVersion: CorpusLoadReportSchemaVersion,
@@ -96,6 +98,7 @@ func NewCorpusLoadReportDocument(dir string, report *CorpusReport) CorpusLoadRep
 			Algorithm:     "sha256",
 			CanonicalForm: `["<method>",<params>] as compact JSON with sorted object keys, absent params as [], UTF-8`,
 		},
+		Policy:       newCorpusPolicy(CorpusExclusions{}, false),
 		Files:        []CorpusFileReport{},
 		SkippedFiles: []CorpusSkip{},
 		Requests: CorpusRequests{
@@ -113,6 +116,7 @@ func NewCorpusLoadReportDocument(dir string, report *CorpusReport) CorpusLoadRep
 		Seed:          report.SampleSeed,
 		BlockOverride: report.BlockOverride,
 	}
+	doc.Policy = newCorpusPolicy(report.Exclusions, report.BlockOverride != "")
 	if report.PerFile != nil {
 		doc.Files = report.PerFile
 	}

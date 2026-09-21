@@ -325,10 +325,16 @@ recurses and reads both line-delimited `*.jsonl` files and `*.json` files
 holding a JSON array of `{method, params}` objects. `--sample N` keeps at
 most N calls per method (deterministic; control the seed with
 `--sample-seed`). The directory may be anywhere on disk — an absolute path is
-fine. Head-dependent and unstorable methods (`eth_getProof`, `eth_gasPrice`,
-`eth_syncing`, `eth_blockNumber`, `eth_maxPriorityFeePerGas`, the `debug_`
-namespace) are excluded; `eth_feeHistory` is kept only when a block override
-pins its `newestBlock`.
+fine. By default, head-dependent and unstorable methods (`eth_getProof`,
+`eth_gasPrice`, `eth_syncing`, `eth_blockNumber`, `eth_maxPriorityFeePerGas`,
+the `debug_` namespace) are excluded at load. `--corpus-exclude` replaces that
+list: comma-separated, an entry ending in `_` excludes a namespace by prefix,
+any other entry excludes that method, and `none` disables exclusions — a lane
+that compares two nodes parked at the same block can keep methods an
+archive-vs-archive run cannot. `eth_feeHistory` is governed by the block
+override, not by the list: it is kept only when `--block-override` (or the
+rules file) pins its `newestBlock`. The effective policy is recorded in
+`corpus-load-report.json` under `policy`.
 
 A corpus tree usually holds files that are not corpora — generator inputs,
 benchmark scenarios. Those are skipped with a warning naming each file and its
