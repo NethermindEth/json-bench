@@ -35,8 +35,10 @@ var (
 	compareSkipAboveHead    bool
 	compareBlockOverride    string
 	compareFromJSONL        string
+	compareCorpusExclude    string
 	compareSample           int
 	compareSampleSeed       int64
+	compareStrictResponse   bool
 )
 
 var compareCmd = &cobra.Command{
@@ -67,8 +69,10 @@ func init() {
 	compareCmd.Flags().BoolVar(&compareSkipAboveHead, "skip-above-head", false, "Skip calls pinned to a block above the lowest client head")
 	compareCmd.Flags().StringVar(&compareBlockOverride, "block-override", "", "Rewrite latest/pending block tags to this static block (overrides config and --rules)")
 	compareCmd.Flags().StringVar(&compareFromJSONL, "from-jsonl", "", "Build the config from a corpus directory (recurses; reads *.jsonl and *.json arrays) instead of --config")
+	compareCmd.Flags().StringVar(&compareCorpusExclude, "corpus-exclude", comparator.DefaultCorpusExcludeFlag, "With --from-jsonl, the methods dropped at load: comma-separated, an entry ending in '_' excludes that namespace by prefix, any other entry excludes that method; 'none' disables exclusions. The default is the list the loader has always applied. eth_feeHistory is governed by --block-override, not by this flag")
 	compareCmd.Flags().IntVar(&compareSample, "sample", 0, "With --from-jsonl, sample at most N calls per method (0 = all)")
 	compareCmd.Flags().Int64Var(&compareSampleSeed, "sample-seed", 42, "Deterministic seed for --sample")
+	compareCmd.Flags().BoolVar(&compareStrictResponse, "strict-response-comparison", false, "Drop implicit response normalizations: \"0x\" no longer equals an all-zero hex string, integers above 2^53 compare exactly, and --block-override leaves an eth_getLogs filter that carries blockHash alone. Explicit rules are unaffected")
 
 	_ = compareCmd.MarkFlagRequired("clients")
 	_ = compareCmd.MarkFlagRequired("client-refs")
@@ -99,6 +103,13 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	if (compareConfigPath == "") == (compareFromJSONL == "") {
 		return fmt.Errorf("exactly one of --config or --from-jsonl is required")
 	}
+	if cmd.Flags().Changed("corpus-exclude") && compareFromJSONL == "" {
+		return fmt.Errorf("--corpus-exclude applies to --from-jsonl only")
+	}
+	corpusExclusions, err := comparator.ParseCorpusExclusions(compareCorpusExclude)
+	if err != nil {
+		return err
+	}
 
 	// Load the optional --rules file first so its block_override can inform
 	// corpus loading (e.g. keeping pinnable methods like eth_feeHistory).
@@ -122,8 +133,21 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	var cfg *comparator.ComparisonConfig
 	if compareFromJSONL != "" {
 		var report *comparator.CorpusReport
-		cfg, report, err = comparator.LoadCorpusConfig(compareFromJSONL, compareSample, compareSampleSeed, effectiveBlockOverride)
+		logger.Infof("corpus exclusions: %s", corpusExclusions)
+		cfg, report, err = comparator.LoadCorpusConfigWithExclusions(compareFromJSONL, compareSample, compareSampleSeed, effectiveBlockOverride, corpusExclusions)
 		logCorpusReport(compareFromJSONL, report)
+		// Written before the load error is returned, and written even when the
+		// load failed: a corpus that yielded nothing is precisely the case a
+		// consumer has to fail closed on, and it can only do that if the
+		// accounting exists.
+		if writeErr := comparator.SaveCorpusLoadReport(outputDir, compareFromJSONL, report); writeErr != nil {
+			if err == nil {
+				return writeErr
+			}
+			logger.Errorf("%v", writeErr)
+		} else {
+			logger.Infof("Corpus load report saved to %s", corpusLoadReportPath())
+		}
 		if err != nil {
 			return fmt.Errorf("failed to build config from corpus: %w", err)
 		}
@@ -146,6 +170,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	cfg.RetryBaseDelayMs = int(compareRetryBaseDelay.Milliseconds())
 	cfg.RateLimitRPS = compareRateLimit
 	cfg.SkipAboveHead = compareSkipAboveHead
+	cfg.StrictResponseComparison = compareStrictResponse
 
 	// Layer the --rules file on top of any rules from --config, then apply the
 	// block-override precedence (rules file over config, flag over everything).
@@ -184,6 +209,12 @@ func logCorpusReport(dir string, report *comparator.CorpusReport) {
 	}
 	logger.Infof("corpus %s: loaded %d calls from %d files, %d files held only excluded methods, %d files skipped",
 		dir, report.Entries, report.Files, report.Excluded, len(report.Skips))
+}
+
+// corpusLoadReportPath names the fourth compare output for the tests and for
+// anything that has to find it without reconstructing the join.
+func corpusLoadReportPath() string {
+	return filepath.Join(outputDir, comparator.CorpusLoadReportFilename)
 }
 
 // applyDiffOnlyDefaults makes --diff-only the obvious "small report" switch: if
