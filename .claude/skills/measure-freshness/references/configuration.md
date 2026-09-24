@@ -14,13 +14,13 @@ Template: `config/freshness/probe.example.yaml`.
 | `pair.labels` | — | Free-form (`el`, `cl`, …). Used by review `hold_constant`. |
 | `pair.el.url` | required* | EL JSON-RPC. *Or `pair.el.client_ref` + `--clients <registry>`, which also brings headers/auth. |
 | `pair.el.headers` | — | Sent on every call; values never written to artifacts. |
-| `pair.cl.beacon_url` | — | Optional. Enables CL sync preflight, slot duration from `/eth/v1/config/spec`, genesis time (slot numbers) and `head`/`block`/`block_gossip` SSE events. |
+| `pair.cl.beacon_url` | — | Optional but recommended. Enables CL sync preflight, slot duration and epoch length from `/eth/v1/config/spec`, genesis time (slot numbers), and `head`/`block`/`block_gossip` SSE events that feed review's CL split. Check the CL's real HTTP port. |
 | `pair.cl.events` | true | Set false to skip the SSE stream but keep the CL checks. |
 | `chain.slot_duration_seconds` | 0 | 0 ⇒ beacon spec, else preset (1, 11155111, 17000, 560048 → 12; 100, 10200 → 5). Unknown chain without beacon ⇒ must set. |
 | `start.block` | 0 | First measured block. Use the same value on every probe. Already passed ⇒ starts at next block with a warning. |
 | `start.time` | "" | RFC3339 alternative to `start.block`; not both. |
 | `block_count` | 1000 | Measured blocks after warm-up. |
-| `warmup_blocks` | 0 (example: 32) | Measured but flagged; review excludes them by default. |
+| `warmup_blocks` | 0 (example: 32) | Extra blocks measured *before* `block_count`, starting at `start.block`, excluded by review. Use 2–4 for short pilot runs. |
 | `max_run_duration_seconds` | 28800 | Hard stop ⇒ outcome `max_duration`. |
 | `stall_slots` | 4 | No new block for this many slots ⇒ `stall` event (keeps waiting). |
 | `poll_interval_ms` | 10 | Offered cadence per probe at full rate. Not a resolution guarantee. |

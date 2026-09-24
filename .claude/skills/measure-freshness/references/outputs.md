@@ -14,7 +14,7 @@ start (`header.timestamp`).
 | `targets.jsonl` | One line per block: hash, parent, timestamp, slot, `missed_slots_before`, tx count, empty-bloom flag, header observed time/source, `late_armed`, `warmup`, `parent_mismatch`, `clock_step`, and per-probe results (status, match time, attempts, skipped polls, scheduler lag). |
 | `rpc-attempts.jsonl` | Outcome transitions per probe/block: `edge` `first`/`last` of each run of identical outcomes (`repeat` = run length), class, local verdict, digest, error, bytes. `edge: all` with `--record-all-attempts`. |
 | `events.jsonl` | `run_started/finished`, `target_armed/promoted`, `header_observed`, `missed_slot`, `parent_mismatch`, `late_armed`, `stall`, `clock_sample`, `clock_step`, `resource_sample`, `cl_event`, `cl_stream_disconnected`. |
-| `responses/<digest>.json` | Each distinct canonical answer once. |
+| `responses/<digest>.json.gz` | Each distinct canonical answer once, gzipped (`zcat`). Review uses only digests; these are for forensics. |
 
 Probe-side statuses (local view, not verified): `matched`, `not_applicable`
 (`not_applicable_empty_logs` / `_empty_transactions`), `deadline_exceeded`,
@@ -26,7 +26,7 @@ Probe-side statuses (local view, not verified): `matched`, `not_applicable`
 | File | Content |
 |---|---|
 | `reference-data/` | Cached raw reference answers (`<hash>.json`, `_chain.json`). Enables `--offline`. |
-| `block-results.jsonl` | Per block identity: reference verdict, per pair × probe outcome (freshness, lower bound, first sent, left-censored, within slot), timeline (header observed, CL events). |
+| `block-results.jsonl` | Per block identity: reference verdict, `epoch_boundary`, per pair × probe outcome (freshness, lower bound, first sent, left-censored, within slot), and `timeline.<pair>`: `header_observed_ms`, `cl_events[]` as `{topic, ms}` (ms from slot start), `epoch_transition`. |
 | `summary.json` | Probes, warnings, block counts, per probe: per-pair stats and pairwise comparisons. |
 | `report.md` | Human report of the above. |
 
@@ -59,6 +59,15 @@ Pairwise fields: `compared`, `observed_a_wins/b_wins/ties`,
 correct), `both_failed`, `excluded` (by reason), `delta_a_minus_b`,
 `effective_margin_ms`, `cross_host`.
 
+CL split (only with beacon events), keyed by milestone `block_gossip` / `head`
+/ `block`:
+
+- per pair, `pairs.<id>.cl_split.<topic>`: `blocks_with_event`,
+  `milestone_from_slot_start`, `ready_after_milestone` (distributions, ms);
+- per comparison, `cl_split.<topic>`: `compared`, `milestone_delta_a_minus_b`,
+  `ready_after_a_faster` / `_b_faster` / `_ties` (configured margin, no clock
+  widening: both sides are same-host differences), `ready_after_delta_a_minus_b`.
+
 ## Quick queries
 
 ```bash
@@ -70,6 +79,9 @@ jq -c 'select(.results["<pair>"].logs_number.status != "matched") | {block_numbe
 
 # Transitions for one block on one probe directory
 jq -c 'select(.block_number == <N>) | {probe, seq, edge, repeat, class, local, local_reason, error}' <probe-dir>/rpc-attempts.jsonl
+
+# Where each pair spends its time after the block reaches its CL
+jq '.results.state_number.pairs | map_values(.cl_split.block_gossip | {milestone_p50: .milestone_from_slot_start.p50_ms, after_p50: .ready_after_milestone.p50_ms})' summary.json
 
 # Probe health at a glance
 jq '{outcome, outcome_reason, clock, rtt_start, dropped_records, counts}' <probe-dir>/run-manifest.json

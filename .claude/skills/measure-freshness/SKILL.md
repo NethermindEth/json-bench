@@ -80,10 +80,12 @@ Pin down with the user (ask only what is unspecified and consequential):
 
 ### 2. Preflight every pair
 
-For each pair, from where its probe will run:
+For each pair, from where its probe will run (copy the script there first,
+e.g. `scp .claude/skills/measure-freshness/scripts/preflight-pair.sh <host>:`;
+it only needs `bash`, `curl` and `python3`):
 
 ```bash
-.claude/skills/measure-freshness/scripts/preflight-pair.sh <el-url> [beacon-url]
+./preflight-pair.sh <el-url> [beacon-url]
 ```
 
 It checks chain id, client version, `eth_syncing`, head age, the EIP-2935
@@ -100,7 +102,9 @@ catching problems here avoids wasted deployments.
 Every probe response time includes the network path from the probe to its node.
 
 1. **On the pair's host** (preferred): EL at `http://127.0.0.1:8545`, beacon at
-   `http://127.0.0.1:5052` (or the client's port). Some hosts do not publish
+   the CL's HTTP port. Check the actual port: defaults are Lighthouse/Nimbus
+   5052, Prysm 3500, Teku 5051, Lodestar 9596, and deployment tools override
+   them (sedge uses 4000). Some hosts do not publish
    8545 publicly or bind it to loopback / a docker bridge — on-host avoids it.
 2. **Nearby machine** (fallback): allowed, but the manifest's idle RTT baseline
    will show the added distance and review warns when RTT differences exceed the
@@ -115,6 +119,13 @@ Copy `config/freshness/probe.example.yaml` next to the run outputs (not into
 `config/`) as `probe-<pair-id>.yaml`. Set `pair.id`, `labels`, `el.url`,
 `cl.beacon_url`, and leave the workload keys identical across pairs — review
 warns when workloads differ. Key settings: `references/configuration.md`.
+
+**Warm-up is extra.** `warmup_blocks` are measured *before* the `block_count`
+blocks, starting at `start.block`, and excluded from review. The example's 32 is
+for long runs; use 2–4 for pilot runs of 20–50 blocks.
+
+**Disk.** Budget about 70 KB per block per probe (~70 MB per 1000 blocks; response bodies are
+gzipped); with `--record-all-attempts`, considerably more.
 
 **Align the start.** Pick one `start.block` a few blocks above the current head
 (e.g. head + 10 ≈ 2 minutes on mainnet) and put it in every config, so all
@@ -134,18 +145,26 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/runner-linux ./runner
 rsync -az /tmp/runner-linux probe-<pair-id>.yaml <user>@<host>:<remote-dir>/
 ```
 
-Runs last hours, so detach them from the SSH session (`tmux`/`nohup`):
+Runs last hours, so detach them from the SSH session. Use `;` (not `&&`) and
+redirect stdin, otherwise ssh keeps the session open until the probe exits:
 
 ```bash
-ssh <user>@<host> 'cd <remote-dir> && nohup ./runner-linux freshness probe \
-  --config probe-<pair-id>.yaml --output results > probe.log 2>&1 &'
+ssh <user>@<host> 'cd <remote-dir>; nohup ./runner-linux freshness probe \
+  --config probe-<pair-id>.yaml --output results > probe.log 2>&1 < /dev/null &'
 ```
 
-- Start all probes before `start.block`; each waits for it.
+(`tmux new -d -s probe '…'` or `setsid` work too.)
+
+- Start all probes before `start.block`; each waits for it and logs
+  `waiting for start.block N (head M, ~Ts)` once per slot meanwhile.
 - While running, `probe.log` prints one line per block
   (`block N 0xhash… state_number=+612ms logs_number=+745ms`). Spot-check early
   blocks on every host: values should be positive and a few hundred ms to a
   few seconds; negative values mean a clock problem.
+- **Waiting for completion:** a probe is done when `probe.log` contains
+  `probe output written to`. Do not poll with `pgrep -f "runner-linux freshness
+  probe"` over ssh: it matches the ssh command line itself and never goes
+  away. Use `pgrep -x runner-linux` or the log line.
 - The last stdout line is the probe's output directory
   (`results/<pair-id>-<run-id>/`). Ctrl-C / SIGTERM finalises it with outcome
   `interrupted`; it is still reviewable.
@@ -165,6 +184,11 @@ Write `review.yaml` next to the outputs from `config/freshness/review.example.ya
 ```bash
 go run ./runner freshness review --config review.yaml
 ```
+
+For a final review, wait until the last measured block is finalized (about two
+epochs, ~13 minutes on mainnet): earlier reviews are correct but report blocks
+as `verified_not_finalized`. Reviewing right away for a first look is fine;
+re-run with `--refresh-reference` later.
 
 Review fetches reference data once into `<output>/reference-data/`. Re-render
 without any node (same results byte-for-byte) with `--offline`; force a
@@ -186,8 +210,16 @@ Check in this order:
    denominators and median winning margin. Prefer `hold_constant` groups over
    the `all` group: the pair matrix is uneven, so never state an unconditional
    EL ranking from pooled results.
-5. **Drill-down** — timelines of the largest-spread blocks; `block-results.jsonl`
-   for anything specific.
+5. **Split at CL milestones** (probes with a beacon URL) — per pair, when its
+   beacon node emitted `block_gossip` / `head` / `block` and how long data took
+   to become readable after each, plus paired deltas. This separates "this
+   pair's CL saw the block earlier" from "this pair's EL served it faster
+   after that". The milestone deltas are cross-host (clock error applies); the
+   ready-after deltas are same-host and clock-error free.
+6. **Drill-down** — timelines of the largest-spread blocks; `block-results.jsonl`
+   for anything specific. Blocks marked `E` are the first slot of an epoch:
+   check epoch processing before attributing their delay to block contents
+   (blobs, gas).
 
 Structure:
 
@@ -221,6 +253,10 @@ attributing persistent differences to client software.
   bloom-consistent, stable answer; only review decides correctness. A missing
   log whose address/topics are already in the bloom passes locally and is caught
   by review as `incorrect`.
+- **Number-addressed probes wait for fork choice.** `state_number` and
+  `logs_number` succeed only after the CL's forkchoiceUpdated makes N
+  canonical, so slow CL import (data availability, epoch processing) shows up
+  as EL "freshness". Use the CL split before blaming the EL.
 - **`late_armed`** means the node was already past a block when it would have
   been armed (probe lagging, node catching up). No latency is reported for it.
 - **Warm-up blocks** (`warmup_blocks`) are excluded from review unless
