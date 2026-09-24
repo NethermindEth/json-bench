@@ -31,6 +31,7 @@ type BlockResult struct {
 	SlotStart         schema.Nanos                   `json:"slot_start_ns"`
 	Slot              *uint64                        `json:"slot,omitempty"`
 	MissedSlotsBefore int                            `json:"missed_slots_before"`
+	EpochBoundary     bool                           `json:"epoch_boundary,omitempty"`
 	Reference         *Reference                     `json:"reference"`
 	Results           map[string]map[string]*Outcome `json:"results"`
 	Timeline          map[string]*Timeline           `json:"timeline,omitempty"`
@@ -40,6 +41,7 @@ type Timeline struct {
 	HeaderObservedMs *float64 `json:"header_observed_ms,omitempty"`
 	HeaderSource     string   `json:"header_source,omitempty"`
 	CL               []CLMark `json:"cl_events,omitempty"`
+	EpochTransition  bool     `json:"epoch_transition,omitempty"`
 }
 
 type CLMark struct {
@@ -173,12 +175,17 @@ func Run(ctx context.Context, cfg *Config, opts Options) (*Result, error) {
 		sum.Blocks[ref.Status]++
 		results = append(results, buildBlock(runs, probeKinds, b, ref, slotDur, cfg.IncludeWarmup))
 	}
+	spe := slotsPerEpoch(runs)
 	for _, br := range results {
 		if br.Reference.Status == RefVerified && !br.Reference.Finalized && chain != nil && chain.HasFinalized {
 			sum.Blocks["verified_not_finalized"]++
 		}
 		if br.MissedSlotsBefore > 0 {
 			sum.Blocks["after_missed_slots"]++
+		}
+		br.EpochBoundary = epochBoundary(br, spe)
+		if br.EpochBoundary {
+			sum.Blocks["epoch_boundary"]++
 		}
 	}
 
@@ -191,6 +198,30 @@ func Run(ctx context.Context, cfg *Config, opts Options) (*Result, error) {
 		return nil, err
 	}
 	return &Result{Dir: cfg.OutputDirectory, Summary: sum, Blocks: results}, nil
+}
+
+func slotsPerEpoch(runs []*ProbeRun) uint64 {
+	for _, r := range runs {
+		if r.Manifest.SlotsPerEpoch != nil {
+			return *r.Manifest.SlotsPerEpoch
+		}
+	}
+	return 0
+}
+
+// epochBoundary flags the first slot of an epoch, where CL epoch processing
+// can delay import independently of the block's contents. Without a known
+// epoch length it falls back to the head event's epoch_transition flag.
+func epochBoundary(br *BlockResult, spe uint64) bool {
+	if br.Slot != nil && spe > 0 {
+		return *br.Slot%spe == 0
+	}
+	for _, tl := range br.Timeline {
+		if tl != nil && tl.EpochTransition {
+			return true
+		}
+	}
+	return false
 }
 
 func loadRuns(dirs []string) ([]*ProbeRun, []string, error) {
@@ -363,7 +394,11 @@ func buildBlock(runs []*ProbeRun, kinds []string, b block, ref *Reference, slotD
 		}
 		if t.Slot != nil {
 			for _, e := range r.CLEvents[*t.Slot] {
-				tl.CL = append(tl.CL, CLMark{Topic: strings.TrimPrefix(e.Source, "beacon_sse:"), Ms: *msFrom(int64(e.At.Wall), int64(t.SlotStart))})
+				topic := strings.TrimPrefix(e.Source, "beacon_sse:")
+				if topic == "head" && ethEpochTransition(e.Data) {
+					tl.EpochTransition = true
+				}
+				tl.CL = append(tl.CL, CLMark{Topic: topic, Ms: *msFrom(int64(e.At.Wall), int64(t.SlotStart))})
 			}
 		}
 		br.Timeline[r.ID()] = tl
@@ -403,6 +438,7 @@ func summarise(cfg *Config, runs []*ProbeRun, results []*BlockResult, kind strin
 	ps := &ProbeSummary{Pairs: map[string]*PairStats{}}
 	for _, r := range runs {
 		var outs []*Outcome
+		var tls []*Timeline
 		for _, br := range results {
 			o := br.Results[r.ID()][kind]
 			if o == nil {
@@ -418,8 +454,11 @@ func summarise(cfg *Config, runs []*ProbeRun, results []*BlockResult, kind strin
 				}
 			}
 			outs = append(outs, o)
+			tls = append(tls, br.Timeline[r.ID()])
 		}
-		ps.Pairs[r.ID()] = pairStats(outs, cfg.DeadlinesMs, slotMs)
+		st := pairStats(outs, cfg.DeadlinesMs, slotMs)
+		st.CL = pairCLSplit(outs, tls)
+		ps.Pairs[r.ID()] = st
 	}
 	for _, g := range groups(cfg, runs) {
 		for i := 0; i < len(g.members); i++ {
@@ -451,6 +490,9 @@ func comparePair(cfg *Config, groupName string, a, b *ProbeRun, results []*Block
 		c.add(side{a, oa}, side{b, ob}, margin, &deltas, &aw, &bw)
 	}
 	c.Delta, c.AWinMargin, c.BWinMargin = newDist(deltas), newDist(aw), newDist(bw)
+	// Each side's ready-after-milestone is a same-host difference, so the
+	// configured margin applies without clock-error widening.
+	c.CL = pairedCLSplit(results, a.ID(), b.ID(), kind, cfg.MarginMs)
 	return c
 }
 
@@ -469,4 +511,9 @@ func writeOutputs(dir string, sum *Summary, results []*BlockResult, cfg *Config)
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, schema.ReportFile), []byte(renderReport(sum, results, cfg)), 0o644)
+}
+
+func ethEpochTransition(data map[string]any) bool {
+	v, _ := data["epoch_transition"].(bool)
+	return v
 }

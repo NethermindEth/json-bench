@@ -307,6 +307,7 @@ func (r *Runner) waitForStart(ctx context.Context) (*ethrpc.Header, error) {
 		return r.fetchHeader(ctx, "latest")
 	}
 	want := r.cfg.Start.Block - 1
+	var lastLogged time.Time
 	for {
 		h, err := r.fetchHeader(ctx, "latest")
 		if err != nil {
@@ -317,6 +318,11 @@ func (r *Runner) waitForStart(ctx context.Context) (*ethrpc.Header, error) {
 		}
 		if h.Number >= want {
 			return h, nil
+		}
+		if time.Since(lastLogged) >= r.slotDur {
+			r.log.Infof("waiting for start.block %d (head %d, ~%s)", r.cfg.Start.Block, h.Number,
+				(time.Duration(want-h.Number) * r.slotDur).Round(time.Second))
+			lastLogged = time.Now()
 		}
 		select {
 		case <-ctx.Done():

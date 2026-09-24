@@ -224,6 +224,9 @@ func (r *Runner) beaconPreflight(ctx context.Context, caps *schema.Capabilities)
 	if g, err := r.beacon.genesisTime(ctx); err == nil {
 		r.manifest.BeaconGenesisTime = &g
 	}
+	if spe, err := r.beacon.specValue(ctx, "SLOTS_PER_EPOCH"); err == nil && spe > 0 {
+		r.manifest.SlotsPerEpoch = &spe
+	}
 	return nil
 }
 
@@ -232,7 +235,7 @@ func (r *Runner) resolveSlotDuration(ctx context.Context, chainID uint64) error 
 	case r.cfg.Chain.SlotDurationSeconds > 0:
 		r.manifest.SlotDurationSeconds, r.manifest.SlotDurationSource = r.cfg.Chain.SlotDurationSeconds, "config"
 	case r.beacon != nil:
-		if s, err := r.beacon.secondsPerSlot(ctx); err == nil && s > 0 {
+		if s, err := r.beacon.specValue(ctx, "SECONDS_PER_SLOT"); err == nil && s > 0 {
 			r.manifest.SlotDurationSeconds, r.manifest.SlotDurationSource = s, "beacon_spec"
 		}
 	}

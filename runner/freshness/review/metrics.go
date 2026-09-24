@@ -39,15 +39,16 @@ func round3(v float64) float64 { return math.Round(v*1000) / 1000 }
 // failure), so unmeasurable blocks (orphaned, unverified, late-armed, empty)
 // stay visible without diluting availability.
 type PairStats struct {
-	Denominator  int                `json:"denominator"`
-	Status       map[string]int     `json:"status"`
-	Freshness    *Dist              `json:"freshness,omitempty"`
-	Availability map[string]float64 `json:"availability_by_deadline"`
-	LeftCensored int                `json:"left_censored"`
-	OutsideSlot  int                `json:"matched_outside_slot"`
-	LocalWrong   int                `json:"local_verdict_disagreed"`
-	SkippedPolls int                `json:"skipped_polls"`
-	Attempts     int                `json:"attempts"`
+	Denominator  int                 `json:"denominator"`
+	Status       map[string]int      `json:"status"`
+	Freshness    *Dist               `json:"freshness,omitempty"`
+	Availability map[string]float64  `json:"availability_by_deadline"`
+	LeftCensored int                 `json:"left_censored"`
+	OutsideSlot  int                 `json:"matched_outside_slot"`
+	LocalWrong   int                 `json:"local_verdict_disagreed"`
+	SkippedPolls int                 `json:"skipped_polls"`
+	Attempts     int                 `json:"attempts"`
+	CL           map[string]*CLSplit `json:"cl_split,omitempty"`
 }
 
 func pairStats(outs []*Outcome, deadlines []float64, slotMs float64) *PairStats {
@@ -101,25 +102,26 @@ func pairStats(outs []*Outcome, deadlines []float64, slotMs float64) *PairStats 
 // probe. Observed counts compare first correct responses directly; inferred
 // counts use availability intervals and call overlaps unresolved.
 type Comparison struct {
-	Group         string         `json:"group"`
-	A             string         `json:"a"`
-	B             string         `json:"b"`
-	MarginMs      float64        `json:"effective_margin_ms"`
-	CrossHost     bool           `json:"cross_host"`
-	Compared      int            `json:"compared"`
-	ObservedAWins int            `json:"observed_a_wins"`
-	ObservedBWins int            `json:"observed_b_wins"`
-	ObservedTies  int            `json:"observed_ties"`
-	InferredAWins int            `json:"inferred_a_wins"`
-	InferredBWins int            `json:"inferred_b_wins"`
-	Unresolved    int            `json:"inferred_unresolved"`
-	CoverageAWins int            `json:"coverage_a_wins"`
-	CoverageBWins int            `json:"coverage_b_wins"`
-	BothFailed    int            `json:"both_failed"`
-	Excluded      map[string]int `json:"excluded"`
-	Delta         *Dist          `json:"delta_a_minus_b,omitempty"`
-	AWinMargin    *Dist          `json:"a_win_margin,omitempty"`
-	BWinMargin    *Dist          `json:"b_win_margin,omitempty"`
+	Group         string                    `json:"group"`
+	A             string                    `json:"a"`
+	B             string                    `json:"b"`
+	MarginMs      float64                   `json:"effective_margin_ms"`
+	CrossHost     bool                      `json:"cross_host"`
+	Compared      int                       `json:"compared"`
+	ObservedAWins int                       `json:"observed_a_wins"`
+	ObservedBWins int                       `json:"observed_b_wins"`
+	ObservedTies  int                       `json:"observed_ties"`
+	InferredAWins int                       `json:"inferred_a_wins"`
+	InferredBWins int                       `json:"inferred_b_wins"`
+	Unresolved    int                       `json:"inferred_unresolved"`
+	CoverageAWins int                       `json:"coverage_a_wins"`
+	CoverageBWins int                       `json:"coverage_b_wins"`
+	BothFailed    int                       `json:"both_failed"`
+	Excluded      map[string]int            `json:"excluded"`
+	Delta         *Dist                     `json:"delta_a_minus_b,omitempty"`
+	AWinMargin    *Dist                     `json:"a_win_margin,omitempty"`
+	BWinMargin    *Dist                     `json:"b_win_margin,omitempty"`
+	CL            map[string]*PairedCLSplit `json:"cl_split,omitempty"`
 }
 
 type side struct {

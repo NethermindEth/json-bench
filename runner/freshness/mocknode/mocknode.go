@@ -549,7 +549,7 @@ func (n *Node) serveBeacon(w http.ResponseWriter, req *http.Request) {
 	case "/eth/v1/node/version":
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"version": "mockbeacon/v1.0.0"}})
 	case "/eth/v1/config/spec":
-		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"SECONDS_PER_SLOT": strconv.FormatUint(n.slotSecs, 10)}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"SECONDS_PER_SLOT": strconv.FormatUint(n.slotSecs, 10), "SLOTS_PER_EPOCH": "32"}})
 	case "/eth/v1/beacon/genesis":
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"genesis_time": strconv.FormatUint(n.genesisTS, 10)}})
 	case "/eth/v1/events":
@@ -594,7 +594,10 @@ func (n *Node) broadcast(num uint64) {
 		return
 	}
 	slot := (b.Timestamp - n.genesisTS) / n.slotSecs
-	msg := fmt.Sprintf("event: head\ndata: {\"slot\":\"%d\",\"block\":\"%s\",\"execution_optimistic\":false}\n\n", slot, b.Hash.Hex())
+	root := b.Hash.Hex()
+	msg := fmt.Sprintf("event: block_gossip\ndata: {\"slot\":\"%d\",\"block\":\"%s\"}\n\n", slot, root) +
+		fmt.Sprintf("event: head\ndata: {\"slot\":\"%d\",\"block\":\"%s\",\"epoch_transition\":%t,\"execution_optimistic\":false}\n\n", slot, root, slot%32 == 0) +
+		fmt.Sprintf("event: block\ndata: {\"slot\":\"%d\",\"block\":\"%s\",\"execution_optimistic\":false}\n\n", slot, root)
 	n.subsMu.Lock()
 	defer n.subsMu.Unlock()
 	for _, c := range n.subs {

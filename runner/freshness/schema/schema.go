@@ -325,6 +325,7 @@ type Manifest struct {
 	SlotDurationSeconds uint64            `json:"slot_duration_seconds"`
 	SlotDurationSource  string            `json:"slot_duration_source"`
 	BeaconGenesisTime   *uint64           `json:"beacon_genesis_time,omitempty"`
+	SlotsPerEpoch       *uint64           `json:"slots_per_epoch,omitempty"`
 	FirstBlock          uint64            `json:"first_block"`
 	LastBlock           uint64            `json:"last_block"`
 	WarmupBlocks        int               `json:"warmup_blocks"`

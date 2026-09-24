@@ -89,14 +89,14 @@ func (b *beaconClient) version(ctx context.Context) string {
 	return resp.Data.Version
 }
 
-func (b *beaconClient) secondsPerSlot(ctx context.Context) (uint64, error) {
+func (b *beaconClient) specValue(ctx context.Context, key string) (uint64, error) {
 	var resp struct {
 		Data map[string]any `json:"data"`
 	}
 	if err := b.get(ctx, "/eth/v1/config/spec", &resp); err != nil {
 		return 0, err
 	}
-	return anyUint(resp.Data["SECONDS_PER_SLOT"])
+	return anyUint(resp.Data[key])
 }
 
 func (b *beaconClient) genesisTime(ctx context.Context) (uint64, error) {

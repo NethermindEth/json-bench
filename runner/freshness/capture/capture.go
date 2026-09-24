@@ -6,7 +6,9 @@ package capture
 
 import (
 	"bufio"
+	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,7 +74,9 @@ func (w *JSONL) Close() error {
 	return <-w.done
 }
 
-// Store keeps each distinct canonical response once, named by its digest.
+// Store keeps each distinct canonical response once, gzipped and named by
+// its digest. Review only needs digests; the bodies are for forensics, and
+// whole-block log sets compress about 9x.
 type Store struct {
 	dir     string
 	mu      sync.Mutex
@@ -99,15 +103,24 @@ func NewStore(dir string, buffer int) (*Store, error) {
 func (s *Store) loop() {
 	var firstErr error
 	for it := range s.ch {
-		b, err := json.Marshal(it.value)
-		if err == nil {
-			err = os.WriteFile(filepath.Join(s.dir, it.digest+".json"), b, 0o644)
-		}
+		err := writeGzipJSON(filepath.Join(s.dir, it.digest+".json.gz"), it.value)
 		if err != nil && firstErr == nil {
 			firstErr = fmt.Errorf("store %s: %w", it.digest, err)
 		}
 	}
 	s.done <- firstErr
+}
+
+func writeGzipJSON(path string, v any) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	zw := gzip.NewWriter(f)
+	encErr := json.NewEncoder(zw).Encode(v)
+	zErr := zw.Close()
+	fErr := f.Close()
+	return errors.Join(encErr, zErr, fErr)
 }
 
 // Put stores value under digest unless that digest was already stored.

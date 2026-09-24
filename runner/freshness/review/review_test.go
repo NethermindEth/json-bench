@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +27,7 @@ func quietLogger() *logrus.Logger {
 	return l
 }
 
-func startProbe(t *testing.T, node *mocknode.Node, id, host string, blocks int, probes map[string]bool, out string) *probeHandle {
+func startProbe(t *testing.T, node *mocknode.Node, id, host string, blocks int, probes map[string]bool, out string, mods ...func(*probe.Config)) *probeHandle {
 	t.Helper()
 	cfg := &probe.Config{
 		Pair:                    probe.PairConfig{ID: id, HostID: host, Labels: map[string]string{"el": id, "cl": "mockcl"}, EL: probe.ELConfig{URL: node.URL()}},
@@ -44,6 +45,9 @@ func startProbe(t *testing.T, node *mocknode.Node, id, host string, blocks int, 
 		OutputDirectory:         out,
 	}
 	cfg.ApplyDefaults()
+	for _, m := range mods {
+		m(cfg)
+	}
 	r, err := probe.New(cfg, probe.Options{Logger: quietLogger()})
 	require.NoError(t, err)
 	h := &probeHandle{r: r, err: make(chan error, 1)}
@@ -241,4 +245,47 @@ func TestCrossHostMarginAbsorbsClockError(t *testing.T) {
 	require.Equal(t, 2.0, c.MarginMs, "margin is raised to the combined 1 ms + 1 ms clock budgets")
 	require.Equal(t, 2, c.Compared)
 	require.Equal(t, 0, c.ObservedBWins)
+}
+
+func TestCLSplitAndEpochFlag(t *testing.T) {
+	n := newNetwork(t)
+	out := t.TempDir()
+	probes := map[string]bool{schema.ProbeStateNumber: true}
+	withBeacon := func(node *mocknode.Node) func(*probe.Config) {
+		return func(c *probe.Config) { c.Pair.CL.BeaconURL = node.BeaconURL() }
+	}
+	pa := startProbe(t, n.a, "pair-a", "host-1", 3, probes, out, withBeacon(n.a))
+	pb := startProbe(t, n.b, "pair-b", "host-1", 3, probes, out, withBeacon(n.b))
+	for i := 0; i < 3; i++ {
+		n.produce(1, 1, 10*time.Millisecond, 80*time.Millisecond, mocknode.All())
+	}
+	dirA, dirB := pa.wait(t), pb.wait(t)
+
+	res, err := Run(context.Background(), reviewConfig(n, []string{dirA, dirB}, filepath.Join(out, "review")), Options{Logger: quietLogger()})
+	require.NoError(t, err)
+	st := res.Summary.Results[schema.ProbeStateNumber]
+	for _, id := range []string{"pair-a", "pair-b"} {
+		sp := st.Pairs[id].CL["block_gossip"]
+		require.NotNil(t, sp, id)
+		require.Equal(t, 3, sp.Blocks)
+		require.NotNil(t, sp.ReadyAfter)
+	}
+	p := st.Comparisons[0].CL["block_gossip"]
+	require.NotNil(t, p)
+	require.Equal(t, 3, p.Compared)
+	require.Less(t, p.MilestoneDelta.P50, -30.0, "pair-a's CL saw every block ~70 ms earlier")
+	require.Less(t, math.Abs(p.ReadyAfterDelta.P50), 30.0, "after the milestone both pairs are equally fast")
+
+	report, err := os.ReadFile(filepath.Join(out, "review", schema.ReportFile))
+	require.NoError(t, err)
+	require.Contains(t, string(report), "### Split at CL milestones")
+}
+
+func TestEpochBoundary(t *testing.T) {
+	slot := func(v uint64) *uint64 { return &v }
+	require.True(t, epochBoundary(&BlockResult{Slot: slot(15287680)}, 32))
+	require.False(t, epochBoundary(&BlockResult{Slot: slot(15287681)}, 32))
+	require.True(t, epochBoundary(&BlockResult{Timeline: map[string]*Timeline{"a": {EpochTransition: true}}}, 0),
+		"without a known epoch length the head event's flag is used")
+	require.False(t, epochBoundary(&BlockResult{}, 0))
 }
