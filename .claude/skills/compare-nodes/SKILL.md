@@ -32,6 +32,8 @@ problems survive to the report.
   fresh resync vs a trusted archive, a new implementation vs a reference.
 - **Do not use** for latency/throughput/load — that's the `run-benchmark`
   skill. If the user wants both, do correctness here first, then benchmark.
+- **Do not use** for "which node serves a new block's data first" — that's the
+  `measure-freshness` skill.
 
 ## Prerequisites
 

@@ -1,0 +1,76 @@
+# Freshness outputs reference
+
+Timestamps are `{wall_ns, mono_ns}` with values as decimal strings. `wall_ns`
+is comparable across hosts within the clock error; `mono_ns` only within one
+probe process. All freshness figures are milliseconds from the block's slot
+start (`header.timestamp`).
+
+## Probe directory (`<pair-id>-<run-id>/`)
+
+| File | Content |
+|---|---|
+| `run-manifest.json` | Redacted config, EL/CL versions, chain id, genesis, slot duration + source, block range, `outcome` (`completed`, `max_duration`, `interrupted`, `error` + reason), `clock` (mode, source, error_ms, max_error_ms, steps), `rtt_start`/`rtt_end`, `dropped_records`, counts. |
+| `capabilities.json` | Preflight: EIP-2935 code/canary, EL/CL sync checks, per-probe `supported` + reason + `not_ready_signature`. |
+| `targets.jsonl` | One line per block: hash, parent, timestamp, slot, `missed_slots_before`, tx count, empty-bloom flag, header observed time/source, `late_armed`, `warmup`, `parent_mismatch`, `clock_step`, and per-probe results (status, match time, attempts, skipped polls, scheduler lag). |
+| `rpc-attempts.jsonl` | Outcome transitions per probe/block: `edge` `first`/`last` of each run of identical outcomes (`repeat` = run length), class, local verdict, digest, error, bytes. `edge: all` with `--record-all-attempts`. |
+| `events.jsonl` | `run_started/finished`, `target_armed/promoted`, `header_observed`, `missed_slot`, `parent_mismatch`, `late_armed`, `stall`, `clock_sample`, `clock_step`, `resource_sample`, `cl_event`, `cl_stream_disconnected`. |
+| `responses/<digest>.json` | Each distinct canonical answer once. |
+
+Probe-side statuses (local view, not verified): `matched`, `not_applicable`
+(`not_applicable_empty_logs` / `_empty_transactions`), `deadline_exceeded`,
+`late_armed`, `aborted`. Attempt classes: `result`, `not_ready`, `rpc_error`,
+`null_result`, `transport_error`, `timeout`, `http_error`, `invalid_body`.
+
+## Review directory
+
+| File | Content |
+|---|---|
+| `reference-data/` | Cached raw reference answers (`<hash>.json`, `_chain.json`). Enables `--offline`. |
+| `block-results.jsonl` | Per block identity: reference verdict, per pair × probe outcome (freshness, lower bound, first sent, left-censored, within slot), timeline (header observed, CL events). |
+| `summary.json` | Probes, warnings, block counts, per probe: per-pair stats and pairwise comparisons. |
+| `report.md` | Human report of the above. |
+
+Reference verdicts: `verified` (receipts reproduce the receipts root),
+`orphaned` (reference has another block at that height, or does not know it),
+`unverified` (fetch failed, no cache, or verification failed — never success).
+
+Review outcomes per pair × probe:
+
+| Status | Meaning | In denominator |
+|---|---|---|
+| `matched` | Earliest response equal to the verified data; time = its receive time | yes |
+| `incorrect` | Answered with data, never the correct data | yes |
+| `timeout` | No data answer before the probe stopped | yes |
+| `aborted` | Run ended while the target was open | yes |
+| `incorrect_not_applicable` | Probe judged the block empty; reference has data | yes |
+| `not_applicable` | Block has no logs / transactions for this probe | no |
+| `late_armed` | Not polled before it was available | no |
+| `unsupported` | Probe failed preflight on this pair | no |
+| `orphaned` / `unverified` | See reference verdicts | no |
+| `different_block` | This pair served another block at that height | no |
+| `not_observed` / `out_of_range` / `warmup` | Not measured by this pair | no |
+
+`left_censored`: the first request already succeeded, or no explicit "not
+ready" preceded it — availability happened at an unknown earlier time.
+Inferred comparisons treat its lower bound as unbounded.
+
+Pairwise fields: `compared`, `observed_a_wins/b_wins/ties`,
+`inferred_a_wins/b_wins/unresolved`, `coverage_a_wins/b_wins` (only one side
+correct), `both_failed`, `excluded` (by reason), `delta_a_minus_b`,
+`effective_margin_ms`, `cross_host`.
+
+## Quick queries
+
+```bash
+# Per-pair state freshness p50/p95 and denominators
+jq '.results.state_number.pairs | map_values({n: .denominator, p50: .freshness.p50_ms, p95: .freshness.p95_ms, status})' summary.json
+
+# Blocks where a pair did not match
+jq -c 'select(.results["<pair>"].logs_number.status != "matched") | {block_number, status: .results["<pair>"].logs_number.status, ref: .reference.status}' block-results.jsonl
+
+# Transitions for one block on one probe directory
+jq -c 'select(.block_number == <N>) | {probe, seq, edge, repeat, class, local, local_reason, error}' <probe-dir>/rpc-attempts.jsonl
+
+# Probe health at a glance
+jq '{outcome, outcome_reason, clock, rtt_start, dropped_records, counts}' <probe-dir>/run-manifest.json
+```
