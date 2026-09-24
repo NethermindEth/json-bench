@@ -1,0 +1,58 @@
+# One probe process per EL+CL pair, run on (or next to) that pair's host:
+#   runner freshness probe --config config/freshness/probe.example.yaml
+schema_version: 1
+
+pair:
+  id: nethermind-lighthouse
+  # Defaults to the hostname. Probes sharing a host_id share a clock domain,
+  # so review compares them without widening for clock error.
+  host_id: ""
+  labels:
+    el: nethermind
+    cl: lighthouse
+  el:
+    url: ${EL_RPC_URL:-http://localhost:8545}
+    # Alternatively resolve url/headers/auth from a clients.yaml entry (needs --clients).
+    # client_ref: nethermind
+  cl:
+    # Optional: CL health preflight, slot duration, and beacon events for the timeline.
+    beacon_url: ${BEACON_URL:-}
+
+chain:
+  # 0 = beacon /eth/v1/config/spec, then a per-chain preset (mainnet 12, Gnosis 5).
+  slot_duration_seconds: 0
+
+# Align several probes on the same first block, or start them at a wall-clock time.
+start:
+  block: 0
+  time: ""
+
+block_count: 1000
+warmup_blocks: 32
+max_run_duration_seconds: 28800
+stall_slots: 4
+
+poll_interval_ms: 10
+lookahead_poll_interval_ms: 100
+request_timeout_ms: 2000
+max_inflight_per_probe: 1
+# Identical locally-valid answers required before a log/receipt probe stops.
+logs_stable_polls: 3
+
+probes:
+  state_number: true
+  logs_number: true
+  state_latest: false
+  state_hash_canonical: false
+  logs_hash: false
+  transaction_receipt: false
+  block_receipts: false
+
+clock:
+  # auto: best-effort chronyc/timedatectl, falling back to error_budget_ms.
+  # budget: trust error_budget_ms (e.g. PTP-disciplined hosts).
+  mode: auto
+  error_budget_ms: 5
+  step_threshold_ms: 5
+
+output_directory: results/rpc-freshness
