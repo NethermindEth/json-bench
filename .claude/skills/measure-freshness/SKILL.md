@@ -206,8 +206,10 @@ reference prunes receipts.
 
 ### 7. Analyze and write ANALYSIS.md
 
-Read `report.md` and `summary.json` (vocabulary in `references/outputs.md`).
-Check in this order:
+Read `report.md` and `summary.json`. The report opens with a plain-language
+**Summary** (where the time goes, head to head); every column in the detail
+sections is defined in `runner/freshness/README.md`, and JSON fields in
+`references/outputs.md`. Check in this order:
 
 1. **Warnings** — workload mismatches, clock fallbacks/steps, RTT differences,
    dropped records, non-completed runs. Each qualifies every conclusion below it.

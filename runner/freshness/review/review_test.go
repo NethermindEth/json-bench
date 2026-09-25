@@ -171,7 +171,8 @@ func TestReviewEndToEndAndOfflineRegeneration(t *testing.T) {
 	require.NoError(t, err)
 	report, err := os.ReadFile(filepath.Join(revDir, schema.ReportFile))
 	require.NoError(t, err)
-	require.Contains(t, string(report), "## state_number")
+	require.Contains(t, string(report), "## Details: state_number")
+	require.Contains(t, string(report), "**pair-a vs pair-b** (same CL: mockcl). pair-a had state readable first on 3 of 3 blocks")
 
 	cfg := reviewConfig(n, []string{dirA, dirB}, revDir)
 	cfg.Reference.RPCURL = ""

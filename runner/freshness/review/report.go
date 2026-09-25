@@ -31,6 +31,14 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 	}
 	w("\n")
 
+	kinds := make([]string, 0, len(sum.Results))
+	for _, k := range schema.AllProbes {
+		if _, ok := sum.Results[k]; ok {
+			kinds = append(kinds, k)
+		}
+	}
+	renderSummary(&b, sum, kinds)
+
 	if len(sum.Warnings) > 0 {
 		w("## Warnings\n\n")
 		for _, x := range sum.Warnings {
@@ -56,12 +64,6 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 	}
 	w("\n")
 
-	kinds := make([]string, 0, len(sum.Results))
-	for _, k := range schema.AllProbes {
-		if _, ok := sum.Results[k]; ok {
-			kinds = append(kinds, k)
-		}
-	}
 	pairs := make([]string, 0, len(sum.Probes))
 	for _, p := range sum.Probes {
 		pairs = append(pairs, p.PairID)
@@ -69,7 +71,8 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 
 	for _, k := range kinds {
 		ps := sum.Results[k]
-		w("## %s\n\n", k)
+		w("## Details: %s\n\n", k)
+		w("Every column is explained in `%s` (section \"Reading the report\").\n\n", docsLink)
 		if k == schema.ProbeStateLatest {
 			w("`latest` answers show *at-least-N* freshness: the expected value stays readable in later blocks.\n\n")
 		}
@@ -96,10 +99,10 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 			w("| %s | %s |\n", id, strings.Join(row, " | "))
 		}
 		w("\n### Pairwise\n\n")
-		w("Observed: first correct responses compared directly (tie below the margin). ")
-		w("Inferred: availability intervals from the last explicit not-ready request to the first correct response, widened by clock error; overlaps are unresolved. ")
-		w("Coverage wins: only one side answered correctly.\n\n")
-		w("| Group | A | B | Compared | Observed A/B/tie | Inferred A/B/unresolved | Coverage A/B | Both failed | Median Δ A−B | Median winning margin A / B | Margin | Excluded |\n")
+		w("Each row counts blocks. *First correct*: whose correct answer arrived first (tie if closer than the margin). ")
+		w("*Certain*: the same, but only when the two availability windows (last \"not ready\" to first correct answer, widened by clock error) do not overlap. ")
+		w("*Only one correct*: only that side ever returned correct data. Δ is A minus B: negative means A was earlier.\n\n")
+		w("| Group | A | B | Compared | First correct A / B / tie | Certain A / B / unclear | Only one correct A / B | Both failed | Median Δ A−B (ms) | Median lead when A / B first | Margin (ms) | Excluded |\n")
 		w("|---|---|---|---|---|---|---|---|---|---|---|---|\n")
 		for _, c := range ps.Comparisons {
 			delta, am, bm := "-", "-", "-"
@@ -387,9 +390,11 @@ func renderCLSplit(b *strings.Builder, ps *ProbeSummary, pairs []string) {
 				distCell(sp.ReadyAfter, false), distCell(sp.ReadyAfter, true))
 		}
 	}
-	w("\nMissing: measured blocks where the pair's CL never emitted that event (e.g. no `head` after an optimistic import). ")
-	w("Pairs with different CL clients are compared at `block_gossip` only: `head` and `block` are emitted at client-specific points.\n")
-	w("\n| Group | A | B | Milestone | Compared | Median milestone Δ A−B | Ready after A/B/tie | Median ready-after Δ A−B |\n|---|---|---|---|---|---|---|---|\n")
+	w("\nMissing: measured blocks where the pair's CL never emitted that event (e.g. no `head` after an optimistic import).\n\n")
+	w("Paired rows, per block where both answered correctly and both CLs emitted the event. *Milestone Δ*: A's event time minus B's (negative: A's CL got there first). ")
+	w("*Faster after milestone*: whose data became readable in less time counted from its own event (tie if closer than the margin). ")
+	w("Pairs with different CL clients are compared at `block_gossip` only, because each CL emits `head` and `block` at a different point in its import.\n")
+	w("\n| Group | A | B | Milestone | Compared | Median milestone Δ A−B (ms) | Faster after milestone A / B / tie | Median Δ after milestone A−B (ms) |\n|---|---|---|---|---|---|---|---|\n")
 	for _, c := range ps.Comparisons {
 		for _, topic := range clTopics {
 			p := c.CL[topic]

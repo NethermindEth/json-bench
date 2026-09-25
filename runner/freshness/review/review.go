@@ -209,17 +209,13 @@ func Run(ctx context.Context, cfg *Config, opts Options) (*Result, error) {
 	return &Result{Dir: cfg.OutputDirectory, Summary: sum, Blocks: results}, nil
 }
 
-// sameCL reports whether two pairs run the same CL implementation, by the
-// `cl` label when both have one, else by the client name in the beacon
-// version string. Unknown counts as different: event timing is client-specific.
+// sameCL decides whether the `head` and `block` milestones are comparable
+// between two pairs. Each CL emits those events at its own point in import
+// (Lighthouse emits head before block, Caplin block before head), so across
+// different CLs only `block_gossip`, defined as "passed gossip validation" by
+// the Beacon API, means the same thing on both sides.
 func sameCL(a, b *ProbeRun) bool {
-	la, oka := a.Manifest.Labels["cl"]
-	lb, okb := b.Manifest.Labels["cl"]
-	if oka && okb {
-		return strings.EqualFold(la, lb)
-	}
-	na, nb := clientName(a.Manifest.CLClientVersion), clientName(b.Manifest.CLClientVersion)
-	return na != "" && na == nb
+	return sameClient(a.Manifest.Labels, b.Manifest.Labels, "cl", a.Manifest.CLClientVersion, b.Manifest.CLClientVersion)
 }
 
 func clientName(version string) string {

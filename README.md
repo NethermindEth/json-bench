@@ -451,6 +451,9 @@ go run ./runner freshness review --config ./config/freshness/review.example.yaml
 go run ./runner freshness review --config ./config/freshness/review.example.yaml --offline
 ```
 
+`runner/freshness/README.md` explains how the measurement works and what every
+report section and column means.
+
 Reference answers are cached in `reference-data/`, so `--offline`
 regenerates `block-results.jsonl`, `summary.json` and `report.md` without
 any node. The report shows per-pair freshness percentiles, availability by

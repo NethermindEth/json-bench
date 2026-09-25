@@ -1,5 +1,8 @@
 # Freshness outputs reference
 
+Report sections and columns are explained in `runner/freshness/README.md`
+("Reading the report"); this file covers the files and JSON fields.
+
 Timestamps are `{wall_ns, mono_ns}` with values as decimal strings. `wall_ns`
 is comparable across hosts within the clock error; `mono_ns` only within one
 probe process. All freshness figures are milliseconds from the block's slot
