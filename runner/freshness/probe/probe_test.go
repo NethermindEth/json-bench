@@ -375,3 +375,13 @@ func TestMaxDurationStillWritesOpenTargets(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &m))
 	require.Equal(t, schema.OutcomeMaxDuration, m.Outcome)
 }
+
+func TestImplausibleSlotDurationIsRejected(t *testing.T) {
+	node := mocknode.New(1, 8, 1)
+	defer node.Close()
+	cfg := testConfig(t, node, 1)
+	cfg.Chain.SlotDurationSeconds = 1 << 40
+	r, err := New(cfg, Options{Logger: logrus.New()})
+	require.NoError(t, err)
+	require.ErrorContains(t, r.Run(context.Background()), "implausible")
+}

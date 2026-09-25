@@ -13,6 +13,10 @@ import (
 	"github.com/jsonrpc-bench/runner/freshness/schema"
 )
 
+// maxSlotSeconds bounds a slot duration from config or the beacon spec well
+// below time.Duration overflow; real networks use 2-12 s.
+const maxSlotSeconds = 3600
+
 // futureOffset is how far past head the preflight asks, to capture the
 // node's own "block unknown" answer for each probe method.
 const futureOffset = 10000
@@ -252,6 +256,9 @@ func (r *Runner) resolveSlotDuration(ctx context.Context, chainID uint64) error 
 	}
 	if r.manifest.SlotDurationSeconds == 0 {
 		return fmt.Errorf("slot duration unknown for chain %d: set chain.slot_duration_seconds or pair.cl.beacon_url", chainID)
+	}
+	if r.manifest.SlotDurationSeconds > maxSlotSeconds {
+		return fmt.Errorf("slot duration %d s (%s) is implausible; the limit is %d s", r.manifest.SlotDurationSeconds, r.manifest.SlotDurationSource, maxSlotSeconds)
 	}
 	r.slotDur = time.Duration(r.manifest.SlotDurationSeconds) * time.Second
 	return nil

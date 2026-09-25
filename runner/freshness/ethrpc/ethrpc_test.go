@@ -166,3 +166,16 @@ func zeros(n int) string {
 func TestHistoryCalldata(t *testing.T) {
 	require.Equal(t, "0x"+zeros(60)+"1234", HistoryCalldata(0x1234))
 }
+
+func TestOutOfRangeValuesAreRejected(t *testing.T) {
+	_, err := CanonReceipt(json.RawMessage(`{"type":"0x100","status":"0x1","cumulativeGasUsed":"0x1","gasUsed":"0x1","logsBloom":"0x` + zeros(512) + `","logs":[],"transactionHash":"0x` + zeros(64) + `","transactionIndex":"0x0","blockHash":"0x` + zeros(64) + `","blockNumber":"0x1"}`))
+	require.ErrorContains(t, err, "exceeds one byte", "a type wider than a byte must not wrap into a valid one")
+
+	raw := `{"hash":"0x` + zeros(64) + `","parentHash":"0x` + zeros(64) + `","number":"0x1","timestamp":"0xffffffffffffffff","logsBloom":"0x` + zeros(512) + `","receiptsRoot":"0x` + zeros(64) + `","transactions":[]}`
+	_, err = ParseHeader(json.RawMessage(raw))
+	require.ErrorContains(t, err, "out of range")
+
+	ns, err := SlotStartNanos(1790344644)
+	require.NoError(t, err)
+	require.Equal(t, int64(1790344644)*1e9, ns)
+}

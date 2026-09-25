@@ -474,13 +474,18 @@ func (r *Runner) onHeader(t *target, h *ethrpc.Header, source string) {
 	if t.header != nil {
 		return
 	}
+	start, err := ethrpc.SlotStartNanos(h.Timestamp)
+	if err != nil {
+		r.log.Warnf("block %d: %v; header ignored", t.number, err)
+		return
+	}
 	n := t.number
 	t.header = h
 	rec := t.rec
 	rec.BlockHash = ethrpc.HashHex(h.Hash)
 	rec.ParentHash = ethrpc.HashHex(h.ParentHash)
 	rec.Timestamp = h.Timestamp
-	rec.SlotStart = schema.Nanos(int64(h.Timestamp) * int64(time.Second))
+	rec.SlotStart = schema.Nanos(start)
 	rec.Deadline = rec.SlotStart + schema.Nanos(r.slotDur)
 	rec.TxCount = len(h.TxHashes)
 	rec.GasUsed = h.GasUsed
@@ -689,14 +694,16 @@ func (r *Runner) recordLateArmed(ctx context.Context, numbers []uint64, head uin
 		rec := &schema.Target{Envelope: r.env, BlockNumber: n, ArmedAt: r.clock.Now(), LateArmed: true,
 			Warmup: n < r.firstBlock+uint64(r.cfg.WarmupBlocks), Probes: map[string]*schema.ProbeResult{}}
 		if err == nil && h != nil {
-			rec.BlockHash = ethrpc.HashHex(h.Hash)
-			rec.ParentHash = ethrpc.HashHex(h.ParentHash)
-			rec.Timestamp = h.Timestamp
-			rec.SlotStart = schema.Nanos(int64(h.Timestamp) * int64(time.Second))
-			rec.Deadline = rec.SlotStart + schema.Nanos(r.slotDur)
-			rec.TxCount = len(h.TxHashes)
-			rec.LogsBloomEmpty = h.LogsBloom == [256]byte{}
-			r.headers[n] = h
+			if start, serr := ethrpc.SlotStartNanos(h.Timestamp); serr == nil {
+				rec.BlockHash = ethrpc.HashHex(h.Hash)
+				rec.ParentHash = ethrpc.HashHex(h.ParentHash)
+				rec.Timestamp = h.Timestamp
+				rec.SlotStart = schema.Nanos(start)
+				rec.Deadline = rec.SlotStart + schema.Nanos(r.slotDur)
+				rec.TxCount = len(h.TxHashes)
+				rec.LogsBloomEmpty = h.LogsBloom == [256]byte{}
+				r.headers[n] = h
+			}
 		}
 		for _, p := range r.probes {
 			rec.Probes[p] = &schema.ProbeResult{Status: schema.StatusLateArmed}

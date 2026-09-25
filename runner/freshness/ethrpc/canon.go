@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -239,7 +241,7 @@ type Receipt struct {
 	BlockNumber       string `json:"blockNumber"`
 	ContractAddress   string `json:"contractAddress,omitempty"`
 
-	txType  uint64
+	txType  uint8
 	status  uint64
 	cumGas  uint64
 	txIndex uint64
@@ -263,10 +265,17 @@ type rawReceipt struct {
 func canonReceipt(r rawReceipt) (Receipt, error) {
 	var c Receipt
 	var err error
-	if c.txType, _, err = optQuantity(r.Type); err != nil {
+	txType, _, err := optQuantity(r.Type)
+	if err != nil {
 		return c, fmt.Errorf("type: %w", err)
 	}
-	c.Type = hexutil.EncodeUint64(c.txType)
+	// EIP-2718 types are one byte; a wider value would wrap and derive a
+	// wrong receipts root instead of failing.
+	if txType > math.MaxUint8 {
+		return c, fmt.Errorf("type %d exceeds one byte", txType)
+	}
+	c.txType = uint8(txType)
+	c.Type = hexutil.EncodeUint64(txType)
 	root, err := hexData(r.Root)
 	if err != nil {
 		return c, fmt.Errorf("root: %w", err)
@@ -359,7 +368,7 @@ func ReceiptsRoot(rs []Receipt) common.Hash {
 	list := make(types.Receipts, len(rs))
 	for i, c := range rs {
 		r := &types.Receipt{
-			Type:              uint8(c.txType),
+			Type:              c.txType,
 			CumulativeGasUsed: c.cumGas,
 			Bloom:             types.BytesToBloom(common.FromHex(c.LogsBloom)),
 		}
@@ -449,6 +458,9 @@ func ParseHeader(raw json.RawMessage) (*Header, error) {
 	if h.Timestamp, err = quantity(r.Timestamp); err != nil {
 		return nil, fmt.Errorf("timestamp: %w", err)
 	}
+	if _, err := SlotStartNanos(h.Timestamp); err != nil {
+		return nil, err
+	}
 	if h.GasUsed, _, err = optQuantity(r.GasUsed); err != nil {
 		return nil, fmt.Errorf("gasUsed: %w", err)
 	}
@@ -475,6 +487,15 @@ func ParseHeader(raw json.RawMessage) (*Header, error) {
 		h.TxHashes = append(h.TxHashes, common.HexToHash(s))
 	}
 	return h, nil
+}
+
+// SlotStartNanos converts a header timestamp (seconds) to Unix nanoseconds.
+// Timestamps past what int64 nanoseconds can hold (year 2262) are malformed.
+func SlotStartNanos(ts uint64) (int64, error) {
+	if ts > math.MaxInt64/uint64(time.Second) {
+		return 0, fmt.Errorf("timestamp %d out of range", ts)
+	}
+	return int64(ts) * int64(time.Second), nil
 }
 
 // ParseQuantity parses a JSON-RPC quantity result such as eth_blockNumber.
