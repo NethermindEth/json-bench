@@ -49,6 +49,35 @@ type PairStats struct {
 	SkippedPolls int                 `json:"skipped_polls"`
 	Attempts     int                 `json:"attempts"`
 	CL           map[string]*CLSplit `json:"cl_split,omitempty"`
+	// Context splits the measured blocks by conditions that move freshness
+	// for reasons outside the EL: epoch processing and optimistic CL import.
+	FreshnessEpoch    *Dist `json:"freshness_epoch_boundary,omitempty"`
+	FreshnessNonEpoch *Dist `json:"freshness_other_blocks,omitempty"`
+	OptimisticImports int   `json:"optimistic_imports"`
+	LagVsState        *Dist `json:"lag_vs_state_number,omitempty"`
+}
+
+func (st *PairStats) addContext(outs []*Outcome, tls []*Timeline, epochs []bool) {
+	var epoch, other []float64
+	for i, o := range outs {
+		if !o.Comparable() {
+			continue
+		}
+		if tls[i] != nil && tls[i].Optimistic {
+			st.OptimisticImports++
+		}
+		if o.Status != OutMatched {
+			continue
+		}
+		if epochs[i] {
+			epoch = append(epoch, *o.FreshnessMs)
+		} else {
+			other = append(other, *o.FreshnessMs)
+		}
+	}
+	if len(epoch) > 0 {
+		st.FreshnessEpoch, st.FreshnessNonEpoch = newDist(epoch), newDist(other)
+	}
 }
 
 func pairStats(outs []*Outcome, deadlines []float64, slotMs float64) *PairStats {
@@ -122,6 +151,7 @@ type Comparison struct {
 	AWinMargin    *Dist                     `json:"a_win_margin,omitempty"`
 	BWinMargin    *Dist                     `json:"b_win_margin,omitempty"`
 	CL            map[string]*PairedCLSplit `json:"cl_split,omitempty"`
+	SameCL        bool                      `json:"same_cl"`
 }
 
 type side struct {

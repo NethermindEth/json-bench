@@ -13,6 +13,7 @@ var clTopics = []string{"block_gossip", "head", "block"}
 // free of cross-host clock error.
 type CLSplit struct {
 	Blocks     int   `json:"blocks_with_event"`
+	Missing    int   `json:"measured_without_event"`
 	Milestone  *Dist `json:"milestone_from_slot_start,omitempty"`
 	ReadyAfter *Dist `json:"ready_after_milestone,omitempty"`
 }
@@ -45,12 +46,14 @@ func pairCLSplit(outs []*Outcome, tls []*Timeline) map[string]*CLSplit {
 	out := map[string]*CLSplit{}
 	for _, topic := range clTopics {
 		var milestone, after []float64
+		missing := 0
 		for i, o := range outs {
 			if !o.Comparable() {
 				continue
 			}
 			m, ok := firstMark(tls[i], topic)
 			if !ok {
+				missing++
 				continue
 			}
 			milestone = append(milestone, m)
@@ -59,7 +62,7 @@ func pairCLSplit(outs []*Outcome, tls []*Timeline) map[string]*CLSplit {
 			}
 		}
 		if len(milestone) > 0 {
-			out[topic] = &CLSplit{Blocks: len(milestone), Milestone: newDist(milestone), ReadyAfter: newDist(after)}
+			out[topic] = &CLSplit{Blocks: len(milestone), Missing: missing, Milestone: newDist(milestone), ReadyAfter: newDist(after)}
 		}
 	}
 	if len(out) == 0 {
@@ -68,9 +71,9 @@ func pairCLSplit(outs []*Outcome, tls []*Timeline) map[string]*CLSplit {
 	return out
 }
 
-func pairedCLSplit(results []*BlockResult, a, b, kind string, margin float64) map[string]*PairedCLSplit {
+func pairedCLSplit(results []*BlockResult, a, b, kind string, margin float64, topics []string) map[string]*PairedCLSplit {
 	out := map[string]*PairedCLSplit{}
-	for _, topic := range clTopics {
+	for _, topic := range topics {
 		p := &PairedCLSplit{}
 		var mDelta, rDelta []float64
 		for _, br := range results {

@@ -26,6 +26,9 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 	if n := sum.Blocks["epoch_boundary"]; n > 0 {
 		w("- %s the first slot of an epoch (marked `E`): CL epoch processing can delay import independently of block contents.\n", plural(n, "block is", "blocks are"))
 	}
+	if n := sum.Blocks["optimistic_import"]; n > 0 {
+		w("- %s imported optimistically by at least one pair's CL (marked `O` in the per-block table): its EL had not validated the block yet, typically because it was busy.\n", plural(n, "block was", "blocks were"))
+	}
 	w("\n")
 
 	if len(sum.Warnings) > 0 {
@@ -114,6 +117,7 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 				c.CoverageAWins, c.CoverageBWins, c.BothFailed, delta, am, bm, c.MarginMs, describeCounts(c.Excluded))
 		}
 		w("\nCompare pairs by the per-block median Δ and win counts, not by the difference of their p50s: the medians of two distributions can order differently from per-block results.\n\n")
+		renderContext(&b, k, ps, pairs)
 		renderCLSplit(&b, ps, pairs)
 	}
 
@@ -125,7 +129,7 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 		for _, br := range results {
 			cells := make([]string, len(pairs))
 			for i, id := range pairs {
-				cells[i] = cell(br.Results[id][primary])
+				cells[i] = cell(br.Results[id][primary], br.Timeline[id])
 			}
 			w("| %d | %s | %d | %s | %s | %s |\n", br.BlockNumber, short(br.BlockHash), br.MissedSlotsBefore, epochMark(br), br.Reference.Status, strings.Join(cells, " | "))
 		}
@@ -216,18 +220,62 @@ func timelineCell(o *Outcome) string {
 	return strings.Join(parts, " → ")
 }
 
-func cell(o *Outcome) string {
+func cell(o *Outcome, tl *Timeline) string {
 	if o == nil {
 		return "-"
 	}
+	s := o.Status
 	if o.Status == OutMatched {
-		s := fmt.Sprintf("%.1f", *o.FreshnessMs)
+		s = fmt.Sprintf("%.1f", *o.FreshnessMs)
 		if o.LeftCensored {
 			s += "*"
 		}
-		return s
 	}
-	return o.Status
+	if tl != nil && tl.Optimistic {
+		s += " O"
+	}
+	return s
+}
+
+// renderContext separates conditions that move freshness for reasons outside
+// the EL, plus how far this probe trails the state canary.
+func renderContext(b *strings.Builder, kind string, ps *ProbeSummary, pairs []string) {
+	has := false
+	for _, id := range pairs {
+		st := ps.Pairs[id]
+		if st.FreshnessEpoch != nil || st.OptimisticImports > 0 || st.LagVsState != nil {
+			has = true
+		}
+	}
+	if !has {
+		return
+	}
+	w := func(format string, args ...any) { fmt.Fprintf(b, format, args...) }
+	w("### Context\n\n")
+	w("Epoch-boundary blocks (first slot of an epoch) include CL epoch processing. Optimistic imports: blocks the CL imported before its EL validated them. ")
+	if kind != schema.ProbeStateNumber {
+		w("Lag vs state: this probe's freshness minus `state_number`'s on the same block, e.g. asynchronous log indexing.")
+	}
+	w("\n\n| Pair | Optimistic imports | Epoch-boundary p50 / p95 (n) | Other blocks p50 / p95 (n) | Lag vs state p50 / p95 |\n|---|---|---|---|---|\n")
+	for _, id := range pairs {
+		st := ps.Pairs[id]
+		w("| %s | %d | %s | %s | %s |\n", id, st.OptimisticImports, distN(st.FreshnessEpoch), distN(st.FreshnessNonEpoch), distPair(st.LagVsState))
+	}
+	w("\n")
+}
+
+func distN(d *Dist) string {
+	if d == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.1f / %.1f (%d)", d.P50, d.P95, d.N)
+}
+
+func distPair(d *Dist) string {
+	if d == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%.1f / %.1f", d.P50, d.P95)
 }
 
 func availabilityKeys(deadlines []float64) []string {
@@ -328,17 +376,19 @@ func renderCLSplit(b *strings.Builder, ps *ProbeSummary, pairs []string) {
 	w("Milestone: when the pair's beacon node emitted the event, from slot start (a post-validation milestone seen by the probe, not network arrival). ")
 	w("Ready after: freshness minus that milestone, i.e. the time spent after it. Which work each milestone includes is client-specific (Lighthouse emits `head` before `block`). ")
 	w("Ready after is measured on one host, so it carries no cross-host clock error.\n\n")
-	w("| Pair | Milestone | Blocks | Milestone p50 | Milestone p95 | Ready after p50 | Ready after p95 |\n|---|---|---|---|---|---|---|\n")
+	w("| Pair | Milestone | Blocks | Missing | Milestone p50 | Milestone p95 | Ready after p50 | Ready after p95 |\n|---|---|---|---|---|---|---|---|\n")
 	for _, id := range pairs {
 		for _, topic := range clTopics {
 			sp := ps.Pairs[id].CL[topic]
 			if sp == nil {
 				continue
 			}
-			w("| %s | %s | %d | %s | %s | %s | %s |\n", id, topic, sp.Blocks, distCell(sp.Milestone, false), distCell(sp.Milestone, true),
+			w("| %s | %s | %d | %d | %s | %s | %s | %s |\n", id, topic, sp.Blocks, sp.Missing, distCell(sp.Milestone, false), distCell(sp.Milestone, true),
 				distCell(sp.ReadyAfter, false), distCell(sp.ReadyAfter, true))
 		}
 	}
+	w("\nMissing: measured blocks where the pair's CL never emitted that event (e.g. no `head` after an optimistic import). ")
+	w("Pairs with different CL clients are compared at `block_gossip` only: `head` and `block` are emitted at client-specific points.\n")
 	w("\n| Group | A | B | Milestone | Compared | Median milestone Δ A−B | Ready after A/B/tie | Median ready-after Δ A−B |\n|---|---|---|---|---|---|---|---|\n")
 	for _, c := range ps.Comparisons {
 		for _, topic := range clTopics {

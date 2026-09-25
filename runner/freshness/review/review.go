@@ -42,6 +42,9 @@ type Timeline struct {
 	HeaderSource     string   `json:"header_source,omitempty"`
 	CL               []CLMark `json:"cl_events,omitempty"`
 	EpochTransition  bool     `json:"epoch_transition,omitempty"`
+	// Optimistic is set when any CL event for the slot carried
+	// execution_optimistic: the CL imported the block before its EL validated it.
+	Optimistic bool `json:"execution_optimistic,omitempty"`
 }
 
 type CLMark struct {
@@ -187,6 +190,12 @@ func Run(ctx context.Context, cfg *Config, opts Options) (*Result, error) {
 		if br.EpochBoundary {
 			sum.Blocks["epoch_boundary"]++
 		}
+		for _, tl := range br.Timeline {
+			if tl != nil && tl.Optimistic {
+				sum.Blocks["optimistic_import"]++
+				break
+			}
+		}
 	}
 
 	for _, p := range probeKinds {
@@ -198,6 +207,24 @@ func Run(ctx context.Context, cfg *Config, opts Options) (*Result, error) {
 		return nil, err
 	}
 	return &Result{Dir: cfg.OutputDirectory, Summary: sum, Blocks: results}, nil
+}
+
+// sameCL reports whether two pairs run the same CL implementation, by the
+// `cl` label when both have one, else by the client name in the beacon
+// version string. Unknown counts as different: event timing is client-specific.
+func sameCL(a, b *ProbeRun) bool {
+	la, oka := a.Manifest.Labels["cl"]
+	lb, okb := b.Manifest.Labels["cl"]
+	if oka && okb {
+		return strings.EqualFold(la, lb)
+	}
+	na, nb := clientName(a.Manifest.CLClientVersion), clientName(b.Manifest.CLClientVersion)
+	return na != "" && na == nb
+}
+
+func clientName(version string) string {
+	name, _, _ := strings.Cut(version, "/")
+	return strings.ToLower(strings.TrimSpace(name))
 }
 
 func slotsPerEpoch(runs []*ProbeRun) uint64 {
@@ -255,7 +282,11 @@ func loadRuns(dirs []string) ([]*ProbeRun, []string, error) {
 	}
 	for _, r := range runs {
 		if r.Manifest.GenesisHash == "" {
-			warnings = append(warnings, fmt.Sprintf("%s: genesis hash unknown, genesis identity not confirmed", r.ID()))
+			reason := r.Capabilities.GenesisError
+			if reason == "" {
+				reason = "not reported"
+			}
+			warnings = append(warnings, fmt.Sprintf("%s: genesis block unavailable (%s), usually a node that pruned history; chain id still matches, genesis identity not confirmed", r.ID(), reason))
 		}
 		if r.Manifest.Outcome != schema.OutcomeCompleted {
 			warnings = append(warnings, fmt.Sprintf("%s: probe run ended with %s %s", r.ID(), r.Manifest.Outcome, r.Manifest.OutcomeReason))
@@ -398,6 +429,9 @@ func buildBlock(runs []*ProbeRun, kinds []string, b block, ref *Reference, slotD
 				if topic == "head" && ethEpochTransition(e.Data) {
 					tl.EpochTransition = true
 				}
+				if v, _ := e.Data["execution_optimistic"].(bool); v {
+					tl.Optimistic = true
+				}
 				tl.CL = append(tl.CL, CLMark{Topic: topic, Ms: *msFrom(int64(e.At.Wall), int64(t.SlotStart))})
 			}
 		}
@@ -439,6 +473,8 @@ func summarise(cfg *Config, runs []*ProbeRun, results []*BlockResult, kind strin
 	for _, r := range runs {
 		var outs []*Outcome
 		var tls []*Timeline
+		var epochs []bool
+		var lags []float64
 		for _, br := range results {
 			o := br.Results[r.ID()][kind]
 			if o == nil {
@@ -455,9 +491,16 @@ func summarise(cfg *Config, runs []*ProbeRun, results []*BlockResult, kind strin
 			}
 			outs = append(outs, o)
 			tls = append(tls, br.Timeline[r.ID()])
+			epochs = append(epochs, br.EpochBoundary)
+			if s := br.Results[r.ID()][schema.ProbeStateNumber]; kind != schema.ProbeStateNumber && s != nil &&
+				s.Status == OutMatched && o.Status == OutMatched {
+				lags = append(lags, *o.FreshnessMs-*s.FreshnessMs)
+			}
 		}
 		st := pairStats(outs, cfg.DeadlinesMs, slotMs)
 		st.CL = pairCLSplit(outs, tls)
+		st.addContext(outs, tls, epochs)
+		st.LagVsState = newDist(lags)
 		ps.Pairs[r.ID()] = st
 	}
 	for _, g := range groups(cfg, runs) {
@@ -492,7 +535,12 @@ func comparePair(cfg *Config, groupName string, a, b *ProbeRun, results []*Block
 	c.Delta, c.AWinMargin, c.BWinMargin = newDist(deltas), newDist(aw), newDist(bw)
 	// Each side's ready-after-milestone is a same-host difference, so the
 	// configured margin applies without clock-error widening.
-	c.CL = pairedCLSplit(results, a.ID(), b.ID(), kind, cfg.MarginMs)
+	c.SameCL = sameCL(a, b)
+	topics := clTopics
+	if !c.SameCL {
+		topics = []string{"block_gossip"}
+	}
+	c.CL = pairedCLSplit(results, a.ID(), b.ID(), kind, cfg.MarginMs, topics)
 	return c
 }
 

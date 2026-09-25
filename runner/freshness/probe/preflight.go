@@ -43,13 +43,19 @@ func (r *Runner) preflight(ctx context.Context) error {
 	}
 	caps.ChainID = chainID.Uint64()
 
-	if raw, err := r.el.CallResult(ctx, "eth_getBlockByNumber", "0x0", false); err == nil {
-		if h, err := ethrpc.ParseHeader(raw); err == nil && h != nil {
-			caps.GenesisHash = ethrpc.HashHex(h.Hash)
-		}
+	raw, err = r.el.CallResult(ctx, "eth_getBlockByNumber", "0x0", false)
+	switch h, perr := ethrpc.ParseHeader(raw); {
+	case err != nil:
+		caps.GenesisError = truncate(err.Error(), 200)
+	case perr != nil:
+		caps.GenesisError = truncate(perr.Error(), 200)
+	case h == nil:
+		caps.GenesisError = "block 0 returned null"
+	default:
+		caps.GenesisHash = ethrpc.HashHex(h.Hash)
 	}
 	if caps.GenesisHash == "" {
-		r.log.Warn("genesis block unavailable; review cannot confirm genesis identity for this probe")
+		r.log.Warnf("genesis block unavailable (%s), usually because the node pruned history; chain id is still checked, but review cannot confirm genesis identity", caps.GenesisError)
 	}
 
 	raw, err = r.el.CallResult(ctx, "eth_syncing")

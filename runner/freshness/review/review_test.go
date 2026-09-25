@@ -152,6 +152,9 @@ func TestReviewEndToEndAndOfflineRegeneration(t *testing.T) {
 	require.Equal(t, 3, all.InferredAWins)
 	require.Len(t, st.Comparisons, 2, "all + cl=mockcl")
 
+	require.NotNil(t, res.Summary.Results[schema.ProbeLogsNumber].Pairs["pair-a"].LagVsState)
+	require.Nil(t, st.Pairs["pair-a"].LagVsState, "state_number has no lag against itself")
+
 	for _, br := range res.Blocks {
 		o := br.Results["pair-a"][schema.ProbeLogsHash]
 		require.Equal(t, OutMatched, o.Status)
@@ -288,4 +291,46 @@ func TestEpochBoundary(t *testing.T) {
 	require.True(t, epochBoundary(&BlockResult{Timeline: map[string]*Timeline{"a": {EpochTransition: true}}}, 0),
 		"without a known epoch length the head event's flag is used")
 	require.False(t, epochBoundary(&BlockResult{}, 0))
+}
+
+func TestSameCL(t *testing.T) {
+	run := func(labels map[string]string, version string) *ProbeRun {
+		return &ProbeRun{Manifest: schema.Manifest{Labels: labels, CLClientVersion: version}}
+	}
+	lh := "Lighthouse/v8.2.2-e423a66/x86_64-linux"
+	require.True(t, sameCL(run(map[string]string{"cl": "lighthouse"}, ""), run(map[string]string{"cl": "Lighthouse"}, "")))
+	require.False(t, sameCL(run(map[string]string{"cl": "lighthouse"}, lh), run(map[string]string{"cl": "caplin"}, lh)), "labels win over versions")
+	require.True(t, sameCL(run(nil, lh), run(nil, "Lighthouse/v8.1.0")))
+	require.False(t, sameCL(run(nil, lh), run(nil, "Caplin/3.6.1-0c4d9c91 linux/amd64")))
+	require.False(t, sameCL(run(nil, ""), run(nil, "")), "unknown CLs are not assumed equal")
+}
+
+func TestContextSplitAndMissingMilestones(t *testing.T) {
+	f := func(v float64) *float64 { return &v }
+	outs := []*Outcome{
+		{Status: OutMatched, FreshnessMs: f(2000)},
+		{Status: OutMatched, FreshnessMs: f(5000)},
+		{Status: OutMatched, FreshnessMs: f(2100)},
+		{Status: OutTimeout},
+	}
+	tls := []*Timeline{
+		{CL: []CLMark{{Topic: "block_gossip", Ms: 1600}, {Topic: "head", Ms: 1900}}},
+		{CL: []CLMark{{Topic: "block_gossip", Ms: 1700}, {Topic: "head", Ms: 4000}}, EpochTransition: true},
+		{CL: []CLMark{{Topic: "block_gossip", Ms: 1650}, {Topic: "block", Ms: 2050}}, Optimistic: true},
+		nil,
+	}
+	epochs := []bool{false, true, false, false}
+
+	st := &PairStats{}
+	st.addContext(outs, tls, epochs)
+	require.Equal(t, 1, st.OptimisticImports)
+	require.Equal(t, 1, st.FreshnessEpoch.N)
+	require.Equal(t, 5000.0, st.FreshnessEpoch.P50)
+	require.Equal(t, 2, st.FreshnessNonEpoch.N)
+
+	split := pairCLSplit(outs, tls)
+	require.Equal(t, 3, split["block_gossip"].Blocks)
+	require.Equal(t, 1, split["block_gossip"].Missing, "the timed-out block had no events")
+	require.Equal(t, 2, split["head"].Blocks)
+	require.Equal(t, 2, split["head"].Missing, "optimistic import emitted no head")
 }

@@ -279,6 +279,7 @@ type Capabilities struct {
 	PairID        string                      `json:"pair_id"`
 	ChainID       uint64                      `json:"chain_id"`
 	GenesisHash   string                      `json:"genesis_hash"`
+	GenesisError  string                      `json:"genesis_error,omitempty"`
 	HistoryCode   bool                        `json:"eip2935_code_present"`
 	HistoryCanary bool                        `json:"eip2935_canary_ok"`
 	ELSyncing     *bool                       `json:"el_syncing"`
