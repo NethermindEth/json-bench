@@ -104,7 +104,14 @@ Every probe response time includes the network path from the probe to its node.
 1. **On the pair's host** (preferred): EL at `http://127.0.0.1:8545`, beacon at
    the CL's HTTP port. Check the actual port: defaults are Lighthouse/Nimbus
    5052, Prysm 3500, Teku 5051, Lodestar 9596, and deployment tools override
-   them (sedge uses 4000). Some hosts do not publish
+   them (sedge uses 4000).
+   **Erigon with embedded Caplin:** the beacon API is off unless Erigon runs
+   with `--beacon.api=…` including at least `beacon,config,node,events`; the
+   port is `--beacon.api.port` (default 5555) and it binds to
+   `--beacon.api.addr` (default localhost), so probe it on the host.
+   Confirm events flow with
+   `curl -N 'http://127.0.0.1:<port>/eth/v1/events?topics=head,block,block_gossip'`.
+   Some hosts do not publish
    8545 publicly or bind it to loopback / a docker bridge — on-host avoids it.
 2. **Nearby machine** (fallback): allowed, but the manifest's idle RTT baseline
    will show the added distance and review warns when RTT differences exceed the
@@ -127,10 +134,12 @@ for long runs; use 2–4 for pilot runs of 20–50 blocks.
 **Disk.** Budget about 70 KB per block per probe (~70 MB per 1000 blocks; response bodies are
 gzipped); with `--record-all-attempts`, considerably more.
 
-**Align the start.** Pick one `start.block` a few blocks above the current head
-(e.g. head + 10 ≈ 2 minutes on mainnet) and put it in every config, so all
-probes measure the same block range. A probe started after that block begins at
-its next block with a warning; review still compares the overlapping range.
+**Align the start.** Pick one `start.block` above the current head and put it
+in every config, so all probes measure the same block range. Choose it only
+once the binary and configs are on every host: a first deploy to several hosts
+can take minutes (26 MB per host), so allow at least head + 15 then; head + 5
+is enough for later runs. A probe started after that block begins at its next
+block with a warning; review still compares the overlapping range.
 
 Leave `pair.host_id` empty (defaults to hostname) unless two probes on the
 **same machine** need an explicit shared id. Probes with the same `host_id` are
@@ -210,16 +219,25 @@ Check in this order:
    denominators and median winning margin. Prefer `hold_constant` groups over
    the `all` group: the pair matrix is uneven, so never state an unconditional
    EL ranking from pooled results.
-5. **Split at CL milestones** (probes with a beacon URL) — per pair, when its
+5. **Context** — per pair: optimistic imports (the CL imported before its EL
+   validated, usually a busy EL), freshness on epoch-boundary blocks vs the
+   rest, and for non-state probes the lag behind `state_number` (asynchronous
+   log indexing shows up here: Erigon 3.6 trails by 0.6–0.9 s at p50).
+6. **Split at CL milestones** (probes with a beacon URL) — per pair, when its
    beacon node emitted `block_gossip` / `head` / `block` and how long data took
    to become readable after each, plus paired deltas. This separates "this
    pair's CL saw the block earlier" from "this pair's EL served it faster
    after that". The milestone deltas are cross-host (clock error applies); the
-   ready-after deltas are same-host and clock-error free.
-6. **Drill-down** — timelines of the largest-spread blocks; `block-results.jsonl`
+   ready-after deltas are same-host and clock-error free. Event order and
+   meaning differ by CL (Lighthouse emits `head` before `block`, Caplin
+   `block` before `head`), so pairs with different CLs are compared at
+   `block_gossip` only. A non-zero `Missing` count means the CL skipped an
+   event on some blocks — e.g. no `head` after an optimistic import.
+7. **Drill-down** — timelines of the largest-spread blocks; `block-results.jsonl`
    for anything specific. Blocks marked `E` are the first slot of an epoch:
    check epoch processing before attributing their delay to block contents
-   (blobs, gas).
+   (blobs, gas). Cells marked `O` are optimistic imports: look at that EL's
+   logs around the slot (pruning, forkchoice stalls).
 
 Structure:
 
@@ -239,6 +257,14 @@ and that one live run is one sample: repeat runs and rotate hosts before
 attributing persistent differences to client software.
 
 ## Gotchas
+
+- **Node log volume.** Every not-ready poll is an RPC error on the node, and
+  some clients log each one (Erigon: `WARN [rpc] served … block not found`,
+  ~10k lines/min at the default cadence, ~2M lines per 1000-block run). Check
+  the node's log rotation and disk before a long run.
+- **Pruned nodes and genesis.** Nodes that pruned history cannot serve block 0,
+  so the probe and review warn that genesis identity is unconfirmed. Chain id
+  is still checked; the warning is harmless for pruned full nodes.
 
 - **Reference ≠ tested pair.** Using a tested node as reference makes it the
   definition of correct. Review cannot detect this; check the URL.
