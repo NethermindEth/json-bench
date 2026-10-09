@@ -1,0 +1,2248 @@
+{
+  "name": "Log-data full-response parity",
+  "description": "Same retained queries on baseline and candidate, including sparse and all-match controls; no expected-difference rules.",
+  "calls": {
+    "eth_getLogs": [
+      {
+        "id": "log-data-selective-1000-0",
+        "params": [
+          {
+            "fromBlock": "0x1838ed9",
+            "toBlock": "0x18392c0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-1",
+        "params": [
+          {
+            "fromBlock": "0x1838f3d",
+            "toBlock": "0x1839324",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-2",
+        "params": [
+          {
+            "fromBlock": "0x1838fa1",
+            "toBlock": "0x1839388",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-3",
+        "params": [
+          {
+            "fromBlock": "0x1839005",
+            "toBlock": "0x18393ec",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-4",
+        "params": [
+          {
+            "fromBlock": "0x1839069",
+            "toBlock": "0x1839450",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-5",
+        "params": [
+          {
+            "fromBlock": "0x18390cd",
+            "toBlock": "0x18394b4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-6",
+        "params": [
+          {
+            "fromBlock": "0x1839131",
+            "toBlock": "0x1839518",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-7",
+        "params": [
+          {
+            "fromBlock": "0x1839195",
+            "toBlock": "0x183957c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-8",
+        "params": [
+          {
+            "fromBlock": "0x18391f9",
+            "toBlock": "0x18395e0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-9",
+        "params": [
+          {
+            "fromBlock": "0x183925d",
+            "toBlock": "0x1839644",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-10",
+        "params": [
+          {
+            "fromBlock": "0x18392c1",
+            "toBlock": "0x18396a8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-11",
+        "params": [
+          {
+            "fromBlock": "0x1839325",
+            "toBlock": "0x183970c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-12",
+        "params": [
+          {
+            "fromBlock": "0x1839389",
+            "toBlock": "0x1839770",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-13",
+        "params": [
+          {
+            "fromBlock": "0x18393ed",
+            "toBlock": "0x18397d4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-14",
+        "params": [
+          {
+            "fromBlock": "0x1839451",
+            "toBlock": "0x1839838",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-15",
+        "params": [
+          {
+            "fromBlock": "0x18394b5",
+            "toBlock": "0x183989c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-16",
+        "params": [
+          {
+            "fromBlock": "0x1839519",
+            "toBlock": "0x1839900",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-17",
+        "params": [
+          {
+            "fromBlock": "0x183957d",
+            "toBlock": "0x1839964",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-18",
+        "params": [
+          {
+            "fromBlock": "0x18395e1",
+            "toBlock": "0x18399c8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-19",
+        "params": [
+          {
+            "fromBlock": "0x1839645",
+            "toBlock": "0x1839a2c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-20",
+        "params": [
+          {
+            "fromBlock": "0x18396a9",
+            "toBlock": "0x1839a90",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-21",
+        "params": [
+          {
+            "fromBlock": "0x183970d",
+            "toBlock": "0x1839af4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-22",
+        "params": [
+          {
+            "fromBlock": "0x1839771",
+            "toBlock": "0x1839b58",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-23",
+        "params": [
+          {
+            "fromBlock": "0x18397d5",
+            "toBlock": "0x1839bbc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-24",
+        "params": [
+          {
+            "fromBlock": "0x1839839",
+            "toBlock": "0x1839c20",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-25",
+        "params": [
+          {
+            "fromBlock": "0x183989d",
+            "toBlock": "0x1839c84",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-26",
+        "params": [
+          {
+            "fromBlock": "0x1839901",
+            "toBlock": "0x1839ce8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-27",
+        "params": [
+          {
+            "fromBlock": "0x1839965",
+            "toBlock": "0x1839d4c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-28",
+        "params": [
+          {
+            "fromBlock": "0x18399c9",
+            "toBlock": "0x1839db0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-29",
+        "params": [
+          {
+            "fromBlock": "0x1839a2d",
+            "toBlock": "0x1839e14",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-30",
+        "params": [
+          {
+            "fromBlock": "0x1839a91",
+            "toBlock": "0x1839e78",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-31",
+        "params": [
+          {
+            "fromBlock": "0x1839af5",
+            "toBlock": "0x1839edc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-32",
+        "params": [
+          {
+            "fromBlock": "0x1839b59",
+            "toBlock": "0x1839f40",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-33",
+        "params": [
+          {
+            "fromBlock": "0x1839bbd",
+            "toBlock": "0x1839fa4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-34",
+        "params": [
+          {
+            "fromBlock": "0x1839c21",
+            "toBlock": "0x183a008",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-35",
+        "params": [
+          {
+            "fromBlock": "0x1839c85",
+            "toBlock": "0x183a06c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-36",
+        "params": [
+          {
+            "fromBlock": "0x1839ce9",
+            "toBlock": "0x183a0d0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-37",
+        "params": [
+          {
+            "fromBlock": "0x1839d4d",
+            "toBlock": "0x183a134",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-38",
+        "params": [
+          {
+            "fromBlock": "0x1839db1",
+            "toBlock": "0x183a198",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-39",
+        "params": [
+          {
+            "fromBlock": "0x1839e15",
+            "toBlock": "0x183a1fc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-40",
+        "params": [
+          {
+            "fromBlock": "0x1839e79",
+            "toBlock": "0x183a260",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-41",
+        "params": [
+          {
+            "fromBlock": "0x1839edd",
+            "toBlock": "0x183a2c4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-42",
+        "params": [
+          {
+            "fromBlock": "0x1839f41",
+            "toBlock": "0x183a328",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-43",
+        "params": [
+          {
+            "fromBlock": "0x1839fa5",
+            "toBlock": "0x183a38c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-44",
+        "params": [
+          {
+            "fromBlock": "0x183a009",
+            "toBlock": "0x183a3f0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-45",
+        "params": [
+          {
+            "fromBlock": "0x183a06d",
+            "toBlock": "0x183a454",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-46",
+        "params": [
+          {
+            "fromBlock": "0x183a0d1",
+            "toBlock": "0x183a4b8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-47",
+        "params": [
+          {
+            "fromBlock": "0x183a135",
+            "toBlock": "0x183a51c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-48",
+        "params": [
+          {
+            "fromBlock": "0x183a199",
+            "toBlock": "0x183a580",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-49",
+        "params": [
+          {
+            "fromBlock": "0x183a1fd",
+            "toBlock": "0x183a5e4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-50",
+        "params": [
+          {
+            "fromBlock": "0x183a261",
+            "toBlock": "0x183a648",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-51",
+        "params": [
+          {
+            "fromBlock": "0x183a2c5",
+            "toBlock": "0x183a6ac",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-52",
+        "params": [
+          {
+            "fromBlock": "0x183a329",
+            "toBlock": "0x183a710",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-53",
+        "params": [
+          {
+            "fromBlock": "0x183a38d",
+            "toBlock": "0x183a774",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-54",
+        "params": [
+          {
+            "fromBlock": "0x183a3f1",
+            "toBlock": "0x183a7d8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-55",
+        "params": [
+          {
+            "fromBlock": "0x183a455",
+            "toBlock": "0x183a83c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-56",
+        "params": [
+          {
+            "fromBlock": "0x183a4b9",
+            "toBlock": "0x183a8a0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-57",
+        "params": [
+          {
+            "fromBlock": "0x183a51d",
+            "toBlock": "0x183a904",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-58",
+        "params": [
+          {
+            "fromBlock": "0x183a581",
+            "toBlock": "0x183a968",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-59",
+        "params": [
+          {
+            "fromBlock": "0x183a5e5",
+            "toBlock": "0x183a9cc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-60",
+        "params": [
+          {
+            "fromBlock": "0x183a649",
+            "toBlock": "0x183aa30",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-61",
+        "params": [
+          {
+            "fromBlock": "0x183a6ad",
+            "toBlock": "0x183aa94",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-62",
+        "params": [
+          {
+            "fromBlock": "0x183a711",
+            "toBlock": "0x183aaf8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-1000-63",
+        "params": [
+          {
+            "fromBlock": "0x183a775",
+            "toBlock": "0x183ab5c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-0",
+        "params": [
+          {
+            "fromBlock": "0x1836bb1",
+            "toBlock": "0x18392c0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-1",
+        "params": [
+          {
+            "fromBlock": "0x1836c15",
+            "toBlock": "0x1839324",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-2",
+        "params": [
+          {
+            "fromBlock": "0x1836c79",
+            "toBlock": "0x1839388",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-3",
+        "params": [
+          {
+            "fromBlock": "0x1836cdd",
+            "toBlock": "0x18393ec",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-4",
+        "params": [
+          {
+            "fromBlock": "0x1836d41",
+            "toBlock": "0x1839450",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-5",
+        "params": [
+          {
+            "fromBlock": "0x1836da5",
+            "toBlock": "0x18394b4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-6",
+        "params": [
+          {
+            "fromBlock": "0x1836e09",
+            "toBlock": "0x1839518",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-7",
+        "params": [
+          {
+            "fromBlock": "0x1836e6d",
+            "toBlock": "0x183957c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-8",
+        "params": [
+          {
+            "fromBlock": "0x1836ed1",
+            "toBlock": "0x18395e0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-9",
+        "params": [
+          {
+            "fromBlock": "0x1836f35",
+            "toBlock": "0x1839644",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-10",
+        "params": [
+          {
+            "fromBlock": "0x1836f99",
+            "toBlock": "0x18396a8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-11",
+        "params": [
+          {
+            "fromBlock": "0x1836ffd",
+            "toBlock": "0x183970c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-12",
+        "params": [
+          {
+            "fromBlock": "0x1837061",
+            "toBlock": "0x1839770",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-13",
+        "params": [
+          {
+            "fromBlock": "0x18370c5",
+            "toBlock": "0x18397d4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-14",
+        "params": [
+          {
+            "fromBlock": "0x1837129",
+            "toBlock": "0x1839838",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-15",
+        "params": [
+          {
+            "fromBlock": "0x183718d",
+            "toBlock": "0x183989c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-16",
+        "params": [
+          {
+            "fromBlock": "0x18371f1",
+            "toBlock": "0x1839900",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-17",
+        "params": [
+          {
+            "fromBlock": "0x1837255",
+            "toBlock": "0x1839964",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-18",
+        "params": [
+          {
+            "fromBlock": "0x18372b9",
+            "toBlock": "0x18399c8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-19",
+        "params": [
+          {
+            "fromBlock": "0x183731d",
+            "toBlock": "0x1839a2c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-20",
+        "params": [
+          {
+            "fromBlock": "0x1837381",
+            "toBlock": "0x1839a90",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-21",
+        "params": [
+          {
+            "fromBlock": "0x18373e5",
+            "toBlock": "0x1839af4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-22",
+        "params": [
+          {
+            "fromBlock": "0x1837449",
+            "toBlock": "0x1839b58",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-23",
+        "params": [
+          {
+            "fromBlock": "0x18374ad",
+            "toBlock": "0x1839bbc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-24",
+        "params": [
+          {
+            "fromBlock": "0x1837511",
+            "toBlock": "0x1839c20",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-25",
+        "params": [
+          {
+            "fromBlock": "0x1837575",
+            "toBlock": "0x1839c84",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-26",
+        "params": [
+          {
+            "fromBlock": "0x18375d9",
+            "toBlock": "0x1839ce8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-27",
+        "params": [
+          {
+            "fromBlock": "0x183763d",
+            "toBlock": "0x1839d4c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-28",
+        "params": [
+          {
+            "fromBlock": "0x18376a1",
+            "toBlock": "0x1839db0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-29",
+        "params": [
+          {
+            "fromBlock": "0x1837705",
+            "toBlock": "0x1839e14",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-30",
+        "params": [
+          {
+            "fromBlock": "0x1837769",
+            "toBlock": "0x1839e78",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-31",
+        "params": [
+          {
+            "fromBlock": "0x18377cd",
+            "toBlock": "0x1839edc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-32",
+        "params": [
+          {
+            "fromBlock": "0x1837831",
+            "toBlock": "0x1839f40",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-33",
+        "params": [
+          {
+            "fromBlock": "0x1837895",
+            "toBlock": "0x1839fa4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-34",
+        "params": [
+          {
+            "fromBlock": "0x18378f9",
+            "toBlock": "0x183a008",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-35",
+        "params": [
+          {
+            "fromBlock": "0x183795d",
+            "toBlock": "0x183a06c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-36",
+        "params": [
+          {
+            "fromBlock": "0x18379c1",
+            "toBlock": "0x183a0d0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-37",
+        "params": [
+          {
+            "fromBlock": "0x1837a25",
+            "toBlock": "0x183a134",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-38",
+        "params": [
+          {
+            "fromBlock": "0x1837a89",
+            "toBlock": "0x183a198",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-39",
+        "params": [
+          {
+            "fromBlock": "0x1837aed",
+            "toBlock": "0x183a1fc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-40",
+        "params": [
+          {
+            "fromBlock": "0x1837b51",
+            "toBlock": "0x183a260",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-41",
+        "params": [
+          {
+            "fromBlock": "0x1837bb5",
+            "toBlock": "0x183a2c4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-42",
+        "params": [
+          {
+            "fromBlock": "0x1837c19",
+            "toBlock": "0x183a328",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-43",
+        "params": [
+          {
+            "fromBlock": "0x1837c7d",
+            "toBlock": "0x183a38c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-44",
+        "params": [
+          {
+            "fromBlock": "0x1837ce1",
+            "toBlock": "0x183a3f0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-45",
+        "params": [
+          {
+            "fromBlock": "0x1837d45",
+            "toBlock": "0x183a454",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-46",
+        "params": [
+          {
+            "fromBlock": "0x1837da9",
+            "toBlock": "0x183a4b8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-47",
+        "params": [
+          {
+            "fromBlock": "0x1837e0d",
+            "toBlock": "0x183a51c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-48",
+        "params": [
+          {
+            "fromBlock": "0x1837e71",
+            "toBlock": "0x183a580",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-49",
+        "params": [
+          {
+            "fromBlock": "0x1837ed5",
+            "toBlock": "0x183a5e4",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-50",
+        "params": [
+          {
+            "fromBlock": "0x1837f39",
+            "toBlock": "0x183a648",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-51",
+        "params": [
+          {
+            "fromBlock": "0x1837f9d",
+            "toBlock": "0x183a6ac",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-52",
+        "params": [
+          {
+            "fromBlock": "0x1838001",
+            "toBlock": "0x183a710",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-53",
+        "params": [
+          {
+            "fromBlock": "0x1838065",
+            "toBlock": "0x183a774",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-54",
+        "params": [
+          {
+            "fromBlock": "0x18380c9",
+            "toBlock": "0x183a7d8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-55",
+        "params": [
+          {
+            "fromBlock": "0x183812d",
+            "toBlock": "0x183a83c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-56",
+        "params": [
+          {
+            "fromBlock": "0x1838191",
+            "toBlock": "0x183a8a0",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-57",
+        "params": [
+          {
+            "fromBlock": "0x18381f5",
+            "toBlock": "0x183a904",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-58",
+        "params": [
+          {
+            "fromBlock": "0x1838259",
+            "toBlock": "0x183a968",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-59",
+        "params": [
+          {
+            "fromBlock": "0x18382bd",
+            "toBlock": "0x183a9cc",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-60",
+        "params": [
+          {
+            "fromBlock": "0x1838321",
+            "toBlock": "0x183aa30",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-61",
+        "params": [
+          {
+            "fromBlock": "0x1838385",
+            "toBlock": "0x183aa94",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-62",
+        "params": [
+          {
+            "fromBlock": "0x18383e9",
+            "toBlock": "0x183aaf8",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-selective-10000-63",
+        "params": [
+          {
+            "fromBlock": "0x183844d",
+            "toBlock": "0x183ab5c",
+            "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-0",
+        "params": [
+          {
+            "fromBlock": "0x18392c0",
+            "toBlock": "0x18392c0"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-1",
+        "params": [
+          {
+            "fromBlock": "0x18392c1",
+            "toBlock": "0x18392c1"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-2",
+        "params": [
+          {
+            "fromBlock": "0x18392c2",
+            "toBlock": "0x18392c2"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-3",
+        "params": [
+          {
+            "fromBlock": "0x18392c3",
+            "toBlock": "0x18392c3"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-4",
+        "params": [
+          {
+            "fromBlock": "0x18392c4",
+            "toBlock": "0x18392c4"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-5",
+        "params": [
+          {
+            "fromBlock": "0x18392c5",
+            "toBlock": "0x18392c5"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-6",
+        "params": [
+          {
+            "fromBlock": "0x18392c6",
+            "toBlock": "0x18392c6"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-7",
+        "params": [
+          {
+            "fromBlock": "0x18392c7",
+            "toBlock": "0x18392c7"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-8",
+        "params": [
+          {
+            "fromBlock": "0x18392c8",
+            "toBlock": "0x18392c8"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-9",
+        "params": [
+          {
+            "fromBlock": "0x18392c9",
+            "toBlock": "0x18392c9"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-10",
+        "params": [
+          {
+            "fromBlock": "0x18392ca",
+            "toBlock": "0x18392ca"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-11",
+        "params": [
+          {
+            "fromBlock": "0x18392cb",
+            "toBlock": "0x18392cb"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-12",
+        "params": [
+          {
+            "fromBlock": "0x18392cc",
+            "toBlock": "0x18392cc"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-13",
+        "params": [
+          {
+            "fromBlock": "0x18392cd",
+            "toBlock": "0x18392cd"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-14",
+        "params": [
+          {
+            "fromBlock": "0x18392ce",
+            "toBlock": "0x18392ce"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-15",
+        "params": [
+          {
+            "fromBlock": "0x18392cf",
+            "toBlock": "0x18392cf"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-16",
+        "params": [
+          {
+            "fromBlock": "0x18392d0",
+            "toBlock": "0x18392d0"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-17",
+        "params": [
+          {
+            "fromBlock": "0x18392d1",
+            "toBlock": "0x18392d1"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-18",
+        "params": [
+          {
+            "fromBlock": "0x18392d2",
+            "toBlock": "0x18392d2"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-19",
+        "params": [
+          {
+            "fromBlock": "0x18392d3",
+            "toBlock": "0x18392d3"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-20",
+        "params": [
+          {
+            "fromBlock": "0x18392d4",
+            "toBlock": "0x18392d4"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-21",
+        "params": [
+          {
+            "fromBlock": "0x18392d5",
+            "toBlock": "0x18392d5"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-22",
+        "params": [
+          {
+            "fromBlock": "0x18392d6",
+            "toBlock": "0x18392d6"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-23",
+        "params": [
+          {
+            "fromBlock": "0x18392d7",
+            "toBlock": "0x18392d7"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-24",
+        "params": [
+          {
+            "fromBlock": "0x18392d8",
+            "toBlock": "0x18392d8"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-25",
+        "params": [
+          {
+            "fromBlock": "0x18392d9",
+            "toBlock": "0x18392d9"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-26",
+        "params": [
+          {
+            "fromBlock": "0x18392da",
+            "toBlock": "0x18392da"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-27",
+        "params": [
+          {
+            "fromBlock": "0x18392db",
+            "toBlock": "0x18392db"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-28",
+        "params": [
+          {
+            "fromBlock": "0x18392dc",
+            "toBlock": "0x18392dc"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-29",
+        "params": [
+          {
+            "fromBlock": "0x18392dd",
+            "toBlock": "0x18392dd"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-30",
+        "params": [
+          {
+            "fromBlock": "0x18392de",
+            "toBlock": "0x18392de"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-31",
+        "params": [
+          {
+            "fromBlock": "0x18392df",
+            "toBlock": "0x18392df"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-32",
+        "params": [
+          {
+            "fromBlock": "0x18392e0",
+            "toBlock": "0x18392e0"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-33",
+        "params": [
+          {
+            "fromBlock": "0x18392e1",
+            "toBlock": "0x18392e1"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-34",
+        "params": [
+          {
+            "fromBlock": "0x18392e2",
+            "toBlock": "0x18392e2"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-35",
+        "params": [
+          {
+            "fromBlock": "0x18392e3",
+            "toBlock": "0x18392e3"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-36",
+        "params": [
+          {
+            "fromBlock": "0x18392e4",
+            "toBlock": "0x18392e4"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-37",
+        "params": [
+          {
+            "fromBlock": "0x18392e5",
+            "toBlock": "0x18392e5"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-38",
+        "params": [
+          {
+            "fromBlock": "0x18392e6",
+            "toBlock": "0x18392e6"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-39",
+        "params": [
+          {
+            "fromBlock": "0x18392e7",
+            "toBlock": "0x18392e7"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-40",
+        "params": [
+          {
+            "fromBlock": "0x18392e8",
+            "toBlock": "0x18392e8"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-41",
+        "params": [
+          {
+            "fromBlock": "0x18392e9",
+            "toBlock": "0x18392e9"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-42",
+        "params": [
+          {
+            "fromBlock": "0x18392ea",
+            "toBlock": "0x18392ea"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-43",
+        "params": [
+          {
+            "fromBlock": "0x18392eb",
+            "toBlock": "0x18392eb"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-44",
+        "params": [
+          {
+            "fromBlock": "0x18392ec",
+            "toBlock": "0x18392ec"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-45",
+        "params": [
+          {
+            "fromBlock": "0x18392ed",
+            "toBlock": "0x18392ed"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-46",
+        "params": [
+          {
+            "fromBlock": "0x18392ee",
+            "toBlock": "0x18392ee"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-47",
+        "params": [
+          {
+            "fromBlock": "0x18392ef",
+            "toBlock": "0x18392ef"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-48",
+        "params": [
+          {
+            "fromBlock": "0x18392f0",
+            "toBlock": "0x18392f0"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-49",
+        "params": [
+          {
+            "fromBlock": "0x18392f1",
+            "toBlock": "0x18392f1"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-50",
+        "params": [
+          {
+            "fromBlock": "0x18392f2",
+            "toBlock": "0x18392f2"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-51",
+        "params": [
+          {
+            "fromBlock": "0x18392f3",
+            "toBlock": "0x18392f3"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-52",
+        "params": [
+          {
+            "fromBlock": "0x18392f4",
+            "toBlock": "0x18392f4"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-53",
+        "params": [
+          {
+            "fromBlock": "0x18392f5",
+            "toBlock": "0x18392f5"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-54",
+        "params": [
+          {
+            "fromBlock": "0x18392f6",
+            "toBlock": "0x18392f6"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-55",
+        "params": [
+          {
+            "fromBlock": "0x18392f7",
+            "toBlock": "0x18392f7"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-56",
+        "params": [
+          {
+            "fromBlock": "0x18392f8",
+            "toBlock": "0x18392f8"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-57",
+        "params": [
+          {
+            "fromBlock": "0x18392f9",
+            "toBlock": "0x18392f9"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-58",
+        "params": [
+          {
+            "fromBlock": "0x18392fa",
+            "toBlock": "0x18392fa"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-59",
+        "params": [
+          {
+            "fromBlock": "0x18392fb",
+            "toBlock": "0x18392fb"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-60",
+        "params": [
+          {
+            "fromBlock": "0x18392fc",
+            "toBlock": "0x18392fc"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-61",
+        "params": [
+          {
+            "fromBlock": "0x18392fd",
+            "toBlock": "0x18392fd"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-62",
+        "params": [
+          {
+            "fromBlock": "0x18392fe",
+            "toBlock": "0x18392fe"
+          }
+        ]
+      },
+      {
+        "id": "log-data-all-match-block-63",
+        "params": [
+          {
+            "fromBlock": "0x18392ff",
+            "toBlock": "0x18392ff"
+          }
+        ]
+      }
+    ]
+  }
+}
