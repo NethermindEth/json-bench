@@ -1,0 +1,72 @@
+{
+  "test_name": "Empty block overrides and plain controls",
+  "description": "Balanced eth_call and eth_estimateGas WETH balance reads at snapshot head. Half use an empty block override and half omit overrides. Compare per-call results and controls; this is a no-op subset, not large state override traffic.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "60s",
+  "rps": 1000,
+  "vus": 40,
+  "calls": [
+    {
+      "name": "eth_call plain-control",
+      "method": "eth_call",
+      "params": [
+        {
+          "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+          "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "data": "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045",
+          "gas": "0x7a120"
+        },
+        "latest"
+      ],
+      "weight": 25
+    },
+    {
+      "name": "eth_call empty-block-override",
+      "method": "eth_call",
+      "params": [
+        {
+          "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+          "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "data": "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045",
+          "gas": "0x7a120"
+        },
+        "latest",
+        null,
+        {}
+      ],
+      "weight": 25
+    },
+    {
+      "name": "eth_estimateGas plain-control",
+      "method": "eth_estimateGas",
+      "params": [
+        {
+          "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+          "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "data": "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045",
+          "gas": "0x7a120"
+        },
+        "latest"
+      ],
+      "weight": 25
+    },
+    {
+      "name": "eth_estimateGas empty-block-override",
+      "method": "eth_estimateGas",
+      "params": [
+        {
+          "from": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+          "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "data": "0x70a08231000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa96045",
+          "gas": "0x7a120"
+        },
+        "latest",
+        null,
+        {}
+      ],
+      "weight": 25
+    }
+  ]
+}
