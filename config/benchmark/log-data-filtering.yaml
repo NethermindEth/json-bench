@@ -1,6 +1,6 @@
 {
   "test_name": "Compact log-data filtering controls",
-  "description": "Balanced selective 1000/10000-block transfer scans and all-match single-block controls. Fixed retained block ranges; no separate warmup or exact customer reproduction. Correctness requires full-response parity.",
+  "description": "Balanced selective 1000/10000-block approval scans with a fixed indexed owner and all-match single-block controls. Fixed retained block ranges; no separate warmup or exact customer reproduction. Correctness requires full-response parity.",
   "clients": [
     "nethermind"
   ],
