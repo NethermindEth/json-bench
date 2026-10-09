@@ -1,0 +1,584 @@
+{
+  "name": "Materialized large log response full parity",
+  "description": "Exact ordered full-response comparison for the same retained ranges. No expected-difference rules. Inspect all results for successful nonempty arrays and default count-limit compliance.",
+  "calls": {
+    "eth_getLogs": [
+      {
+        "id": "log-response-8-blocks-0",
+        "params": [
+          {
+            "fromBlock": "0x18392c0",
+            "toBlock": "0x18392c7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-1",
+        "params": [
+          {
+            "fromBlock": "0x18392d0",
+            "toBlock": "0x18392d7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-2",
+        "params": [
+          {
+            "fromBlock": "0x18392e0",
+            "toBlock": "0x18392e7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-3",
+        "params": [
+          {
+            "fromBlock": "0x18392f0",
+            "toBlock": "0x18392f7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-4",
+        "params": [
+          {
+            "fromBlock": "0x1839300",
+            "toBlock": "0x1839307"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-5",
+        "params": [
+          {
+            "fromBlock": "0x1839310",
+            "toBlock": "0x1839317"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-6",
+        "params": [
+          {
+            "fromBlock": "0x1839320",
+            "toBlock": "0x1839327"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-7",
+        "params": [
+          {
+            "fromBlock": "0x1839330",
+            "toBlock": "0x1839337"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-8",
+        "params": [
+          {
+            "fromBlock": "0x1839340",
+            "toBlock": "0x1839347"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-9",
+        "params": [
+          {
+            "fromBlock": "0x1839350",
+            "toBlock": "0x1839357"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-10",
+        "params": [
+          {
+            "fromBlock": "0x1839360",
+            "toBlock": "0x1839367"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-11",
+        "params": [
+          {
+            "fromBlock": "0x1839370",
+            "toBlock": "0x1839377"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-12",
+        "params": [
+          {
+            "fromBlock": "0x1839380",
+            "toBlock": "0x1839387"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-13",
+        "params": [
+          {
+            "fromBlock": "0x1839390",
+            "toBlock": "0x1839397"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-14",
+        "params": [
+          {
+            "fromBlock": "0x18393a0",
+            "toBlock": "0x18393a7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-15",
+        "params": [
+          {
+            "fromBlock": "0x18393b0",
+            "toBlock": "0x18393b7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-16",
+        "params": [
+          {
+            "fromBlock": "0x18393c0",
+            "toBlock": "0x18393c7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-17",
+        "params": [
+          {
+            "fromBlock": "0x18393d0",
+            "toBlock": "0x18393d7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-18",
+        "params": [
+          {
+            "fromBlock": "0x18393e0",
+            "toBlock": "0x18393e7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-19",
+        "params": [
+          {
+            "fromBlock": "0x18393f0",
+            "toBlock": "0x18393f7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-20",
+        "params": [
+          {
+            "fromBlock": "0x1839400",
+            "toBlock": "0x1839407"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-21",
+        "params": [
+          {
+            "fromBlock": "0x1839410",
+            "toBlock": "0x1839417"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-22",
+        "params": [
+          {
+            "fromBlock": "0x1839420",
+            "toBlock": "0x1839427"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-23",
+        "params": [
+          {
+            "fromBlock": "0x1839430",
+            "toBlock": "0x1839437"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-24",
+        "params": [
+          {
+            "fromBlock": "0x1839440",
+            "toBlock": "0x1839447"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-25",
+        "params": [
+          {
+            "fromBlock": "0x1839450",
+            "toBlock": "0x1839457"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-26",
+        "params": [
+          {
+            "fromBlock": "0x1839460",
+            "toBlock": "0x1839467"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-27",
+        "params": [
+          {
+            "fromBlock": "0x1839470",
+            "toBlock": "0x1839477"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-28",
+        "params": [
+          {
+            "fromBlock": "0x1839480",
+            "toBlock": "0x1839487"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-29",
+        "params": [
+          {
+            "fromBlock": "0x1839490",
+            "toBlock": "0x1839497"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-30",
+        "params": [
+          {
+            "fromBlock": "0x18394a0",
+            "toBlock": "0x18394a7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-8-blocks-31",
+        "params": [
+          {
+            "fromBlock": "0x18394b0",
+            "toBlock": "0x18394b7"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-0",
+        "params": [
+          {
+            "fromBlock": "0x18392c0",
+            "toBlock": "0x18392cf"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-1",
+        "params": [
+          {
+            "fromBlock": "0x18392d0",
+            "toBlock": "0x18392df"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-2",
+        "params": [
+          {
+            "fromBlock": "0x18392e0",
+            "toBlock": "0x18392ef"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-3",
+        "params": [
+          {
+            "fromBlock": "0x18392f0",
+            "toBlock": "0x18392ff"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-4",
+        "params": [
+          {
+            "fromBlock": "0x1839300",
+            "toBlock": "0x183930f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-5",
+        "params": [
+          {
+            "fromBlock": "0x1839310",
+            "toBlock": "0x183931f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-6",
+        "params": [
+          {
+            "fromBlock": "0x1839320",
+            "toBlock": "0x183932f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-7",
+        "params": [
+          {
+            "fromBlock": "0x1839330",
+            "toBlock": "0x183933f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-8",
+        "params": [
+          {
+            "fromBlock": "0x1839340",
+            "toBlock": "0x183934f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-9",
+        "params": [
+          {
+            "fromBlock": "0x1839350",
+            "toBlock": "0x183935f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-10",
+        "params": [
+          {
+            "fromBlock": "0x1839360",
+            "toBlock": "0x183936f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-11",
+        "params": [
+          {
+            "fromBlock": "0x1839370",
+            "toBlock": "0x183937f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-12",
+        "params": [
+          {
+            "fromBlock": "0x1839380",
+            "toBlock": "0x183938f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-13",
+        "params": [
+          {
+            "fromBlock": "0x1839390",
+            "toBlock": "0x183939f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-14",
+        "params": [
+          {
+            "fromBlock": "0x18393a0",
+            "toBlock": "0x18393af"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-15",
+        "params": [
+          {
+            "fromBlock": "0x18393b0",
+            "toBlock": "0x18393bf"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-16",
+        "params": [
+          {
+            "fromBlock": "0x18393c0",
+            "toBlock": "0x18393cf"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-17",
+        "params": [
+          {
+            "fromBlock": "0x18393d0",
+            "toBlock": "0x18393df"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-18",
+        "params": [
+          {
+            "fromBlock": "0x18393e0",
+            "toBlock": "0x18393ef"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-19",
+        "params": [
+          {
+            "fromBlock": "0x18393f0",
+            "toBlock": "0x18393ff"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-20",
+        "params": [
+          {
+            "fromBlock": "0x1839400",
+            "toBlock": "0x183940f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-21",
+        "params": [
+          {
+            "fromBlock": "0x1839410",
+            "toBlock": "0x183941f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-22",
+        "params": [
+          {
+            "fromBlock": "0x1839420",
+            "toBlock": "0x183942f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-23",
+        "params": [
+          {
+            "fromBlock": "0x1839430",
+            "toBlock": "0x183943f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-24",
+        "params": [
+          {
+            "fromBlock": "0x1839440",
+            "toBlock": "0x183944f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-25",
+        "params": [
+          {
+            "fromBlock": "0x1839450",
+            "toBlock": "0x183945f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-26",
+        "params": [
+          {
+            "fromBlock": "0x1839460",
+            "toBlock": "0x183946f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-27",
+        "params": [
+          {
+            "fromBlock": "0x1839470",
+            "toBlock": "0x183947f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-28",
+        "params": [
+          {
+            "fromBlock": "0x1839480",
+            "toBlock": "0x183948f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-29",
+        "params": [
+          {
+            "fromBlock": "0x1839490",
+            "toBlock": "0x183949f"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-30",
+        "params": [
+          {
+            "fromBlock": "0x18394a0",
+            "toBlock": "0x18394af"
+          }
+        ]
+      },
+      {
+        "id": "log-response-16-blocks-31",
+        "params": [
+          {
+            "fromBlock": "0x18394b0",
+            "toBlock": "0x18394bf"
+          }
+        ]
+      }
+    ]
+  }
+}
