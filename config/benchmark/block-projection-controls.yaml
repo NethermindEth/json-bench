@@ -1,0 +1,25 @@
+{
+  "test_name": "Block projection regression controls",
+  "description": "Balanced warm 200-block and rotating 20000-block hashes-only reads below the snapshot head window. This controls warmed-hit and unique-miss costs; it does not establish overlapping-miss benefit or cold OS-cache performance.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "60s",
+  "rps": 1000,
+  "vus": 128,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getBlockByNumber warm-control",
+      "file": "./rpc-calls/block-projection-warm.json",
+      "file_type": "json",
+      "weight": 50
+    },
+    {
+      "name": "eth_getBlockByNumber rotating-control",
+      "file": "./rpc-calls/block-projection-rotating.json",
+      "file_type": "json",
+      "weight": 50
+    }
+  ]
+}
