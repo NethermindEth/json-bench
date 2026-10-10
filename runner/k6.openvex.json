@@ -1,0 +1,27 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/NethermindEth/json-bench/blob/main/runner/k6.openvex.json",
+  "author": "NethermindEth/json-bench",
+  "timestamp": "2026-10-10T04:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "GO-2026-5932"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/go.k6.io/k6/v2",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/golang.org/x/crypto@v0.57.0"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "GO-2026-5932 affects only golang.org/x/crypto/openpgp and its subpackages. The k6 build records its complete production dependency graph in /app/security/k6-packages.txt and fails if any of those packages is imported. x/crypto is used by other, unaffected packages. This statement applies only to k6 with x/crypto v0.57.0; runner and OS findings remain gated normally."
+    }
+  ]
+}

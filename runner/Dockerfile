@@ -23,7 +23,9 @@ RUN git clone --depth 1 --branch v2.3.0 https://github.com/grafana/k6.git /k6 &&
     test "$(git -C /k6 rev-parse HEAD)" = "e0887846143ab176d4b5483c9d52cf3b3e009f1a"
 WORKDIR /k6
 RUN go get golang.org/x/net@v0.60.0 && \
-    CGO_ENABLED=0 GOOS=linux go build -mod=mod -trimpath -o /out/k6 .
+    CGO_ENABLED=0 GOOS=linux go build -mod=mod -trimpath -o /out/k6 . && \
+    go list -mod=readonly -deps . > /out/k6-packages.txt && \
+    ! grep -Eq '^golang.org/x/crypto/openpgp(/|$)' /out/k6-packages.txt
 
 # Final stage - minimal runtime image with k6 (base is alpine)
 FROM grafana/k6:2.3.0
@@ -52,6 +54,7 @@ RUN addgroup -g 1001 -S appgroup && \
 # Copy binary from builder
 COPY --from=builder /app/jsonrpc-bench-runner /app/jsonrpc-bench-runner
 COPY --from=k6-builder /out/k6 /usr/bin/k6
+COPY --from=k6-builder /out/k6-packages.txt /app/security/k6-packages.txt
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/results /app/historic && \
