@@ -23,7 +23,7 @@ RUN git clone --depth 1 --branch v2.3.0 https://github.com/grafana/k6.git /k6 &&
     test "$(git -C /k6 rev-parse HEAD)" = "e0887846143ab176d4b5483c9d52cf3b3e009f1a"
 WORKDIR /k6
 RUN go get golang.org/x/net@v0.60.0 && \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -o /out/k6 .
+    CGO_ENABLED=0 GOOS=linux go build -mod=mod -trimpath -o /out/k6 .
 
 # Final stage - minimal runtime image with k6 (base is alpine)
 FROM grafana/k6:2.3.0
