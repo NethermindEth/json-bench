@@ -1,5 +1,5 @@
 # Multi-stage build for Go runner
-FROM golang:1.25.14-alpine AS builder
+FROM golang:1.27.2-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -16,13 +16,24 @@ COPY runner/ ./runner/
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner
 
+# Build k6 with the same patched toolchain instead of shipping an older prebuilt Go runtime.
+FROM golang:1.27.2-alpine AS k6-builder
+RUN apk add --no-cache git ca-certificates
+RUN git clone --depth 1 --branch v2.3.0 https://github.com/grafana/k6.git /k6 && \
+    test "$(git -C /k6 rev-parse HEAD)" = "e0887846143ab176d4b5483c9d52cf3b3e009f1a"
+WORKDIR /k6
+RUN go get golang.org/x/net@v0.60.0 && \
+    CGO_ENABLED=0 GOOS=linux go build -mod=mod -trimpath -o /out/k6 . && \
+    CGO_ENABLED=0 GOOS=linux go list -mod=readonly -deps . > /out/k6-packages.txt && \
+    ! grep -Eq '^golang.org/x/crypto/openpgp(/|$)' /out/k6-packages.txt
+
 # Final stage - minimal runtime image with k6 (base is alpine)
-FROM grafana/k6:2.1.0
+FROM grafana/k6:2.3.0
 
 # Use root user for dependencies installation
 USER root
 
-# Refresh base image packages so the pinned grafana/k6:2.1.0 picks up patched
+# Refresh base image packages so the pinned grafana/k6:2.3.0 picks up patched
 # libcrypto3/libssl3 from Alpine's update channel. The explicit minimums are not
 # redundant: CI builds with `cache-from: type=gha`, and `--no-cache` only
 # disables apk's index cache, not Docker's layer cache — so a bare `apk upgrade`
@@ -42,6 +53,8 @@ RUN addgroup -g 1001 -S appgroup && \
 
 # Copy binary from builder
 COPY --from=builder /app/jsonrpc-bench-runner /app/jsonrpc-bench-runner
+COPY --from=k6-builder /out/k6 /usr/bin/k6
+COPY --from=k6-builder /out/k6-packages.txt /app/security/k6-packages.txt
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/results /app/historic && \
