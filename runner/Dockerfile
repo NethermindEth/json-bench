@@ -24,7 +24,7 @@ RUN git clone --depth 1 --branch v2.3.0 https://github.com/grafana/k6.git /k6 &&
 WORKDIR /k6
 RUN go get golang.org/x/net@v0.60.0 && \
     CGO_ENABLED=0 GOOS=linux go build -mod=mod -trimpath -o /out/k6 . && \
-    go list -mod=readonly -deps . > /out/k6-packages.txt && \
+    CGO_ENABLED=0 GOOS=linux go list -mod=readonly -deps . > /out/k6-packages.txt && \
     ! grep -Eq '^golang.org/x/crypto/openpgp(/|$)' /out/k6-packages.txt
 
 # Final stage - minimal runtime image with k6 (base is alpine)
