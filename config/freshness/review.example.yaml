@@ -1,0 +1,27 @@
+# Offline comparison of probe outputs:
+#   runner freshness review --config config/freshness/review.example.yaml [--offline]
+schema_version: 1
+
+reference:
+  # Must be a node that is not one of the tested pairs.
+  rpc_url: ${REFERENCE_RPC_URL}
+  request_timeout_ms: 10000
+  concurrency: 8
+
+probes:
+  - results/rpc-freshness/nethermind-lighthouse-<run_id>
+  - results/rpc-freshness/reth-lighthouse-<run_id>
+  - results/rpc-freshness/nethermind-prysm-<run_id>
+
+# Extra comparison groups among probes sharing a label value, e.g. `cl`
+# compares ELs with the CL held constant.
+hold_constant: [cl, el]
+
+# Observed differences below this are ties; cross-host pairs use at least
+# their combined clock error.
+margin_ms: 5
+deadlines_ms: [250, 500, 1000, 2000, 4000]
+include_warmup: false
+timeline_blocks: 10
+
+output_directory: results/rpc-freshness/review
