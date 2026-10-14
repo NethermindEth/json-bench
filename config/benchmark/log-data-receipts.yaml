@@ -1,0 +1,25 @@
+{
+  "test_name": "Historical receipts",
+  "description": "eth_getBlockReceipts for 64 blocks and eth_getTransactionReceipt for 128 transactions inside the retained log index range (25390001..25406300). Correctness requires full-response parity.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "60s",
+  "rps": 1,
+  "vus": 128,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getBlockReceipts log-data-receipts-block",
+      "file": "./rpc-calls/log-data-receipts-block.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getTransactionReceipt log-data-receipts-tx",
+      "file": "./rpc-calls/log-data-receipts-tx.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}
