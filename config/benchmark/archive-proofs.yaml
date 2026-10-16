@@ -1,0 +1,18 @@
+test_name: "Archive eth_getProof"
+description: "Historical eth_getProof on a mainnet archive: WETH, USDC and USDT at one height per million blocks (1,333,333-25,333,333), and five tokens at 60 seeded heights in 4,500,000-25,900,000. Each proof asks for slot 0 and one holder's balance entry. See archive-workloads.md for the cold and warm passes."
+clients:
+  - nethermind
+duration: "300s"
+rps: 20
+vus: 16
+calls:
+  - name: "eth_getProof spread"
+    file: "./rpc-calls/archive/proofs-spread.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
+  - name: "eth_getProof random"
+    file: "./rpc-calls/archive/proofs-random.jsonl"
+    file_type: "jsonl"
+    weight: 4
+    thresholds: ["p(99)<600000"]

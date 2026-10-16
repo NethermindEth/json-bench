@@ -1,0 +1,13 @@
+test_name: "Archive block tracing"
+description: "debug_traceBlockByNumber with callTracer and trace_block at 25 blocks spread evenly over 15,123,456-25,900,000 on a mainnet archive. Clients without the trace namespace skip trace_block. A cold block can take seconds."
+clients:
+  - nethermind
+duration: "900s"
+rps: 1
+vus: 8
+calls:
+  - name: "debug_traceBlockByNumber and trace_block"
+    file: "./rpc-calls/archive/trace-blocks.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]

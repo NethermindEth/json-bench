@@ -1,0 +1,13 @@
+test_name: "Archive state reads"
+description: "Historical eth_getBalance of one holder and eth_getStorageAt of its balance entry in five tokens, at 60 seeded heights in 4,500,000-25,900,000 on a mainnet archive."
+clients:
+  - nethermind
+duration: "300s"
+rps: 50
+vus: 16
+calls:
+  - name: "eth_getBalance and eth_getStorageAt"
+    file: "./rpc-calls/archive/state-reads.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
