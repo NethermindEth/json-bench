@@ -114,3 +114,17 @@ regenerating a corpus — the mainnet fixtures need a mainnet archive, the
   archive carrying that history; a node that keeps history only from its sync
   point on has to mint its own, which is what the generator's floor discovery
   is for.
+
+## Archive reads
+
+- Source: in-tree, no external corpus and no node at generation time.
+- Generator: `scripts/generate-archive/` writes fixed heights (one per million
+  blocks) and seeded heights (seeds 13, 19 and 21) over WETH, USDC, USDT, DAI and
+  LINK. Storage keys are slot 0 and one holder's balance entry, under balance
+  mapping slots checked on mainnet.
+- Output: `rpc-calls/archive/*.jsonl`, consumed by `config/benchmark/archive-*.yaml`.
+- Provenance: rebuilt from the recorded method of earlier archive measurements,
+  whose scripts were not kept. The families, heights, seeds and contracts follow
+  that method; the exact requests are new.
+- Verification: replay with `scripts/verify-calls/` against a mainnet archive
+  before use.
