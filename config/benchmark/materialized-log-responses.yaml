@@ -1,0 +1,25 @@
+{
+  "test_name": "Materialized large log response serialization",
+  "description": "Retained 8-block and 16-block all-match ranges at a pinned snapshot. Compare complete results and errors before accepting timing or capacity claims. Default endpoint limits and buffering settings remain unchanged.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "180s",
+  "rps": 5,
+  "vus": 128,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs log-response-8-blocks",
+      "file": "./rpc-calls/log-response-8-blocks.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs log-response-16-blocks",
+      "file": "./rpc-calls/log-response-16-blocks.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}
