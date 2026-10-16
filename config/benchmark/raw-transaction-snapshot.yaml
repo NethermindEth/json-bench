@@ -1,0 +1,18 @@
+{
+  "test_name": "Raw transaction lookup at snapshot",
+  "description": "286 indexed transactions from mainnet block 25489872, 128 blocks before snapshot 25490000. Uniform positions within one block; cache-resident after warmup. Measures stored receipt bodies, not receipt regeneration or cold-block capacity.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "60s",
+  "rps": 1000,
+  "vus": 40,
+  "calls": [
+    {
+      "name": "debug_getRawTransaction",
+      "file": "./rpc-calls/debug_getRawTransaction-snapshot.json",
+      "file_type": "json",
+      "weight": 100
+    }
+  ]
+}
