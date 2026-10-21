@@ -36,6 +36,7 @@ type Config struct {
 	Probes                  map[string]bool `yaml:"probes" json:"probes"`
 	Clock                   ClockConfig     `yaml:"clock" json:"clock"`
 	RTTSamples              int             `yaml:"rtt_samples" json:"rtt_samples"`
+	PreflightWaitSeconds    int             `yaml:"preflight_wait_seconds" json:"preflight_wait_seconds"`
 	SampleIntervalSeconds   int             `yaml:"sample_interval_seconds" json:"sample_interval_seconds"`
 	OutputDirectory         string          `yaml:"output_directory" json:"output_directory"`
 }

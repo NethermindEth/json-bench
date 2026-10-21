@@ -141,6 +141,7 @@ const (
 	EventClockStep    = "clock_step"
 	EventResource     = "resource_sample"
 	EventCL           = "cl_event"
+	EventCLSubscribed = "cl_stream_subscribed"
 	EventCLDisconnect = "cl_stream_disconnected"
 	EventRunStart     = "run_started"
 	EventRunEnd       = "run_finished"
@@ -327,6 +328,7 @@ type Manifest struct {
 	SlotDurationSource  string            `json:"slot_duration_source"`
 	BeaconGenesisTime   *uint64           `json:"beacon_genesis_time,omitempty"`
 	SlotsPerEpoch       *uint64           `json:"slots_per_epoch,omitempty"`
+	CLEventTopics       []string          `json:"cl_event_topics,omitempty"`
 	FirstBlock          uint64            `json:"first_block"`
 	LastBlock           uint64            `json:"last_block"`
 	WarmupBlocks        int               `json:"warmup_blocks"`

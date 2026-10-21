@@ -129,11 +129,11 @@ type sseEvent struct {
 // drop. CLs reject the whole request when any topic is unsupported (some lack
 // block_gossip, Nethermind's embedded CL serves only head), so a 4xx drops the
 // last topic and retries, down to head alone.
-func (b *beaconClient) stream(ctx context.Context, out func(sseEvent), onDisconnect func(error)) {
+func (b *beaconClient) stream(ctx context.Context, out func(sseEvent), onSubscribed func([]string), onDisconnect func(error)) {
 	topics := []string{"head", "block", "block_gossip"}
 	backoff := time.Second
 	for ctx.Err() == nil {
-		status, err := b.streamOnce(ctx, topics, out)
+		status, err := b.streamOnce(ctx, topics, out, onSubscribed)
 		if ctx.Err() != nil {
 			return
 		}
@@ -153,7 +153,7 @@ func (b *beaconClient) stream(ctx context.Context, out func(sseEvent), onDisconn
 	}
 }
 
-func (b *beaconClient) streamOnce(ctx context.Context, topics []string, out func(sseEvent)) (int, error) {
+func (b *beaconClient) streamOnce(ctx context.Context, topics []string, out func(sseEvent), onSubscribed func([]string)) (int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.base+"/eth/v1/events?topics="+strings.Join(topics, ","), nil)
 	if err != nil {
 		return 0, err
@@ -170,6 +170,7 @@ func (b *beaconClient) streamOnce(ctx context.Context, topics []string, out func
 	if resp.StatusCode != http.StatusOK {
 		return resp.StatusCode, fmt.Errorf("event stream: http %d", resp.StatusCode)
 	}
+	onSubscribed(topics)
 	sc := bufio.NewScanner(resp.Body)
 	sc.Buffer(make([]byte, 64<<10), 4<<20)
 	var topic string

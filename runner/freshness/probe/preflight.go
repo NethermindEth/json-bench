@@ -3,6 +3,7 @@ package probe
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -24,7 +25,35 @@ const futureOffset = 10000
 // unknownHash stands in for a block/transaction no node can know.
 var unknownHash = common.HexToHash("0x00000000000000000000000000000000000000000000000000000000deadbeef")
 
+// notSyncedError is a preflight failure that can clear on its own: the EL or
+// CL is (temporarily) behind or unhealthy.
+type notSyncedError struct{ error }
+
+// preflightUntilSynced repeats preflight while the only failure is sync
+// state, up to preflight_wait_seconds. Some CLs drop in and out of sync after
+// a reorg; waiting avoids a manual restart.
+func (r *Runner) preflightUntilSynced(ctx context.Context) error {
+	deadline := time.Now().Add(time.Duration(r.cfg.PreflightWaitSeconds) * time.Second)
+	for {
+		err := r.preflight(ctx)
+		var ns *notSyncedError
+		if err == nil || !errors.As(err, &ns) || !time.Now().Before(deadline) {
+			return err
+		}
+		r.log.Warnf("%v; retrying preflight until %s", err, deadline.Format(time.TimeOnly))
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(preflightRetryInterval):
+		}
+	}
+}
+
+var preflightRetryInterval = 5 * time.Second
+
 func (r *Runner) preflight(ctx context.Context) error {
+	r.probes = nil
+	r.sigs = map[string]*schema.NotReadySignature{}
 	caps := &schema.Capabilities{
 		SchemaVersion: schema.Version,
 		RunID:         r.env.RunID,
@@ -70,12 +99,12 @@ func (r *Runner) preflight(ctx context.Context) error {
 	if json.Unmarshal(raw, &syncing) == nil {
 		caps.ELSyncing = &syncing
 		if syncing {
-			return fmt.Errorf("execution client reports eth_syncing != false")
+			return &notSyncedError{fmt.Errorf("execution client reports eth_syncing != false")}
 		}
 	} else {
 		t := true
 		caps.ELSyncing = &t
-		return fmt.Errorf("execution client is syncing: %s", truncate(string(raw), 200))
+		return &notSyncedError{fmt.Errorf("execution client is syncing: %s", truncate(string(raw), 200))}
 	}
 
 	head, err := r.fetchHeader(ctx, "latest")
@@ -224,7 +253,7 @@ func (r *Runner) beaconPreflight(ctx context.Context, caps *schema.Capabilities)
 	caps.CLSyncChecks = checks
 	for field, verdict := range checks {
 		if verdict == "failed" {
-			return fmt.Errorf("consensus client unhealthy: %s", field)
+			return &notSyncedError{fmt.Errorf("consensus client unhealthy: %s", field)}
 		}
 		if verdict == "unknown" {
 			r.log.Warnf("consensus client does not report %s; recorded as unknown", field)

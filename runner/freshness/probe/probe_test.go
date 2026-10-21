@@ -368,6 +368,34 @@ func TestHeadOnlyEventStream(t *testing.T) {
 	}
 	require.Equal(t, 1, heads)
 	require.Zero(t, disconnects)
+
+	var m schema.Manifest
+	raw, err := os.ReadFile(filepath.Join(x.r.Dir(), schema.ManifestFile))
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(raw, &m))
+	require.Equal(t, []string{"head"}, m.CLEventTopics, "the topics finally subscribed are recorded")
+}
+
+func TestPreflightWaitsForSync(t *testing.T) {
+	old := preflightRetryInterval
+	preflightRetryInterval = 50 * time.Millisecond
+	defer func() { preflightRetryInterval = old }()
+
+	node := mocknode.New(1, 8, 1)
+	defer node.Close()
+	node.SetSyncing(true)
+	cfg := testConfig(t, node, 1)
+	cfg.PreflightWaitSeconds = 10
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		node.SetSyncing(false)
+	}()
+	x := start(t, cfg)
+	b := node.Mine(1, 1, 1)
+	pause()
+	node.Publish(b.Number, mocknode.All())
+	x.wait(t)
+	require.Equal(t, schema.StatusMatched, targetsByNumber(t, x.r.Dir())[b.Number].Probes[schema.ProbeStateNumber].Status)
 }
 
 func TestRedactedConfigHasNoSecrets(t *testing.T) {

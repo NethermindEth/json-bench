@@ -161,7 +161,7 @@ func (r *Runner) Run(ctx context.Context) (err error) {
 	}()
 
 	r.log.Infof("preflight against %s", RedactURL(r.cfg.Pair.EL.URL))
-	if err := r.preflight(ctx); err != nil {
+	if err := r.preflightUntilSynced(ctx); err != nil {
 		return fmt.Errorf("preflight: %w", err)
 	}
 	if err := capture.WriteJSON(filepath.Join(r.dir, schema.CapabilitiesFile), r.caps); err != nil {
@@ -814,6 +814,11 @@ func (r *Runner) followBeacon(ctx context.Context) {
 			}
 		}
 		r.event(e)
+	}, func(topics []string) {
+		r.mu.Lock()
+		r.manifest.CLEventTopics = append([]string(nil), topics...)
+		r.mu.Unlock()
+		r.event(schema.Event{Type: schema.EventCLSubscribed, Source: "beacon_sse", Data: map[string]any{"topics": topics}})
 	}, func(err error) {
 		reason := ""
 		if err != nil {
