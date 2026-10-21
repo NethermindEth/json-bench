@@ -55,16 +55,6 @@ points it at.
 
 ## Workflow
 
-### 0. Start a feedback log
-
-This skill is being validated on live nodes. Create
-`outputs/<date>-freshness-<name>/FEEDBACK.md` at the start and append to it as
-you go: every command that failed or needed a workaround, confusing output,
-warnings you could not explain, missing options, wrong defaults, and time spent
-per step. Record exact commands, runner commit (`git rev-parse --short HEAD`),
-client versions and error text. Do not "fix" the tool silently mid-run — note
-it and continue with a workaround, so the user can bring the log back for fixes.
-
 ### 1. Frame the run
 
 Pin down with the user (ask only what is unspecified and consequential):
@@ -91,7 +81,7 @@ it only needs `bash`, `curl` and `python3`):
 It checks chain id, client version, `eth_syncing`, head age, the EIP-2935
 contract code **and** canary answer, whole-block `eth_getLogs`, CL sync /
 optimistic / EL-offline, and the local clock. Any `FAIL` must be resolved
-before probing; `WARN` goes into FEEDBACK.md and the analysis. Also confirm all
+before probing; `WARN` goes into the analysis's run notes. Also confirm all
 pairs report the **same chain id**, and preflight the reference URL too.
 
 The probe repeats these checks itself at start and refuses unsynced nodes, but
@@ -111,6 +101,10 @@ Every probe response time includes the network path from the probe to its node.
    `--beacon.api.addr` (default localhost), so probe it on the host.
    Confirm events flow with
    `curl -N 'http://127.0.0.1:<port>/eth/v1/events?topics=head,block,block_gossip'`.
+   **Nethermind with its embedded CL:** run with `--BeaconChain.Enabled`,
+   `--BeaconApi.Enabled` and `--BeaconApi.Port=<port>`. Its event stream only
+   serves `head` and `finalized_checkpoint`; the probe drops unsupported
+   topics on its own and records `head` alone.
    Some hosts do not publish
    8545 publicly or bind it to loopback / a docker bridge — on-host avoids it.
 2. **Nearby machine** (fallback): allowed, but the manifest's idle RTT baseline
@@ -251,6 +245,7 @@ Structure:
 ## Results         (per probe: percentiles, availability, pairwise tables by group)
 ## Notable blocks  (largest spreads, failures, reorgs, with timelines)
 ## Caveats         (warnings, single-run variability, host placement)
+## Run notes       (deviations from this procedure: restarts, workarounds, config differences, failed commands and why)
 ## Bottom line
 ```
 
@@ -259,6 +254,17 @@ and that one live run is one sample: repeat runs and rotate hosts before
 attributing persistent differences to client software.
 
 ## Gotchas
+
+- **CLs with only some events.** A CL that serves only `head` (Nethermind's
+  embedded CL) gives no `block_gossip`, so its pair has no "CL had the block"
+  split, and its row in "Where the time goes" shows only the total. When a
+  pair's data is readable *before* its own `head` event (negative "ready
+  after"), that event is not a usable milestone for it. `block_gossip` timing
+  also shifts between client versions (Caplin 3.7.1 emits it ~400 ms later
+  than 3.6.1), so do not read it as network arrival.
+- **Freshly synced CLs.** A CL that reports synced may still be backfilling
+  history (Lighthouse: `Downloading historical blocks`), which loads that
+  host during the run. Check the CL logs before starting.
 
 - **Node log volume.** Every not-ready poll is an RPC error on the node, and
   some clients log each one (Erigon: `WARN [rpc] served … block not found`,
