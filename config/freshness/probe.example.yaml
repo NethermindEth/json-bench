@@ -48,6 +48,8 @@ probes:
   transaction_receipt: false
   block_receipts: false
 
+preflight_wait_seconds: 0
+
 clock:
   # auto: best-effort chronyc/timedatectl, falling back to error_budget_ms.
   # budget: trust error_budget_ms (e.g. PTP-disciplined hosts).

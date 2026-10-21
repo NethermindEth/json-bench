@@ -35,6 +35,7 @@ Template: `config/freshness/probe.example.yaml`.
 | `clock.step_threshold_ms` | 5 | Wall-vs-monotonic drift per second that counts as a clock step. |
 | `rtt_samples` | 50 | `eth_chainId` calls for the idle RTT baseline, at start and end. |
 | `sample_interval_seconds` | 30 | Resource and clock sampling period. |
+| `preflight_wait_seconds` | 0 | Retry preflight while the only failure is sync state (EL syncing, CL syncing/optimistic/EL offline), up to this long. 0 fails at once. |
 | `output_directory` | results/rpc-freshness | |
 
 Flags: `--clients <registry>` (for `client_ref`), `--record-all-attempts`.
@@ -58,10 +59,12 @@ Template: `config/freshness/review.example.yaml`.
 
 | Key | Default | Notes |
 |---|---|---|
-| `reference.rpc_url` | required online | Not a tested pair. Needs `eth_getBlockByHash`; `eth_getBlockReceipts` preferred (falls back to per-tx receipts, slower). |
+| `reference.rpc_url` | required online | Not a tested pair. Needs `eth_getBlockByHash`; `eth_getBlockReceipts` preferred (only a node without it falls back to per-tx receipts, which is much slower; a transient failure is retried instead). |
 | `reference.headers` | — | |
 | `reference.request_timeout_ms` | 10000 | |
-| `reference.concurrency` | 8 | Parallel block fetches. |
+| `reference.concurrency` | 8 | Parallel block fetches. Use 2 against public endpoints. |
+| `reference.max_attempts` | 4 | Attempts per call on timeouts, transport errors, 5xx/429 and rate-limit errors, with exponential backoff. Other RPC errors are not retried. |
+| `reference.retry_base_delay_ms` | 500 | First backoff; doubles per attempt, capped at 10 s. |
 | `probes` | required | Probe output directories. Same chain, genesis and slot duration required. |
 | `hold_constant` | — | Label keys; each adds comparison groups of probes sharing that label value. |
 | `margin_ms` | 5 | Observed tie threshold; cross-host pairs use max(margin, combined clock error). |
@@ -70,4 +73,7 @@ Template: `config/freshness/review.example.yaml`.
 | `timeline_blocks` | 10 | Largest-spread blocks drilled into in `report.md`. |
 | `output_directory` | results/rpc-freshness/review | Reference cache lives here, so reuse the same dir for `--offline`. |
 
-Flags: `--offline` (cache only), `--refresh-reference` (re-fetch cached blocks).
+Flags: `--offline` (cache only), `--refresh-unfinalized` (re-fetch cached blocks
+that were not finalized when fetched, plus the chain record), `--refresh-reference`
+(re-fetch everything). Cached blocks whose fetch failed are always re-fetched
+online.

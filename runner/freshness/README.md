@@ -104,6 +104,7 @@ per-block results.
 |---|---|
 | Optimistic imports | Blocks the CL imported before its EL had validated them, usually because the EL was busy. Marked `O` in the per-block table. |
 | Epoch-boundary / Other blocks | Freshness on the first slot of each epoch (CL epoch processing) vs all other blocks. Epoch-boundary blocks are marked `E`. |
+| Within slot | Freshness leaving out blocks served after their slot ended, usually stalls that dominate the tail. "all blocks" when none were late. |
 | Lag vs state | This probe's freshness minus `state_number`'s on the same block, e.g. log indexing that runs after execution. |
 
 **Split at CL milestones**: one row per pair and event.

@@ -12,11 +12,11 @@ start (`header.timestamp`).
 
 | File | Content |
 |---|---|
-| `run-manifest.json` | Redacted config, EL/CL versions, chain id, genesis, slot duration + source, block range, `outcome` (`completed`, `max_duration`, `interrupted`, `error` + reason), `clock` (mode, source, error_ms, max_error_ms, steps), `rtt_start`/`rtt_end` (`samples`, `failures`, `p50_us`, `p95_us`, `max_us` — microseconds), `slots_per_epoch`, `dropped_records`, counts. |
+| `run-manifest.json` | Redacted config, EL/CL versions, chain id, genesis, slot duration + source, block range, `outcome` (`completed`, `max_duration`, `interrupted`, `error` + reason), `clock` (mode, source, error_ms, max_error_ms, steps), `cl_event_topics` (event topics the CL accepted), `rtt_start`/`rtt_end` (`samples`, `failures`, `p50_us`, `p95_us`, `max_us` — microseconds), `slots_per_epoch`, `dropped_records`, counts. |
 | `capabilities.json` | Preflight: genesis hash (or `genesis_error` on pruned nodes), EIP-2935 code/canary, EL/CL sync checks, per-probe `supported` + reason + `not_ready_signature`. |
 | `targets.jsonl` | One line per block: hash, parent, timestamp, slot, `missed_slots_before`, tx count, empty-bloom flag, header observed time/source, `late_armed`, `warmup`, `parent_mismatch`, `clock_step`, and per-probe results (status, match time, attempts, skipped polls, scheduler lag). |
 | `rpc-attempts.jsonl` | Outcome transitions per probe/block: `edge` `first`/`last` of each run of identical outcomes (`repeat` = run length), class, local verdict, digest, error, bytes. `edge: all` with `--record-all-attempts`. |
-| `events.jsonl` | `run_started/finished`, `target_armed/promoted`, `header_observed`, `missed_slot`, `parent_mismatch`, `late_armed`, `stall`, `clock_sample`, `clock_step`, `resource_sample`, `cl_event`, `cl_stream_disconnected`. |
+| `events.jsonl` | `run_started/finished`, `target_armed/promoted`, `header_observed`, `missed_slot`, `parent_mismatch`, `late_armed`, `stall`, `clock_sample`, `clock_step`, `resource_sample`, `cl_event`, `cl_stream_subscribed` (topics the CL accepted), `cl_stream_disconnected`. |
 | `responses/<digest>.json.gz` | Each distinct canonical answer once, gzipped (`zcat`). Review uses only digests; these are for forensics. |
 
 Probe-side statuses (local view, not verified): `matched`, `not_applicable`
@@ -62,7 +62,8 @@ Pairwise fields: `compared`, `observed_a_wins/b_wins/ties`,
 correct), `both_failed`, `excluded` (by reason), `delta_a_minus_b`,
 `effective_margin_ms`, `cross_host`.
 
-Per-pair context: `optimistic_imports`, `freshness_epoch_boundary` /
+Per-pair context: `optimistic_imports`, `freshness_within_slot` (present when
+some blocks were served after their slot ended), `freshness_epoch_boundary` /
 `freshness_other_blocks` (present when the range has epoch boundaries),
 `lag_vs_state_number` (non-state probes: this probe's freshness minus
 `state_number`'s on blocks where both matched).

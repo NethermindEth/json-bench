@@ -85,7 +85,10 @@ before probing; `WARN` goes into the analysis's run notes. Also confirm all
 pairs report the **same chain id**, and preflight the reference URL too.
 
 The probe repeats these checks itself at start and refuses unsynced nodes, but
-catching problems here avoids wasted deployments.
+catching problems here avoids wasted deployments. A CL that drops in and out
+of sync (seen after one-block reorgs) can make a probe refuse to start; set
+`preflight_wait_seconds` (e.g. 300) to have it retry until the nodes are
+healthy instead of exiting.
 
 ### 3. Decide placement
 
@@ -191,12 +194,18 @@ go run ./runner freshness review --config review.yaml
 For a final review, wait until the last measured block is finalized (about two
 epochs, ~13 minutes on mainnet): earlier reviews are correct but report blocks
 as `verified_not_finalized`. Reviewing right away for a first look is fine;
-re-run with `--refresh-reference` later.
+re-run with `--refresh-unfinalized` later, which re-fetches only the blocks
+that were not final yet.
 
-Review fetches reference data once into `<output>/reference-data/`. Re-render
-without any node (same results byte-for-byte) with `--offline`; force a
-re-fetch with `--refresh-reference`. Run review soon after the probes if the
-reference prunes receipts.
+Review fetches reference data once into `<output>/reference-data/`, retrying
+timeouts and rate limits with backoff (`reference.max_attempts`). Blocks whose
+fetch still failed are fetched again on the next online review, so re-running
+review heals a flaky reference. Re-render without any node (same results
+byte-for-byte) with `--offline`; force a full re-fetch with
+`--refresh-reference`. A slow public reference is the usual bottleneck: keep
+`reference.concurrency` low (2) and raise `reference.request_timeout_ms`
+rather than concurrency. Run review soon after the probes if the reference
+prunes receipts.
 
 ### 7. Analyze and write ANALYSIS.md
 
