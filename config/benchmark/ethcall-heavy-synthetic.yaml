@@ -1,0 +1,15 @@
+test_name: "Heavy synthetic eth_call"
+description: "100 supplied heavy eth_call requests with code overrides; unmodified params, fixed snapshot and deterministic sampling."
+clients:
+  - nethermind
+duration: "120s"
+rps: 10
+vus: 32
+seed: 7
+calls:
+  - name: "ethcall-heavy-synthetic"
+    file: "./rpc-calls/eth-call-corpus-heavy-synthetic-100.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds:
+      - "p(95)<1000"
