@@ -71,20 +71,35 @@ type block struct {
 	hash   string
 }
 
-// fetchReferences fills the cache for every block not cached yet (or all,
-// when refresh is set).
-func fetchReferences(ctx context.Context, cfg *Config, dir string, blocks []block, refresh bool) error {
+// Refresh selects which cached reference records an online review fetches
+// again. Records whose fetch failed are always fetched again.
+type Refresh int
+
+const (
+	RefreshNone Refresh = iota
+	RefreshUnfinalized
+	RefreshAll
+)
+
+// fetchReferences fills the cache for every block that is missing, failed
+// earlier, or selected by refresh.
+func fetchReferences(ctx context.Context, cfg *Config, dir string, blocks []block, refresh Refresh) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	client := ethrpc.NewClient(ethrpc.Options{
-		URL:     cfg.Reference.RPCURL,
-		Headers: cfg.Reference.Headers,
-		Timeout: time.Duration(cfg.Reference.RequestTimeoutMs) * time.Millisecond,
-	}, schema.NewClock())
+	client := &refClient{
+		c: ethrpc.NewClient(ethrpc.Options{
+			URL:     cfg.Reference.RPCURL,
+			Headers: cfg.Reference.Headers,
+			Timeout: time.Duration(cfg.Reference.RequestTimeoutMs) * time.Millisecond,
+		}, schema.NewClock()),
+		attempts:  cfg.Reference.MaxAttempts,
+		baseDelay: time.Duration(cfg.Reference.RetryBaseDelayMs) * time.Millisecond,
+	}
 
 	chainPath := filepath.Join(dir, "_chain.json")
-	if _, err := os.Stat(chainPath); refresh || err != nil {
+	var chain chainRecord
+	if err := readJSON(chainPath, &chain); refresh != RefreshNone || err != nil {
 		cr, err := fetchChain(ctx, client)
 		if err != nil {
 			return fmt.Errorf("reference node: %w", err)
@@ -93,6 +108,7 @@ func fetchReferences(ctx context.Context, cfg *Config, dir string, blocks []bloc
 		if err := capture.WriteJSON(chainPath, cr); err != nil {
 			return err
 		}
+		chain = *cr
 	}
 
 	work := make(chan block)
@@ -105,7 +121,7 @@ func fetchReferences(ctx context.Context, cfg *Config, dir string, blocks []bloc
 			defer wg.Done()
 			for b := range work {
 				path := filepath.Join(dir, b.hash+".json")
-				if _, err := os.Stat(path); err == nil && !refresh {
+				if !needsFetch(path, refresh, &chain) {
 					continue
 				}
 				rec := fetchBlock(ctx, client, b)
@@ -125,12 +141,69 @@ func fetchReferences(ctx context.Context, cfg *Config, dir string, blocks []bloc
 	return errors.Join(errs...)
 }
 
-func fetchChain(ctx context.Context, c *ethrpc.Client) (*chainRecord, error) {
+func needsFetch(path string, refresh Refresh, chain *chainRecord) bool {
+	var rec refRecord
+	if refresh == RefreshAll || readJSON(path, &rec) != nil || rec.FetchError != "" {
+		return true
+	}
+	return refresh == RefreshUnfinalized && (!chain.HasFinalized || rec.Number > chain.Finalized)
+}
+
+// refClient retries transient failures (transport errors, timeouts, non-JSON
+// or 5xx/429 bodies, rate-limit errors) with exponential backoff, so a slow
+// or throttling reference does not turn verifiable blocks into unverified ones.
+type refClient struct {
+	c         *ethrpc.Client
+	attempts  int
+	baseDelay time.Duration
+}
+
+// callError is a failed reference call. Permanent means the node answered
+// with an RPC error that retrying cannot change, such as a missing method.
+type callError struct {
+	reply     ethrpc.Reply
+	permanent bool
+}
+
+func (e *callError) Error() string { return e.reply.AsError().Error() }
+
+func (rc *refClient) call(ctx context.Context, method string, params ...any) (json.RawMessage, error) {
+	delay := rc.baseDelay
+	var last ethrpc.Reply
+	for attempt := 0; attempt < max(rc.attempts, 1); attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+			delay = min(delay*2, 10*time.Second)
+		}
+		last = ethrpc.Parse(rc.c.Call(ctx, method, params...))
+		switch {
+		case last.Class == schema.ClassResult || last.Class == schema.ClassNull:
+			return last.Result, nil
+		case last.Class == schema.ClassRPCError && !rateLimited(last):
+			return nil, &callError{reply: last, permanent: true}
+		}
+	}
+	return nil, &callError{reply: last}
+}
+
+func rateLimited(r ethrpc.Reply) bool {
+	if r.Code != nil && (*r.Code == -32005 || *r.Code == 429) {
+		return true
+	}
+	msg := strings.ToLower(r.Message)
+	return strings.Contains(msg, "rate limit") || strings.Contains(msg, "too many requests")
+}
+
+func fetchChain(ctx context.Context, c *refClient) (*chainRecord, error) {
 	cr := &chainRecord{}
-	if raw, err := c.CallResult(ctx, "web3_clientVersion"); err == nil {
+	if raw, err := c.call(ctx, "web3_clientVersion"); err == nil {
 		_ = json.Unmarshal(raw, &cr.ClientVersion)
 	}
-	raw, err := c.CallResult(ctx, "eth_chainId")
+	raw, err := c.call(ctx, "eth_chainId")
 	if err != nil {
 		return nil, err
 	}
@@ -139,13 +212,13 @@ func fetchChain(ctx context.Context, c *ethrpc.Client) (*chainRecord, error) {
 		return nil, fmt.Errorf("eth_chainId returned %s", raw)
 	}
 	cr.ChainID = id.Uint64()
-	if raw, err = c.CallResult(ctx, "eth_blockNumber"); err != nil {
+	if raw, err = c.call(ctx, "eth_blockNumber"); err != nil {
 		return nil, err
 	}
 	if cr.Head, err = ethrpc.ParseQuantity(raw); err != nil {
 		return nil, err
 	}
-	if raw, err := c.CallResult(ctx, "eth_getBlockByNumber", "finalized", false); err == nil {
+	if raw, err := c.call(ctx, "eth_getBlockByNumber", "finalized", false); err == nil {
 		if h, err := ethrpc.ParseHeader(raw); err == nil && h != nil {
 			cr.Finalized, cr.HasFinalized = h.Number, true
 		}
@@ -153,20 +226,20 @@ func fetchChain(ctx context.Context, c *ethrpc.Client) (*chainRecord, error) {
 	return cr, nil
 }
 
-func fetchBlock(ctx context.Context, c *ethrpc.Client, b block) *refRecord {
+func fetchBlock(ctx context.Context, c *refClient, b block) *refRecord {
 	rec := &refRecord{Hash: b.hash, Number: b.number}
 	fail := func(what string, err error) *refRecord {
 		rec.FetchError = what + ": " + err.Error()
 		return rec
 	}
-	raw, err := c.CallResult(ctx, "eth_getBlockByNumber", ethrpc.Quantity(b.number), false)
+	raw, err := c.call(ctx, "eth_getBlockByNumber", ethrpc.Quantity(b.number), false)
 	if err != nil {
 		return fail("eth_getBlockByNumber", err)
 	}
 	if h, err := ethrpc.ParseHeader(raw); err == nil && h != nil {
 		rec.CanonicalHash = ethrpc.HashHex(h.Hash)
 	}
-	raw, err = c.CallResult(ctx, "eth_getBlockByHash", b.hash, false)
+	raw, err = c.call(ctx, "eth_getBlockByHash", b.hash, false)
 	if err != nil {
 		return fail("eth_getBlockByHash", err)
 	}
@@ -178,14 +251,20 @@ func fetchBlock(ctx context.Context, c *ethrpc.Client, b block) *refRecord {
 	if h == nil {
 		return rec
 	}
-	raw, err = c.CallResult(ctx, "eth_getBlockReceipts", b.hash)
+	raw, err = c.call(ctx, "eth_getBlockReceipts", b.hash)
 	if err == nil && string(raw) != "null" {
 		rec.Receipts, rec.ReceiptsSource = raw, "eth_getBlockReceipts"
 		return rec
 	}
+	// Per-transaction receipts cost one call per transaction; use them only
+	// when the node cannot serve block receipts, not after a transient failure.
+	var ce *callError
+	if err != nil && (!errors.As(err, &ce) || !ce.permanent) {
+		return fail("eth_getBlockReceipts", err)
+	}
 	parts := make([]json.RawMessage, 0, len(h.TxHashes))
 	for _, tx := range h.TxHashes {
-		r, err := c.CallResult(ctx, "eth_getTransactionReceipt", ethrpc.HashHex(tx))
+		r, err := c.call(ctx, "eth_getTransactionReceipt", ethrpc.HashHex(tx))
 		if err != nil {
 			return fail("eth_getTransactionReceipt", err)
 		}

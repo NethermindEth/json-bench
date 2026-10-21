@@ -31,6 +31,8 @@ type ReferenceConfig struct {
 	Headers          map[string]string `yaml:"headers" json:"headers,omitempty"`
 	RequestTimeoutMs int               `yaml:"request_timeout_ms" json:"request_timeout_ms"`
 	Concurrency      int               `yaml:"concurrency" json:"concurrency"`
+	MaxAttempts      int               `yaml:"max_attempts" json:"max_attempts"`
+	RetryBaseDelayMs int               `yaml:"retry_base_delay_ms" json:"retry_base_delay_ms"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -70,6 +72,12 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Reference.Concurrency == 0 {
 		c.Reference.Concurrency = 8
+	}
+	if c.Reference.MaxAttempts == 0 {
+		c.Reference.MaxAttempts = 4
+	}
+	if c.Reference.RetryBaseDelayMs == 0 {
+		c.Reference.RetryBaseDelayMs = 500
 	}
 	if c.OutputDirectory == "" {
 		c.OutputDirectory = "results/rpc-freshness/review"

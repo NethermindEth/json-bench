@@ -19,7 +19,7 @@ import (
 
 type Options struct {
 	Offline bool
-	Refresh bool
+	Refresh Refresh
 	Logger  logrus.FieldLogger
 }
 
@@ -61,6 +61,7 @@ type ProbeInfo struct {
 	Dir         string              `json:"dir"`
 	ELVersion   string              `json:"el_client_version,omitempty"`
 	CLVersion   string              `json:"cl_client_version,omitempty"`
+	CLTopics    []string            `json:"cl_event_topics,omitempty"`
 	FirstBlock  uint64              `json:"first_block"`
 	LastBlock   uint64              `json:"last_block"`
 	Outcome     string              `json:"outcome"`
@@ -300,7 +301,7 @@ func probeInfo(r *ProbeRun) ProbeInfo {
 	m := r.Manifest
 	info := ProbeInfo{
 		PairID: m.PairID, HostID: m.HostID, ClockDomain: m.ClockDomain, Labels: m.Labels, RunID: m.RunID, Dir: r.Dir,
-		ELVersion: m.ELClientVersion, CLVersion: m.CLClientVersion, FirstBlock: m.FirstBlock, LastBlock: m.LastBlock,
+		ELVersion: m.ELClientVersion, CLVersion: m.CLClientVersion, CLTopics: m.CLEventTopics, FirstBlock: m.FirstBlock, LastBlock: m.LastBlock,
 		Outcome: m.Outcome, Clock: m.Clock, RTTStart: m.RTTStart, RTTEnd: m.RTTEnd, Dropped: m.Dropped,
 	}
 	var cfg probe.Config

@@ -81,16 +81,18 @@ type chain struct {
 // Node fields are guarded by the shared chain mutex.
 type Node struct {
 	*chain
-	vis     map[uint64]Visibility
-	style   NotReadyStyle
-	syncing bool
-	delay   map[string]time.Duration
-	calls   map[string]int
-	server  *httptest.Server
-	beacon  *httptest.Server
-	subsMu  sync.Mutex
-	subs    []*subscriber
-	topics  []string
+	vis      map[uint64]Visibility
+	style    NotReadyStyle
+	syncing  bool
+	delay    map[string]time.Duration
+	failNext map[string]int
+	disabled map[string]bool
+	calls    map[string]int
+	server   *httptest.Server
+	beacon   *httptest.Server
+	subsMu   sync.Mutex
+	subs     []*subscriber
+	topics   []string
 }
 
 type subscriber struct {
@@ -140,11 +142,13 @@ func (n *Node) Peer() *Node {
 
 func newNode(c *chain) *Node {
 	n := &Node{
-		chain: c,
-		vis:   map[uint64]Visibility{},
-		style: DefaultStyle,
-		delay: map[string]time.Duration{},
-		calls: map[string]int{},
+		chain:    c,
+		vis:      map[uint64]Visibility{},
+		style:    DefaultStyle,
+		delay:    map[string]time.Duration{},
+		failNext: map[string]int{},
+		disabled: map[string]bool{},
+		calls:    map[string]int{},
 	}
 	n.server = httptest.NewServer(http.HandlerFunc(n.serveRPC))
 	n.beacon = httptest.NewServer(http.HandlerFunc(n.serveBeacon))
@@ -175,6 +179,21 @@ func (n *Node) SetEventTopics(topics ...string) {
 	n.subsMu.Lock()
 	n.topics = topics
 	n.subsMu.Unlock()
+}
+
+// FailNext answers the next n calls of method with a non-JSON 503, as an
+// overloaded or rate-limiting gateway does.
+func (n *Node) FailNext(method string, count int) {
+	n.mu.Lock()
+	n.failNext[method] = count
+	n.mu.Unlock()
+}
+
+// Disable makes method answer "method not found".
+func (n *Node) Disable(method string) {
+	n.mu.Lock()
+	n.disabled[method] = true
+	n.mu.Unlock()
 }
 
 // SetDelay adds latency to every call of method.
@@ -337,7 +356,21 @@ func (n *Node) serveRPC(w http.ResponseWriter, req *http.Request) {
 	n.mu.Lock()
 	n.calls[r.Method]++
 	d := n.delay[r.Method]
+	fail := n.failNext[r.Method] > 0
+	if fail {
+		n.failNext[r.Method]--
+	}
+	disabled := n.disabled[r.Method]
 	n.mu.Unlock()
+	if fail {
+		http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if disabled {
+		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": r.ID,
+			"error": rpcErr{Code: -32601, Message: "the method " + r.Method + " does not exist/is not available"}})
+		return
+	}
 	if d > 0 {
 		time.Sleep(d)
 	}

@@ -76,7 +76,7 @@ func renderSummary(b *strings.Builder, sum *Summary, kinds []string) {
 		total := st.Freshness.P50
 		g := st.CL["block_gossip"]
 		if g == nil || g.Milestone == nil || g.ReadyAfter == nil {
-			w("| %s | - | - | %.0f | %s |\n", p.PairID, total, bar(0, total, maxTotal))
+			w("| %s | no `block_gossip` event | - | %.0f | |\n", p.PairID, total)
 			continue
 		}
 		w("| %s | %.0f | +%.0f | %.0f | %s |\n", p.PairID, g.Milestone.P50, g.ReadyAfter.P50, total, bar(g.Milestone.P50, total, maxTotal))
@@ -149,9 +149,27 @@ func headToHead(c *Comparison, a, b ProbeInfo, primary string, results map[strin
 }
 
 func winSentence(c *Comparison, what string) string {
+	more := "more "
+	if c.ObservedAWins+c.ObservedBWins+c.ObservedTies == 0 {
+		more = ""
+	}
+	var failed []string
+	if c.CoverageAWins > 0 {
+		failed = append(failed, fmt.Sprintf("only %s returned correct data on %s", c.A, plural(c.CoverageAWins, more+"block", more+"blocks")))
+	}
+	if c.CoverageBWins > 0 {
+		verb := ""
+		if c.CoverageAWins == 0 {
+			verb = " returned correct data"
+		}
+		failed = append(failed, fmt.Sprintf("only %s%s on %s", c.B, verb, plural(c.CoverageBWins, more+"block", more+"blocks")))
+	}
+	if c.BothFailed > 0 {
+		failed = append(failed, fmt.Sprintf("neither on %s", plural(c.BothFailed, "block", "blocks")))
+	}
 	extra := ""
-	if n := c.CoverageAWins + c.CoverageBWins + c.BothFailed; n > 0 {
-		extra = fmt.Sprintf(" On %s at least one side never returned correct data.", plural(n, "more block", "more blocks"))
+	if len(failed) > 0 {
+		extra = " " + upperFirst(strings.Join(failed, "; ")) + "."
 	}
 	matched := c.ObservedAWins + c.ObservedBWins + c.ObservedTies
 	if matched == 0 {
@@ -182,6 +200,13 @@ func relative(delta float64, ahead, behind string) string {
 	default:
 		return fmt.Sprintf("%.0f ms %s", delta, behind)
 	}
+}
+
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 func lowerFirst(s string) string {

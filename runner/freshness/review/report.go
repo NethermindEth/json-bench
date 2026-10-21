@@ -60,7 +60,7 @@ func renderReport(sum *Summary, results []*BlockResult, cfg *Config) string {
 			dropped += n
 		}
 		w("| %s | %s | %s | %s | %s | %d-%d | %s | %.2f (%s) | %s | %d |\n", p.PairID, p.HostID, labels(p.Labels),
-			orDash(p.ELVersion), orDash(p.CLVersion), p.FirstBlock, p.LastBlock, p.Outcome, math.Max(p.Clock.ErrorMs, p.Clock.MaxErrorMs), p.Clock.Source, rtt, dropped)
+			orDash(p.ELVersion), clCell(p), p.FirstBlock, p.LastBlock, p.Outcome, math.Max(p.Clock.ErrorMs, p.Clock.MaxErrorMs), p.Clock.Source, rtt, dropped)
 	}
 	w("\n")
 
@@ -246,7 +246,7 @@ func renderContext(b *strings.Builder, kind string, ps *ProbeSummary, pairs []st
 	has := false
 	for _, id := range pairs {
 		st := ps.Pairs[id]
-		if st.FreshnessEpoch != nil || st.OptimisticImports > 0 || st.LagVsState != nil {
+		if st.FreshnessEpoch != nil || st.OptimisticImports > 0 || st.LagVsState != nil || st.FreshnessWithinSlot != nil {
 			has = true
 		}
 	}
@@ -259,10 +259,15 @@ func renderContext(b *strings.Builder, kind string, ps *ProbeSummary, pairs []st
 	if kind != schema.ProbeStateNumber {
 		w("Lag vs state: this probe's freshness minus `state_number`'s on the same block, e.g. asynchronous log indexing.")
 	}
-	w("\n\n| Pair | Optimistic imports | Epoch-boundary p50 / p95 (n) | Other blocks p50 / p95 (n) | Lag vs state p50 / p95 |\n|---|---|---|---|---|\n")
+	w("Within slot: freshness leaving out blocks served after their slot ended, usually stalls that dominate the tail.")
+	w("\n\n| Pair | Optimistic imports | Epoch-boundary p50 / p95 (n) | Other blocks p50 / p95 (n) | Within slot p50 / p95 (n) | Lag vs state p50 / p95 |\n|---|---|---|---|---|---|\n")
 	for _, id := range pairs {
 		st := ps.Pairs[id]
-		w("| %s | %d | %s | %s | %s |\n", id, st.OptimisticImports, distN(st.FreshnessEpoch), distN(st.FreshnessNonEpoch), distPair(st.LagVsState))
+		within := distN(st.FreshnessWithinSlot)
+		if st.FreshnessWithinSlot == nil && st.Freshness != nil {
+			within = "all blocks"
+		}
+		w("| %s | %d | %s | %s | %s | %s |\n", id, st.OptimisticImports, distN(st.FreshnessEpoch), distN(st.FreshnessNonEpoch), within, distPair(st.LagVsState))
 	}
 	w("\n")
 }
@@ -355,6 +360,16 @@ func short(h string) string {
 	return h
 }
 
+// clCell names the CL and, when it did not serve every probed event topic,
+// which ones the probe got.
+func clCell(p ProbeInfo) string {
+	s := orDash(p.CLVersion)
+	if len(p.CLTopics) > 0 && len(p.CLTopics) < len(clTopics) {
+		s += " (events: " + strings.Join(p.CLTopics, ", ") + ")"
+	}
+	return s
+}
+
 func epochMark(br *BlockResult) string {
 	if br.EpochBoundary {
 		return "E"
@@ -390,7 +405,23 @@ func renderCLSplit(b *strings.Builder, ps *ProbeSummary, pairs []string) {
 				distCell(sp.ReadyAfter, false), distCell(sp.ReadyAfter, true))
 		}
 	}
-	w("\nMissing: measured blocks where the pair's CL never emitted that event (e.g. no `head` after an optimistic import).\n\n")
+	w("\nMissing: measured blocks where the pair's CL never emitted that event (e.g. no `head` after an optimistic import).")
+	for _, id := range pairs {
+		for _, topic := range clTopics {
+			if sp := ps.Pairs[id].CL[topic]; sp != nil && sp.ReadyAfter != nil && sp.ReadyAfter.P50 < 0 {
+				w(" %s's data was usually readable *before* its `%s` event (negative ready after), so that event is not a usable milestone for it.", id, topic)
+			}
+		}
+	}
+	w("\n\n")
+	rows := 0
+	for _, c := range ps.Comparisons {
+		rows += len(c.CL)
+	}
+	if rows == 0 {
+		w("No milestone is shared by two pairs, so there is no paired comparison: pairs with different CLs are compared at `block_gossip` only, and not every pair's CL emits it.\n\n")
+		return
+	}
 	w("Paired rows, per block where both answered correctly and both CLs emitted the event. *Milestone Δ*: A's event time minus B's (negative: A's CL got there first). ")
 	w("*Faster after milestone*: whose data became readable in less time counted from its own event (tie if closer than the margin). ")
 	w("Pairs with different CL clients are compared at `block_gossip` only, because each CL emits `head` and `block` at a different point in its import.\n")

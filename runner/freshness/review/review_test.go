@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"os"
 	"path/filepath"
@@ -202,6 +203,10 @@ func TestIncompleteLogsNeverCountAsSuccess(t *testing.T) {
 	require.Equal(t, 0.0, logs.Pairs["pair-b"].Availability["slot"])
 	require.Equal(t, 1, logs.Comparisons[0].CoverageAWins)
 	require.Nil(t, logs.Comparisons[0].Delta, "no finite delta against a failure")
+
+	report, err := os.ReadFile(filepath.Join(out, "review", schema.ReportFile))
+	require.NoError(t, err)
+	require.Contains(t, string(report), "Only pair-a returned correct data on 1 block.", "the summary names the side that failed")
 }
 
 func TestOrphanedAndUnverifiedBlocks(t *testing.T) {
@@ -334,4 +339,58 @@ func TestContextSplitAndMissingMilestones(t *testing.T) {
 	require.Equal(t, 1, split["block_gossip"].Missing, "the timed-out block had no events")
 	require.Equal(t, 2, split["head"].Blocks)
 	require.Equal(t, 2, split["head"].Missing, "optimistic import emitted no head")
+}
+
+func TestReferenceRetriesAndFallback(t *testing.T) {
+	n := newNetwork(t)
+	out := t.TempDir()
+	probes := map[string]bool{schema.ProbeStateNumber: true, schema.ProbeLogsNumber: true}
+	pa := startProbe(t, n.a, "pair-a", "host-1", 2, probes, out)
+	n.produce(2, 1, 10*time.Millisecond, 10*time.Millisecond, mocknode.All())
+	n.produce(2, 1, 10*time.Millisecond, 10*time.Millisecond, mocknode.All())
+	dirA := pa.wait(t)
+
+	cfg := reviewConfig(n, []string{dirA}, filepath.Join(out, "review"))
+	cfg.Reference.RetryBaseDelayMs = 1
+	cfg.Reference.Concurrency = 1
+
+	n.ref.FailNext("eth_getBlockReceipts", 2)
+	res, err := Run(context.Background(), cfg, Options{Logger: quietLogger()})
+	require.NoError(t, err)
+	require.Equal(t, 2, res.Summary.Blocks[RefVerified], "transient failures are retried")
+	require.Zero(t, n.ref.Calls("eth_getTransactionReceipt"), "a transient block-receipts failure must not fall back to per-tx receipts")
+
+	n.ref.FailNext("eth_getBlockByHash", 100)
+	res, err = Run(context.Background(), cfg, Options{Refresh: RefreshAll, Logger: quietLogger()})
+	require.NoError(t, err)
+	require.Equal(t, 2, res.Summary.Blocks[RefUnverified], "exhausted retries leave the block unverified")
+
+	n.ref.FailNext("eth_getBlockByHash", 0)
+	n.ref.Disable("eth_getBlockReceipts")
+	res, err = Run(context.Background(), cfg, Options{Logger: quietLogger()})
+	require.NoError(t, err)
+	require.Equal(t, 2, res.Summary.Blocks[RefVerified], "cached fetch errors are fetched again on the next online review")
+	require.Positive(t, n.ref.Calls("eth_getTransactionReceipt"), "a node without eth_getBlockReceipts uses per-tx receipts")
+}
+
+func TestNeedsFetch(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, rec refRecord) string {
+		p := filepath.Join(dir, name)
+		b, _ := json.Marshal(rec)
+		require.NoError(t, os.WriteFile(p, b, 0o644))
+		return p
+	}
+	final := write("final.json", refRecord{Number: 10})
+	recent := write("recent.json", refRecord{Number: 20})
+	failed := write("failed.json", refRecord{Number: 5, FetchError: "timeout"})
+	chain := &chainRecord{Finalized: 15, HasFinalized: true}
+
+	require.True(t, needsFetch(filepath.Join(dir, "missing.json"), RefreshNone, chain))
+	require.True(t, needsFetch(failed, RefreshNone, chain))
+	require.False(t, needsFetch(final, RefreshNone, chain))
+	require.False(t, needsFetch(recent, RefreshNone, chain))
+	require.False(t, needsFetch(final, RefreshUnfinalized, chain))
+	require.True(t, needsFetch(recent, RefreshUnfinalized, chain))
+	require.True(t, needsFetch(final, RefreshAll, chain))
 }

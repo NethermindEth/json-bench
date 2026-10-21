@@ -54,11 +54,14 @@ type PairStats struct {
 	FreshnessEpoch    *Dist `json:"freshness_epoch_boundary,omitempty"`
 	FreshnessNonEpoch *Dist `json:"freshness_other_blocks,omitempty"`
 	OptimisticImports int   `json:"optimistic_imports"`
-	LagVsState        *Dist `json:"lag_vs_state_number,omitempty"`
+	// FreshnessWithinSlot leaves out blocks served after their slot ended,
+	// which are usually stalls and dominate the tail.
+	FreshnessWithinSlot *Dist `json:"freshness_within_slot,omitempty"`
+	LagVsState          *Dist `json:"lag_vs_state_number,omitempty"`
 }
 
 func (st *PairStats) addContext(outs []*Outcome, tls []*Timeline, epochs []bool) {
-	var epoch, other []float64
+	var epoch, other, within []float64
 	for i, o := range outs {
 		if !o.Comparable() {
 			continue
@@ -74,9 +77,15 @@ func (st *PairStats) addContext(outs []*Outcome, tls []*Timeline, epochs []bool)
 		} else {
 			other = append(other, *o.FreshnessMs)
 		}
+		if o.WithinSlot != nil && *o.WithinSlot {
+			within = append(within, *o.FreshnessMs)
+		}
 	}
 	if len(epoch) > 0 {
 		st.FreshnessEpoch, st.FreshnessNonEpoch = newDist(epoch), newDist(other)
+	}
+	if st.OutsideSlot > 0 {
+		st.FreshnessWithinSlot = newDist(within)
 	}
 }
 

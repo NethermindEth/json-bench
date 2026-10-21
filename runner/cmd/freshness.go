@@ -22,6 +22,7 @@ var (
 	freshnessReviewConfig string
 	freshnessOffline      bool
 	freshnessRefresh      bool
+	freshnessRefreshUnfin bool
 )
 
 var freshnessCmd = &cobra.Command{
@@ -53,7 +54,8 @@ func init() {
 
 	freshnessReviewCmd.Flags().StringVar(&freshnessReviewConfig, "config", "", "Path to a review config (see config/freshness/review.example.yaml)")
 	freshnessReviewCmd.Flags().BoolVar(&freshnessOffline, "offline", false, "Use only cached reference data; no network access")
-	freshnessReviewCmd.Flags().BoolVar(&freshnessRefresh, "refresh-reference", false, "Re-fetch reference data even when it is cached")
+	freshnessReviewCmd.Flags().BoolVar(&freshnessRefresh, "refresh-reference", false, "Re-fetch all reference data even when it is cached")
+	freshnessReviewCmd.Flags().BoolVar(&freshnessRefreshUnfin, "refresh-unfinalized", false, "Re-fetch cached reference data only for blocks that were not finalized when fetched")
 	_ = freshnessReviewCmd.MarkFlagRequired("config")
 
 	freshnessCmd.AddCommand(freshnessProbeCmd, freshnessReviewCmd)
@@ -108,7 +110,14 @@ func runFreshnessReview(cmd *cobra.Command, args []string) error {
 	}
 	ctx, stop := signalContext()
 	defer stop()
-	res, err := review.Run(ctx, cfg, review.Options{Offline: freshnessOffline, Refresh: freshnessRefresh, Logger: logger})
+	refresh := review.RefreshNone
+	switch {
+	case freshnessRefresh:
+		refresh = review.RefreshAll
+	case freshnessRefreshUnfin:
+		refresh = review.RefreshUnfinalized
+	}
+	res, err := review.Run(ctx, cfg, review.Options{Offline: freshnessOffline, Refresh: refresh, Logger: logger})
 	if err != nil {
 		return err
 	}
