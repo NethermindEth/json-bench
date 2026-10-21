@@ -344,6 +344,32 @@ func TestBeaconEventsAndSlots(t *testing.T) {
 	require.Equal(t, "mockbeacon/v1.0.0", m.CLClientVersion)
 }
 
+func TestHeadOnlyEventStream(t *testing.T) {
+	node := mocknode.New(1, 8, 1)
+	defer node.Close()
+	node.SetEventTopics("head", "finalized_checkpoint")
+	cfg := testConfig(t, node, 1)
+	cfg.Pair.CL.BeaconURL = node.BeaconURL()
+	x := start(t, cfg)
+	b := node.Mine(1, 1, 1)
+	pause()
+	node.Publish(b.Number, mocknode.All())
+	x.wait(t)
+
+	slot := (b.Timestamp - node.Genesis()) / 1
+	var heads, disconnects int
+	for _, e := range readJSONL[schema.Event](t, filepath.Join(x.r.Dir(), schema.EventsFile)) {
+		switch {
+		case e.Type == schema.EventCL && e.Source == "beacon_sse:head" && e.Slot != nil && *e.Slot == slot:
+			heads++
+		case e.Type == schema.EventCLDisconnect:
+			disconnects++
+		}
+	}
+	require.Equal(t, 1, heads)
+	require.Zero(t, disconnects)
+}
+
 func TestRedactedConfigHasNoSecrets(t *testing.T) {
 	cfg := &Config{Pair: PairConfig{ID: "x", EL: ELConfig{URL: "https://user:pw@rpc.example.com/v3/SECRETKEY?x=1", Headers: map[string]string{"Authorization": "Bearer SECRET"}}}}
 	red := cfg.Redacted()

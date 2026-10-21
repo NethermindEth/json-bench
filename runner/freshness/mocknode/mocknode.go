@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -88,7 +89,17 @@ type Node struct {
 	server  *httptest.Server
 	beacon  *httptest.Server
 	subsMu  sync.Mutex
-	subs    []chan string
+	subs    []*subscriber
+	topics  []string
+}
+
+type subscriber struct {
+	ch     chan sseMessage
+	topics map[string]bool
+}
+
+type sseMessage struct {
+	topic, text string
 }
 
 // New builds a chain of history blocks 0..historyLen-1, all visible, with
@@ -144,8 +155,8 @@ func (n *Node) URL() string       { return n.server.URL }
 func (n *Node) BeaconURL() string { return n.beacon.URL }
 func (n *Node) Close() {
 	n.subsMu.Lock()
-	for _, c := range n.subs {
-		close(c)
+	for _, s := range n.subs {
+		close(s.ch)
 	}
 	n.subs = nil
 	n.subsMu.Unlock()
@@ -157,6 +168,14 @@ func (n *Node) Close() {
 
 func (n *Node) SetStyle(s NotReadyStyle) { n.mu.Lock(); n.style = s; n.mu.Unlock() }
 func (n *Node) SetSyncing(v bool)        { n.mu.Lock(); n.syncing = v; n.mu.Unlock() }
+
+// SetEventTopics limits the event stream to these topics: a request naming
+// any other topic is rejected with 400, as CLs with a partial events API do.
+func (n *Node) SetEventTopics(topics ...string) {
+	n.subsMu.Lock()
+	n.topics = topics
+	n.subsMu.Unlock()
+}
 
 // SetDelay adds latency to every call of method.
 func (n *Node) SetDelay(method string, d time.Duration) {
@@ -565,9 +584,22 @@ func (n *Node) serveEvents(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "no flush", http.StatusInternalServerError)
 		return
 	}
-	ch := make(chan string, 64)
+	requested := map[string]bool{}
+	for _, t := range strings.Split(req.URL.Query().Get("topics"), ",") {
+		requested[t] = true
+	}
 	n.subsMu.Lock()
-	n.subs = append(n.subs, ch)
+	if n.topics != nil {
+		for t := range requested {
+			if !slices.Contains(n.topics, t) {
+				n.subsMu.Unlock()
+				http.Error(w, fmt.Sprintf(`{"message":"Unsupported topic '%s'; this node only supports: %s"}`, t, strings.Join(n.topics, ", ")), http.StatusBadRequest)
+				return
+			}
+		}
+	}
+	sub := &subscriber{ch: make(chan sseMessage, 64), topics: requested}
+	n.subs = append(n.subs, sub)
 	n.subsMu.Unlock()
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
@@ -576,11 +608,11 @@ func (n *Node) serveEvents(w http.ResponseWriter, req *http.Request) {
 		select {
 		case <-req.Context().Done():
 			return
-		case msg, ok := <-ch:
+		case msg, ok := <-sub.ch:
 			if !ok {
 				return
 			}
-			_, _ = io.WriteString(w, msg)
+			_, _ = io.WriteString(w, msg.text)
 			fl.Flush()
 		}
 	}
@@ -595,15 +627,22 @@ func (n *Node) broadcast(num uint64) {
 	}
 	slot := (b.Timestamp - n.genesisTS) / n.slotSecs
 	root := b.Hash.Hex()
-	msg := fmt.Sprintf("event: block_gossip\ndata: {\"slot\":\"%d\",\"block\":\"%s\"}\n\n", slot, root) +
-		fmt.Sprintf("event: head\ndata: {\"slot\":\"%d\",\"block\":\"%s\",\"epoch_transition\":%t,\"execution_optimistic\":false}\n\n", slot, root, slot%32 == 0) +
-		fmt.Sprintf("event: block\ndata: {\"slot\":\"%d\",\"block\":\"%s\",\"execution_optimistic\":false}\n\n", slot, root)
+	msgs := []sseMessage{
+		{"block_gossip", fmt.Sprintf("event: block_gossip\ndata: {\"slot\":\"%d\",\"block\":\"%s\"}\n\n", slot, root)},
+		{"head", fmt.Sprintf("event: head\ndata: {\"slot\":\"%d\",\"block\":\"%s\",\"epoch_transition\":%t,\"execution_optimistic\":false}\n\n", slot, root, slot%32 == 0)},
+		{"block", fmt.Sprintf("event: block\ndata: {\"slot\":\"%d\",\"block\":\"%s\",\"execution_optimistic\":false}\n\n", slot, root)},
+	}
 	n.subsMu.Lock()
 	defer n.subsMu.Unlock()
-	for _, c := range n.subs {
-		select {
-		case c <- msg:
-		default:
+	for _, s := range n.subs {
+		for _, m := range msgs {
+			if !s.topics[m.topic] {
+				continue
+			}
+			select {
+			case s.ch <- m:
+			default:
+			}
 		}
 	}
 }

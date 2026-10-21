@@ -35,7 +35,10 @@ With a beacon URL it also records the CL's Beacon API events for each slot:
 
 These are post-validation milestones as seen by the probe, not network
 arrival times. When `head` and `block` fire is client-specific: Lighthouse
-emits `head` before `block`, Caplin `block` before `head`.
+emits `head` before `block`, Caplin `block` before `head`. CLs reject the whole
+subscription when any topic is unsupported, so the probe drops topics one at a
+time down to `head` alone. A CL that serves only `head` (Nethermind's embedded
+CL) yields no `block_gossip`, and its pair gets no "CL had the block" split.
 
 **`freshness review`** runs later, offline. It checks every block against a
 separate reference node (the receipts must reproduce the header's receipts

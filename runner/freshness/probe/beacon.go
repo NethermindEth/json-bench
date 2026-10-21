@@ -126,8 +126,9 @@ type sseEvent struct {
 }
 
 // stream follows the SSE event stream until ctx ends, reconnecting after a
-// drop. Some CLs reject block_gossip, so a 4xx on it falls back to the
-// remaining topics.
+// drop. CLs reject the whole request when any topic is unsupported (some lack
+// block_gossip, Nethermind's embedded CL serves only head), so a 4xx drops the
+// last topic and retries, down to head alone.
 func (b *beaconClient) stream(ctx context.Context, out func(sseEvent), onDisconnect func(error)) {
 	topics := []string{"head", "block", "block_gossip"}
 	backoff := time.Second
@@ -136,8 +137,8 @@ func (b *beaconClient) stream(ctx context.Context, out func(sseEvent), onDisconn
 		if ctx.Err() != nil {
 			return
 		}
-		if status >= 400 && status < 500 && len(topics) == 3 {
-			topics = topics[:2]
+		if status >= 400 && status < 500 && len(topics) > 1 {
+			topics = topics[:len(topics)-1]
 			continue
 		}
 		onDisconnect(err)
