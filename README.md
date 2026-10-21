@@ -34,6 +34,9 @@ json-bench/
 │   │   └── example.yaml
 │   ├── compare-openrpc/          # OpenRPC-driven comparison inputs
 │   │   └── param_variations.yaml
+│   ├── freshness/                # `runner freshness` probe/review configs
+│   │   ├── probe.example.yaml
+│   │   └── review.example.yaml
 │   └── storage/                  # Historic storage configuration
 │       ├── storage-example.yaml
 │       └── storage-docker.yaml
@@ -41,7 +44,8 @@ json-bench/
 ├── runner/                   # Go benchmark runner with historic tracking
 │   ├── main.go              # Thin entry point - delegates to cmd.Execute()
 │   ├── cmd/                 # Cobra subcommands (benchmark, api, historic,
-│   │                        #                    compare, compare-openrpc)
+│   │                        #    compare, compare-openrpc, freshness)
+│   ├── freshness/           # Live new-block freshness probe and offline review
 │   ├── api/                 # HTTP API server and WebSocket support
 │   ├── storage/             # PostgreSQL integration
 │   ├── analysis/            # Trend analysis and regression detection
@@ -131,6 +135,7 @@ The `runner` binary exposes its functionality through subcommands. Running
 runner benchmark        Run a benchmark (k6 -> Prometheus -> reports)
 runner compare          One-shot cross-client JSON-RPC response comparison
 runner compare-openrpc  Cross-client comparison driven by an OpenRPC specification
+runner freshness        Measure how soon each EL+CL pair serves correct data for new blocks
 runner api              Start the HTTP API server
 runner historic         Generate a historic-analysis report from PostgreSQL
 ```
@@ -404,6 +409,60 @@ Useful debug aids:
 
 Both `comparison-results.json` and `comparison-report.html` are written
 to `--output`.
+
+### RPC Freshness (new-block race)
+
+`runner freshness` answers: for the same new block, which EL+CL pair lets
+an application read *correct* new state and logs first, measured from the
+block's slot start. Earlier block delivery counts as an advantage; this is
+not a steady-state latency benchmark. It has two modes.
+
+**Probe** runs live, one process per pair, on or next to that pair's host
+(where it runs is the operator's choice and is recorded in the manifest
+together with an idle RTT baseline). Before block N exists it polls
+(default every 10 ms) an EIP-2935 `eth_call` at N, whose correct answer is
+the already-known hash of N−1, and a whole-block `eth_getLogs` at N. It arms
+N+1 as soon as its own node serves N, so it never waits for other pairs.
+The deadline is the block's own slot end (`header.timestamp` + slot
+duration), so a missed slot delays the block without abandoning the target.
+Logs are checked locally against the header bloom and must be stable for
+`logs_stable_polls` responses; zero-log blocks are `not_applicable`.
+
+```bash
+go run ./runner freshness probe --config ./config/freshness/probe.example.yaml
+```
+
+The probe writes `run-manifest.json`, `capabilities.json` (including each
+method's "block unknown" error signature, captured at preflight),
+`events.jsonl`, `targets.jsonl`, `rpc-attempts.jsonl` (outcome transitions
+only; `--record-all-attempts` logs every poll) and `responses/` (each
+distinct canonical answer once). URLs and headers are redacted.
+
+**Review** runs offline against the probe directories and a separate
+reference node. It verifies every block's receipts against the header
+receipts root, derives the expected logs and state answer, and takes each
+probe's earliest matching response, keeping its original receive time.
+Orphaned or unverifiable blocks never count as success. Pairs are joined by
+`(chain_id, block_hash)`; `hold_constant` adds comparison groups such as
+ELs with the CL held constant.
+
+```bash
+go run ./runner freshness review --config ./config/freshness/review.example.yaml
+go run ./runner freshness review --config ./config/freshness/review.example.yaml --offline
+```
+
+`runner/freshness/README.md` explains how the measurement works and what every
+report section and column means.
+
+Reference answers are cached in `reference-data/`, so `--offline`
+regenerates `block-results.jsonl`, `summary.json` and `report.md` without
+any node. The report shows per-pair freshness percentiles, availability by
+deadline, and pairwise wins/ties with their denominators. Observed wins
+compare first correct responses directly; inferred wins use availability
+intervals and call overlaps unresolved. Timeouts, incorrect data, empty
+blocks, late arming, orphaned blocks and clock quality appear next to the
+latencies. For cross-host pairs the tie margin is at least their combined
+clock error.
 
 ### Migrating from the pre-refactor CLI
 

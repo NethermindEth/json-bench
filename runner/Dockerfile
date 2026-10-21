@@ -1,5 +1,5 @@
 # Multi-stage build for Go runner
-FROM golang:1.27.2-alpine AS builder
+FROM golang:1.27.3-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -17,7 +17,7 @@ COPY runner/ ./runner/
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o jsonrpc-bench-runner ./runner
 
 # Build k6 with the same patched toolchain instead of shipping an older prebuilt Go runtime.
-FROM golang:1.27.2-alpine AS k6-builder
+FROM golang:1.27.3-alpine AS k6-builder
 RUN apk add --no-cache git ca-certificates
 RUN git clone --depth 1 --branch v2.3.0 https://github.com/grafana/k6.git /k6 && \
     test "$(git -C /k6 rev-parse HEAD)" = "e0887846143ab176d4b5483c9d52cf3b3e009f1a"
