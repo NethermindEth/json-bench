@@ -1,0 +1,20 @@
+test_name: "Uniswap V3 swap quotes: eth_call vs debug_traceCall prestateTracer (head only)"
+description: "The same 12 QuoterV2 swap quotes (single and multi-hop, 130k-760k gas) as eth_call, as debug_traceCall with prestateTracer, and with prestateTracer disableCode. Equal weights, so per-method latencies compare the same executions. All calls use the latest block tag."
+clients:
+  - nethermind
+duration: "2m"
+rps: 30
+vus: 20
+calls:
+  - name: "eth_call-quotes"
+    file: "./rpc-calls/uniswap-v3-quotes-eth_call-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "prestate-quotes"
+    file: "./rpc-calls/uniswap-v3-quotes-prestate-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "prestate-nocode-quotes"
+    file: "./rpc-calls/uniswap-v3-quotes-prestate-nocode-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
