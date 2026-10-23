@@ -43,7 +43,8 @@ USER root
 # than publishing a vulnerable image.
 RUN apk --no-cache upgrade && \
     apk --no-cache add ca-certificates tzdata curl postgresql-client \
-        'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0'
+        'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0' \
+        'musl>=1.2.6-r3' 'musl-utils>=1.2.6-r3'
 
 WORKDIR /app
 
