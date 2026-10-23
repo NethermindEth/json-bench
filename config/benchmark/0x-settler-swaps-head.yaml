@@ -1,0 +1,32 @@
+test_name: "0x Settler WETH->USDC swaps: eth_call vs debug_traceCall prestateTracer (head only)"
+description: "The six funded Settler swap requests 0x shared (Uniswap V3 and V4, eth_call / prestateTracer / prestateTracer disableCode) with their state overrides, at latest. gasPrice is dropped so the calls stay valid at any base fee, and the Settler runtime code is added as an override so they run on snapshots older than its deployment (block 25,896,070); at a block where it exists the result is identical."
+clients:
+  - nethermind
+duration: "2m"
+rps: 10
+vus: 10
+calls:
+  - name: "v3-eth_call"
+    file: "./rpc-calls/0x-settler-v3-weth-usdc-eth_call-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "v3-prestate"
+    file: "./rpc-calls/0x-settler-v3-weth-usdc-prestate-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "v3-prestate-nocode"
+    file: "./rpc-calls/0x-settler-v3-weth-usdc-prestate-nocode-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "v4-eth_call"
+    file: "./rpc-calls/0x-settler-v4-weth-usdc-eth_call-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "v4-prestate"
+    file: "./rpc-calls/0x-settler-v4-weth-usdc-prestate-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
+  - name: "v4-prestate-nocode"
+    file: "./rpc-calls/0x-settler-v4-weth-usdc-prestate-nocode-latest.jsonl"
+    file_type: "jsonl"
+    weight: 1
