@@ -1,0 +1,23 @@
+test_name: "Archive mixed load"
+description: "The archive proof, state-read and eth_call corpora mixed by weight, for capacity at a fixed offered rate on a mainnet archive. Block tracing is left out: one cold trace costs more than thousands of the other requests, so it would decide the result on its own."
+clients:
+  - nethermind
+duration: "300s"
+rps: 100
+vus: 32
+calls:
+  - name: "eth_getProof"
+    file: "./rpc-calls/archive/proofs-random.jsonl"
+    file_type: "jsonl"
+    weight: 20
+    thresholds: ["p(99)<600000"]
+  - name: "state reads"
+    file: "./rpc-calls/archive/state-reads.jsonl"
+    file_type: "jsonl"
+    weight: 40
+    thresholds: ["p(99)<600000"]
+  - name: "eth_call"
+    file: "./rpc-calls/archive/calls.jsonl"
+    file_type: "jsonl"
+    weight: 40
+    thresholds: ["p(99)<600000"]
