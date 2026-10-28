@@ -1,0 +1,277 @@
+{
+  "test_name": "PREFLIGHT ONLY - mainnet log history qualification, NOT performance comparison",
+  "description": "16 public filters. Initial baseline-only run is coverage preflight, NOT a performance comparison. Reject RPC errors or empty positive filters before A/B. No cold-cache claim.",
+  "duration": "5s",
+  "rps": 1,
+  "vus": 4,
+  "seed": 11990,
+  "calls": [
+    {
+      "name": "22m-empty-zero-256",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb081",
+          "toBlock": "0x14fb180",
+          "address": "0x0000000000000000000000000000000000000000",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22m-weth-transfer-1",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb180",
+          "toBlock": "0x14fb180",
+          "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22m-usdc-transfer-32",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb161",
+          "toBlock": "0x14fb180",
+          "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22m-weth-transfer-128",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb101",
+          "toBlock": "0x14fb180",
+          "address": [
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+          ],
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22m-erc1155-single-256",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb081",
+          "toBlock": "0x14fb180",
+          "topics": [
+            "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22m-topic-or-32",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb161",
+          "toBlock": "0x14fb180",
+          "topics": [
+            [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+              "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
+            ]
+          ],
+          "address": [
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22m-address-array-32",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb161",
+          "toBlock": "0x14fb180",
+          "address": [
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+          ],
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22m-dense-unfiltered-1",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x14fb180",
+          "toBlock": "0x14fb180"
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-empty-zero-256",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f0ed",
+          "toBlock": "0x184f1ec",
+          "address": "0x0000000000000000000000000000000000000000",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-weth-transfer-1",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f1ec",
+          "toBlock": "0x184f1ec",
+          "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-usdc-transfer-32",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f1cd",
+          "toBlock": "0x184f1ec",
+          "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-weth-transfer-128",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f16d",
+          "toBlock": "0x184f1ec",
+          "address": [
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+          ],
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-erc1155-single-256",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f0ed",
+          "toBlock": "0x184f1ec",
+          "topics": [
+            "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-topic-or-32",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f1cd",
+          "toBlock": "0x184f1ec",
+          "topics": [
+            [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+              "0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62"
+            ]
+          ],
+          "address": [
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-address-array-32",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f1cd",
+          "toBlock": "0x184f1ec",
+          "address": [
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+          ],
+          "topics": [
+            "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot-tail-dense-unfiltered-1",
+      "method": "eth_getLogs",
+      "weight": 1,
+      "params": [
+        {
+          "fromBlock": "0x184f1ec",
+          "toBlock": "0x184f1ec"
+        }
+      ]
+    },
+    {
+      "name": "identity-chain-id",
+      "method": "eth_chainId",
+      "params": [],
+      "weight": 1
+    },
+    {
+      "name": "identity-current-head",
+      "method": "eth_getBlockByNumber",
+      "params": [
+        "latest",
+        false
+      ],
+      "weight": 1
+    }
+  ]
+}
