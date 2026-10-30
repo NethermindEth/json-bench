@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -21,8 +23,15 @@ const DefaultDiffOnlyMaxResponseBytes = 4096
 
 // ComparisonResult represents the result of comparing responses from different clients
 type ComparisonResult struct {
-	Method          string                 `json:"method"`
-	Params          []interface{}          `json:"params"`
+	Method string        `json:"method"`
+	Params []interface{} `json:"params"`
+	// RPCMethod is the wire-level method Method resolves to (eth_call for
+	// eth_call_variant1), so a reader does not have to strip the suffix a
+	// loader invented. RequestID identifies this request across tools — see
+	// RequestID; it is computed from the params as supplied, before any block
+	// override rewrites them, so it matches the corpus line the call came from.
+	RPCMethod       string                 `json:"rpc_method"`
+	RequestID       string                 `json:"request_id"`
 	Timestamp       string                 `json:"timestamp"`
 	Responses       map[string]interface{} `json:"responses"`
 	Differences     map[string]interface{} `json:"differences"`
@@ -100,6 +109,20 @@ type ComparisonConfig struct {
 	// SkipAboveHead skips calls pinned to a numeric block above the lowest
 	// client head.
 	SkipAboveHead bool `json:"skip_above_head,omitempty"`
+
+	// StrictResponseComparison turns off the comparator's implicit
+	// normalizations, for callers replaying one client against another where
+	// any byte of difference is a finding (see --strict-response-comparison):
+	// "0x" stops being equal to an all-zero hex string, JSON numbers are
+	// compared by their literal digits instead of through float64, and a
+	// block override never injects a range into an eth_getLogs filter that
+	// already addresses a block by hash.
+	StrictResponseComparison bool `json:"strict_response_comparison,omitempty"`
+
+	// Scenarios are run after Methods are queued, each as one unit of work
+	// whose steps run in order on every client (scenario.go). Only the corpus
+	// loader produces them.
+	Scenarios []ScenarioCall `json:"-"`
 }
 
 // Comparator handles comparing responses between different Ethereum clients
@@ -114,15 +137,31 @@ type Comparator struct {
 	mutex       sync.Mutex
 	results     []ComparisonResult
 	skipped     []skippedCall
-	verbose     bool
+	// wireTransforms holds one entry per call the block override rewrote,
+	// guarded by mutex like results.
+	wireTransforms []wireTransform
+	verbose        bool
+}
+
+// wireTransform records a call whose params the block override rewrote: the
+// form the caller supplied and the form the transport actually sent. The
+// result artifact carries the original params, so without this the effective
+// request -- the one the answers belong to -- is not recorded anywhere.
+type wireTransform struct {
+	Method          string        `json:"method"`
+	RPCMethod       string        `json:"rpc_method"`
+	OriginalParams  []interface{} `json:"original_params"`
+	EffectiveParams []interface{} `json:"effective_params"`
 }
 
 // skippedCall records a call omitted because it pins to a block above the
 // lowest client head (see --skip-above-head).
 type skippedCall struct {
-	Method string `json:"method"`
-	Reason string `json:"reason"`
-	Block  string `json:"block,omitempty"`
+	Method    string `json:"method"`
+	RPCMethod string `json:"rpc_method"`
+	RequestID string `json:"request_id"`
+	Reason    string `json:"reason"`
+	Block     string `json:"block,omitempty"`
 }
 
 // NewComparator creates a new response comparator
@@ -186,12 +225,6 @@ func (c *Comparator) transport(client *types.ClientConfig) *rpcTransport {
 
 // CompareResponses compares responses from different clients for a specific method and parameters
 func (c *Comparator) CompareResponses(method string, params []interface{}) (*ComparisonResult, error) {
-	responses := make(map[string]interface{})
-	schemaErrors := make(map[string][]string)
-	transportErrors := make(map[string]string)
-	transportErrorClass := make(map[string]string)
-	errorClass := make(map[string]string)
-
 	// Recover the real JSON-RPC method name from the identifier; loaders set
 	// MethodRPCNames to point each identifier (e.g. eth_call_variant1) at the
 	// wire-level method (eth_call). Fall back to the identifier itself so
@@ -203,19 +236,76 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 
 	callParams := params
 	if c.config.BlockOverride != "" {
-		callParams = applyBlockOverride(rpcMethod, params, c.config.BlockOverride)
+		callParams = applyBlockOverride(rpcMethod, params, c.config.BlockOverride, c.config.StrictResponseComparison)
+		c.recordWireTransform(method, rpcMethod, params, callParams)
 	}
+
+	requestID, idErr := RequestID(rpcMethod, params)
+	if idErr != nil {
+		log.Printf("warning: no request identity for %s: %v", method, idErr)
+	}
+	result, err := c.compareCall(callSpec{
+		method:    method,
+		rpcMethod: rpcMethod,
+		params:    params,
+		requestID: requestID,
+		paramsFor: func(*types.ClientConfig) ([]interface{}, error) { return callParams, nil },
+	})
+	if err != nil {
+		return nil, err
+	}
+	c.saveResult(result)
+	return result, nil
+}
+
+// callSpec is one call as compareCall sends it. paramsFor gives the params each
+// client is sent: the same for every client on an ordinary call, and the
+// client's own resolution of the $ref tokens on a scenario step. An error from
+// paramsFor means the call is not sent to that client and is recorded as a
+// failure of the run, never as a difference.
+type callSpec struct {
+	method    string
+	rpcMethod string
+	params    []interface{}
+	requestID string
+	paramsFor func(*types.ClientConfig) ([]interface{}, error)
+	// opaque compares the result as a handle (opaqueResponse), not a value.
+	opaque bool
+	// onAnswer, when set, is told each client's response as it arrives.
+	onAnswer func(client *types.ClientConfig, response map[string]interface{})
+	metadata map[string]interface{}
+}
+
+// compareCall sends one call to every client and compares the answers. It
+// does not store the result; the caller does, so a scenario can attach what
+// it knows first.
+func (c *Comparator) compareCall(spec callSpec) (*ComparisonResult, error) {
+	responses := make(map[string]interface{})
+	schemaErrors := make(map[string][]string)
+	transportErrors := make(map[string]string)
+	transportErrorClass := make(map[string]string)
+	errorClass := make(map[string]string)
+	rpcMethod := spec.rpcMethod
 
 	// Make JSON-RPC calls to all clients. A transport failure for one client is
 	// recorded and the run continues, so one bad endpoint never aborts the run;
 	// this call is then reported as incomplete rather than compared.
 	answered := make([]*types.ClientConfig, 0, len(c.config.Clients))
 	for _, client := range c.config.Clients {
+		callParams, err := spec.paramsFor(client)
+		if err != nil {
+			transportErrors[client.Name] = err.Error()
+			transportErrorClass[client.Name] = TransportScenarioRef
+			continue
+		}
 		response, err := c.transport(client).call(rpcMethod, callParams)
 		if err != nil {
 			transportErrors[client.Name] = err.Error()
 			transportErrorClass[client.Name] = classifyTransportError(err)
 			continue
+		}
+		if spec.onAnswer != nil {
+			spec.onAnswer(client, response)
 		}
 
 		responses[client.Name] = response
@@ -245,10 +335,16 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 	differences := make(map[string]interface{})
 	if len(transportErrors) == 0 && len(answered) >= 2 {
 		refResponse := responses[c.config.Clients[0].Name].(map[string]interface{})
-		ctx := newDiffContext(rpcMethod, c.config.Rules)
+		if spec.opaque {
+			refResponse = opaqueResponse(refResponse)
+		}
+		ctx := newDiffContextStrict(rpcMethod, c.config.Rules, c.config.StrictResponseComparison)
 
 		for _, client := range answered[1:] {
 			clientResponse := responses[client.Name].(map[string]interface{})
+			if spec.opaque {
+				clientResponse = opaqueResponse(clientResponse)
+			}
 			diff, err := compareJSONRPCResponses(ctx, refResponse, clientResponse)
 			if err != nil {
 				return nil, fmt.Errorf("failed to compare responses: %w", err)
@@ -260,10 +356,17 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 		}
 	}
 
-	// Create comparison result
-	result := &ComparisonResult{
-		Method:              method,
-		Params:              params,
+	metadata := map[string]interface{}{
+		"clients": c.config.Clients,
+	}
+	for k, v := range spec.metadata {
+		metadata[k] = v
+	}
+	return &ComparisonResult{
+		Method:              spec.method,
+		Params:              spec.params,
+		RPCMethod:           rpcMethod,
+		RequestID:           spec.requestID,
 		Timestamp:           time.Now().Format(time.RFC3339),
 		Responses:           responses,
 		Differences:         differences,
@@ -271,17 +374,15 @@ func (c *Comparator) CompareResponses(method string, params []interface{}) (*Com
 		TransportErrors:     transportErrors,
 		TransportErrorClass: transportErrorClass,
 		ErrorClass:          errorClass,
-		Metadata: map[string]interface{}{
-			"clients": c.config.Clients,
-		},
-	}
+		Metadata:            metadata,
+	}, nil
+}
 
-	// Save result
+// saveResult appends a finished result to the run's results.
+func (c *Comparator) saveResult(result *ComparisonResult) {
 	c.mutex.Lock()
 	c.results = append(c.results, *result)
 	c.mutex.Unlock()
-
-	return result, nil
 }
 
 // retryParams resolves the retry budget: an explicit config value (from the
@@ -355,7 +456,7 @@ func (c *Comparator) VerifyNetworkConsistency() error {
 func (c *Comparator) RunComparisons() ([]ComparisonResult, error) {
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, c.config.Concurrency)
-	errCh := make(chan error, len(c.config.Methods))
+	errCh := make(chan error, len(c.config.Methods)+len(c.config.Scenarios))
 
 	for _, method := range c.config.Methods {
 		// Loaders populate CustomParameters for every identifier they emit;
@@ -380,6 +481,23 @@ func (c *Comparator) RunComparisons() ([]ComparisonResult, error) {
 				errCh <- fmt.Errorf("comparison failed for %s: %w", method, err)
 			}
 		}(method, params)
+	}
+
+	// A scenario is one unit of work: its steps share a goroutine, so they
+	// reach every client in order, while different scenarios run as
+	// concurrently as single calls do.
+	for i := range c.config.Scenarios {
+		wg.Add(1)
+		go func(scenario ScenarioCall) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			if err := c.runScenario(scenario); err != nil {
+				errCh <- fmt.Errorf("scenario %s failed: %w", scenario.Label, err)
+			}
+		}(c.config.Scenarios[i])
 	}
 
 	// Wait for all comparisons to complete
@@ -442,10 +560,20 @@ func (c *Comparator) applySkipAboveHead() error {
 		}
 		block, ok := pinnedBlock(rpcMethod, c.config.CustomParameters[method])
 		if ok && block > lowestHead {
+			// The identity is recorded here, where the params are still to
+			// hand: a skipped call is exactly the one a consumer must be able
+			// to name against its approved-omission list, and the result
+			// document it is absent from cannot name it.
+			id, idErr := RequestID(rpcMethod, c.config.CustomParameters[method])
+			if idErr != nil {
+				log.Printf("warning: no request identity for skipped call %s: %v", method, idErr)
+			}
 			c.skipped = append(c.skipped, skippedCall{
-				Method: method,
-				Reason: "pinned block above lowest client head",
-				Block:  fmt.Sprintf("0x%x", block),
+				Method:    method,
+				RPCMethod: rpcMethod,
+				RequestID: id,
+				Reason:    "pinned block above lowest client head",
+				Block:     fmt.Sprintf("0x%x", block),
 			})
 			continue
 		}
@@ -697,6 +825,40 @@ func (c *Comparator) HasEnvDifferences() bool {
 	return false
 }
 
+// recordWireTransform notes a call whose effective params differ from the ones
+// it was given. Calls the override left alone are not recorded, so the list is
+// the set of requests that changed on the way to the wire.
+func (c *Comparator) recordWireTransform(method, rpcMethod string, original, effective []interface{}) {
+	if reflect.DeepEqual(original, effective) {
+		return
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.wireTransforms = append(c.wireTransforms, wireTransform{
+		Method:          method,
+		RPCMethod:       rpcMethod,
+		OriginalParams:  original,
+		EffectiveParams: effective,
+	})
+}
+
+// sortedWireTransforms returns the recorded transforms in a stable order;
+// calls run concurrently, so the recording order is not reproducible.
+func (c *Comparator) sortedWireTransforms() []wireTransform {
+	c.mutex.Lock()
+	out := append([]wireTransform(nil), c.wireTransforms...)
+	c.mutex.Unlock()
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Method != out[j].Method {
+			return out[i].Method < out[j].Method
+		}
+		a, _ := json.Marshal(out[i].OriginalParams)
+		b, _ := json.Marshal(out[j].OriginalParams)
+		return string(a) < string(b)
+	})
+	return out
+}
+
 // Provenance returns the effective comparison configuration so a report is
 // self-describing and reproducible.
 func (c *Comparator) Provenance() map[string]interface{} {
@@ -719,8 +881,14 @@ func (c *Comparator) Provenance() map[string]interface{} {
 		"omit_matching_responses": c.config.OmitMatchingResponses,
 		"max_response_bytes":      c.config.MaxResponseBytes,
 		"skip_above_head":         c.config.SkipAboveHead,
-		"call_count":              len(c.config.Methods),
+		"call_count":              len(c.config.Methods) + scenarioStepCount(c.config.Scenarios),
 		"skipped":                 c.skipped,
+
+		// The strict flag and what it changed on the wire. wire_transformations
+		// is empty when no block override applied, or when every call already
+		// carried the block it was pinned to.
+		"strict_response_comparison": c.config.StrictResponseComparison,
+		"wire_transformations":       c.sortedWireTransforms(),
 	}
 }
 

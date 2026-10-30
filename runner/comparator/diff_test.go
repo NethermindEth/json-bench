@@ -1,6 +1,8 @@
 package comparator
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -243,5 +245,154 @@ func TestClassifyError(t *testing.T) {
 	}
 	if got := classifyError(resultResp("0x1")); got != "" {
 		t.Errorf("classifyError on result response = %q, want empty", got)
+	}
+}
+
+// TestStrictZeroHexEquivalence pins the difference strict mode restores: a
+// client that answers with the bare "0x" and one that answers with an
+// all-zero hex string are not saying the same thing, and no rule could switch
+// the built-in equivalence off.
+func TestStrictZeroHexEquivalence(t *testing.T) {
+	pairs := []struct{ a, b string }{
+		{"0x", "0x0"},
+		{"0x", "0x00"},
+		{"0x", "0x" + strings.Repeat("00", 32)},
+		{"0x0", "0x"},
+	}
+	for _, p := range pairs {
+		t.Run(p.a+" vs "+p.b, func(t *testing.T) {
+			loose, err := deepCompare(newDiffContext("eth_call", nil), "result", p.a, p.b)
+			if err != nil {
+				t.Fatalf("deepCompare: %v", err)
+			}
+			if len(loose) != 0 {
+				t.Errorf("the default must keep treating these as equal, got %v", loose)
+			}
+
+			strict, err := deepCompare(newDiffContextStrict("eth_call", nil, true), "result", p.a, p.b)
+			if err != nil {
+				t.Fatalf("deepCompare: %v", err)
+			}
+			if len(strict) != 1 || strict[0].Type != DiffTypeValueMismatch {
+				t.Errorf("strict must report a value mismatch, got %v", strict)
+			}
+		})
+	}
+}
+
+// TestStrictZeroHexInErrorData covers the same equivalence inside error.data,
+// which reaches deepCompare through the error branch rather than the result
+// branch and so has to be checked separately.
+func TestStrictZeroHexInErrorData(t *testing.T) {
+	revert := func(data string) map[string]interface{} {
+		return map[string]interface{}{"jsonrpc": "2.0", "id": 1, "error": map[string]interface{}{
+			"code": float64(3), "message": "execution reverted", "data": data,
+		}}
+	}
+
+	loose, err := compareJSONRPCResponses(newDiffContext("eth_call", nil), revert("0x"), revert("0x00"))
+	if err != nil {
+		t.Fatalf("compareJSONRPCResponses: %v", err)
+	}
+	if len(loose) != 0 {
+		t.Errorf("the default must keep treating these as equal, got %v", loose)
+	}
+
+	strict, err := compareJSONRPCResponses(newDiffContextStrict("eth_call", nil, true), revert("0x"), revert("0x00"))
+	if err != nil {
+		t.Fatalf("compareJSONRPCResponses: %v", err)
+	}
+	if _, ok := strict["error_differences"]; !ok {
+		t.Errorf("strict must report an error difference, got %v", strict)
+	}
+}
+
+// TestStrictKeepsExplicitRules proves strictness only removes implicit
+// behaviour: a numeric_tolerance rule still applies, and an ignore rule still
+// drops its path, under both modes.
+func TestStrictKeepsExplicitRules(t *testing.T) {
+	tolerance := []ComparisonRule{{Method: "eth_estimateGas", Path: "result", Kind: RuleNumericTolerance, Abs: 32}}
+	diffs, err := deepCompare(newDiffContextStrict("eth_estimateGas", tolerance, true), "result", "0x5b9c", "0x5b9f")
+	if err != nil {
+		t.Fatalf("deepCompare: %v", err)
+	}
+	if len(diffs) != 0 {
+		t.Errorf("an explicit tolerance must still apply under strict, got %v", diffs)
+	}
+
+	ignore := []ComparisonRule{{Method: "eth_call", Path: "result", Kind: RuleIgnore}}
+	diffs, err = deepCompare(newDiffContextStrict("eth_call", ignore, true), "result", "0xaa", "0xbb")
+	if err != nil {
+		t.Fatalf("deepCompare: %v", err)
+	}
+	if len(diffs) != 0 {
+		t.Errorf("an explicit ignore must still apply under strict, got %v", diffs)
+	}
+}
+
+// TestExactIntegerComparison covers the second hidden equivalence: JSON
+// numbers decoded into interface{} land on float64, whose 53-bit mantissa
+// makes two different integers above 2**53 compare equal. Strict mode decodes
+// with UseNumber, so the literal digits decide.
+func TestExactIntegerComparison(t *testing.T) {
+	const a, b = "12345678901234567890", "12345678901234567891"
+
+	asFloat := func(s string) float64 {
+		var f float64
+		if err := json.Unmarshal([]byte(s), &f); err != nil {
+			t.Fatalf("unmarshal %s: %v", s, err)
+		}
+		return f
+	}
+	if asFloat(a) != asFloat(b) {
+		t.Fatalf("premise broken: %s and %s no longer collide as float64", a, b)
+	}
+
+	ctx := newDiffContext("eth_call", nil)
+	diffs, err := deepCompare(ctx, "result", asFloat(a), asFloat(b))
+	if err != nil {
+		t.Fatalf("deepCompare: %v", err)
+	}
+	if len(diffs) != 0 {
+		t.Errorf("float64 decoding is expected to hide this by default, got %v", diffs)
+	}
+
+	strictCtx := newDiffContextStrict("eth_call", nil, true)
+	diffs, err = deepCompare(strictCtx, "result", json.Number(a), json.Number(b))
+	if err != nil {
+		t.Fatalf("deepCompare: %v", err)
+	}
+	if len(diffs) != 1 || diffs[0].Type != DiffTypeValueMismatch {
+		t.Errorf("strict must report a value mismatch, got %v", diffs)
+	}
+
+	same, err := deepCompare(strictCtx, "result", json.Number(a), json.Number(a))
+	if err != nil {
+		t.Fatalf("deepCompare: %v", err)
+	}
+	if len(same) != 0 {
+		t.Errorf("equal numbers must not differ, got %v", same)
+	}
+}
+
+// TestNumericCode reads the JSON-RPC error code in both decoded shapes: an
+// error classified as code 0 would silently leave every strict-mode run's
+// env/real difference split wrong.
+func TestNumericCode(t *testing.T) {
+	for _, v := range []interface{}{float64(-32002), json.Number("-32002")} {
+		got, ok := numericCode(v)
+		if !ok || got != -32002 {
+			t.Errorf("numericCode(%#v) = %d,%v; want -32002,true", v, got, ok)
+		}
+	}
+	if _, ok := numericCode("-32002"); ok {
+		t.Error("a string code must not be read as a number")
+	}
+
+	strictErr := map[string]interface{}{"jsonrpc": "2.0", "id": 1, "error": map[string]interface{}{
+		"code": json.Number("-32002"), "message": "No state available",
+	}}
+	if got := classifyError(strictErr); got != ClassNoState {
+		t.Errorf("classifyError with a json.Number code = %q, want %q", got, ClassNoState)
 	}
 }

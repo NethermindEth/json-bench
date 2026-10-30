@@ -155,14 +155,22 @@ func deepCompare(ctx *diffContext, path string, val1, val2 interface{}) ([]DiffE
 	case []interface{}:
 		return compareArrays(ctx, path, val1.([]interface{}), val2.([]interface{}))
 
-	case string, float64, bool, int, int64:
-		// Special case for Ethereum hex strings: treat 0x and 0x0000...0000 as equal
+	case string, float64, bool, int, int64, json.Number:
+		// json.Number lands here rather than in the default branch so that two
+		// integers above 2**53 that differ are compared by their literal
+		// digits. It is a distinct named type, so the string assertions below
+		// do not fire for it and the hex paths are unreachable from a number.
 		if str1, ok1 := val1.(string); ok1 {
 			if str2, ok2 := val2.(string); ok2 {
 				// Check if both are hex strings
 				if strings.HasPrefix(str1, "0x") && strings.HasPrefix(str2, "0x") {
-					// Check if one is 0x and the other is a zero-value hex string
-					if (str1 == "0x" && isZeroHex(str2)) || (str2 == "0x" && isZeroHex(str1)) {
+					// Special case for Ethereum hex strings: treat 0x and
+					// 0x0000...0000 as equal. A client that omits a value and
+					// one that returns it as zero are not the same answer, so
+					// strict mode does not apply the equivalence -- neither in
+					// result nor inside error.data, which reaches this branch
+					// through the same path.
+					if !ctx.strict && ((str1 == "0x" && isZeroHex(str2)) || (str2 == "0x" && isZeroHex(str1))) {
 						// Consider them equal
 						return nil, nil
 					}

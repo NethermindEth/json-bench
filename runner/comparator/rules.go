@@ -1,6 +1,7 @@
 package comparator
 
 import (
+	"encoding/json"
 	"math/big"
 	"regexp"
 	"strings"
@@ -53,6 +54,9 @@ const defaultEstimateGasRelTolerance = 0.10
 type diffContext struct {
 	method string
 	rules  *ruleSet
+	// strict drops the comparator's implicit normalizations; see
+	// ComparisonConfig.StrictResponseComparison.
+	strict bool
 }
 
 type compiledRule struct {
@@ -70,6 +74,13 @@ type ruleSet struct {
 // newDiffContext filters the config rules down to those that apply to method
 // and injects the built-in eth_estimateGas tolerance when none is configured.
 func newDiffContext(method string, rules []ComparisonRule) *diffContext {
+	return newDiffContextStrict(method, rules, false)
+}
+
+// newDiffContextStrict is newDiffContext with the strict response comparison
+// mode selectable. Rule handling is identical in both modes: strictness
+// removes implicit equivalences, never an explicitly configured rule.
+func newDiffContextStrict(method string, rules []ComparisonRule, strict bool) *diffContext {
 	applicable := make([]ComparisonRule, 0, len(rules)+1)
 	hasEstimateGasTolerance := false
 	for _, r := range rules {
@@ -89,7 +100,7 @@ func newDiffContext(method string, rules []ComparisonRule) *diffContext {
 			Rel:    defaultEstimateGasRelTolerance,
 		})
 	}
-	return &diffContext{method: method, rules: compileRuleSet(applicable)}
+	return &diffContext{method: method, rules: compileRuleSet(applicable), strict: strict}
 }
 
 func compileRuleSet(rules []ComparisonRule) *ruleSet {
@@ -197,11 +208,26 @@ func errorCode(errVal interface{}) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	code, ok := m["code"].(float64)
-	if !ok {
+	return numericCode(m["code"])
+}
+
+// numericCode reads a JSON-RPC error code out of a decoded response. The
+// number is a float64 by default and a json.Number under strict response
+// comparison (which decodes with UseNumber), so both shapes must be read here
+// or every strict-mode error would classify as code 0.
+func numericCode(v interface{}) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int(n), true
+	case json.Number:
+		i, err := n.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(i), true
+	default:
 		return 0, false
 	}
-	return int(code), true
 }
 
 // Environment/capability classes returned by classifyError.
@@ -246,8 +272,8 @@ func classifyError(resp map[string]interface{}) string {
 		return ""
 	}
 	code := 0
-	if f, ok := e["code"].(float64); ok {
-		code = int(f)
+	if n, ok := numericCode(e["code"]); ok {
+		code = n
 	}
 	msg, _ := e["message"].(string)
 	lower := strings.ToLower(msg)
