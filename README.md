@@ -341,6 +341,39 @@ override, not by the list: it is kept only when `--block-override` (or the
 rules file) pins its `newestBlock`. The effective policy is recorded in
 `corpus-load-report.json` under `policy`.
 
+A line may also hold a **scenario**: calls that only mean something in order
+on one node, such as a filter's lifecycle.
+
+```json
+{"scenario":"log_filter","steps":[
+  {"method":"eth_newFilter","params":[{"fromBlock":"0x10","toBlock":"0x1f"}]},
+  {"method":"eth_getFilterLogs","params":[{"$ref":0}]},
+  {"method":"eth_uninstallFilter","params":[{"$ref":0}]}]}
+```
+
+Each node runs the steps in order, and `{"$ref": N}` anywhere in a later
+step's params is replaced by *that node's* result of step N, so one node is
+never asked about a filter id the other handed out. A step whose result is
+referenced is compared as an opaque handle: the nodes agree when both answered
+a result of the same JSON kind, whatever its value. Every step is compared and
+reported as a call of its own (`scenario:<label>_variant<k>#<step>`), carrying
+its scenario and position in `metadata` and each node's resolved params in
+`metadata.effective_params`; the block override applies to each step's
+resolved params. A step a node cannot be sent because the step it references
+answered no result there is a transport error of class
+`scenario_ref_unresolved` — never a difference, and never skipped. Exclusions
+drop a whole scenario when they name any of its steps, and `--sample N` keeps
+at most N scenarios per label. Different scenarios run as concurrently as
+single calls; one scenario's steps never interleave.
+
+A scenario step's `request_id` is `RequestID(method, [scenario_id, index,
+params])`, where `scenario_id` is `RequestID("scenario", [{method, params}, …])`
+over the steps as written — the step's params alone would collide across
+scenarios. The load report counts every step as an entry and a call, and names
+each with `scenario`, `scenario_id` and `step`; a file report gains a
+`scenarios` count. A corpus without scenarios loads, and reports, exactly as
+before.
+
 A corpus tree usually holds files that are not corpora — generator inputs,
 benchmark scenarios. Those are skipped with a warning naming each file and its
 reason, and the run continues; the load ends with a line stating how many calls

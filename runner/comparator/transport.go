@@ -31,6 +31,11 @@ const (
 	TransportTruncated = "truncated_body"
 	// TransportOther covers every other transport failure.
 	TransportOther = "other"
+	// TransportScenarioRef means a scenario step was never sent to the client
+	// because a $ref in its params named an earlier step that client answered
+	// without a result. It is not a network fault, but like one it leaves the
+	// call uncompared, which is what a fail-closed consumer must see.
+	TransportScenarioRef = "scenario_ref_unresolved"
 )
 
 // maxRetryDelay caps both the exponential backoff and a server-supplied

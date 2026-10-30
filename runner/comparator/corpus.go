@@ -27,6 +27,37 @@ var corpusPinnable = map[string]struct{}{
 type corpusEntry struct {
 	Method string        `json:"method"`
 	Params []interface{} `json:"params"`
+
+	// Scenario and Steps are set instead of Method and Params on a scenario
+	// line (scenario.go). opaque is filled in by readCorpusFile.
+	Scenario string         `json:"scenario"`
+	Steps    []ScenarioStep `json:"steps"`
+	opaque   []bool
+}
+
+// isScenario reports whether the entry is a scenario line.
+func (e corpusEntry) isScenario() bool {
+	return e.Scenario != "" || e.Steps != nil
+}
+
+// calls is how many calls the entry stands for: one, or one per step.
+func (e corpusEntry) calls() int {
+	if e.isScenario() {
+		return len(e.Steps)
+	}
+	return 1
+}
+
+// corpusScenario is one loaded scenario on its way to selection, the scenario
+// counterpart of corpusCall.
+type corpusScenario struct {
+	Label      string
+	Steps      []ScenarioStep
+	Opaque     []bool
+	Path       string
+	ScenarioID string
+	StepIDs    []string
+	IDError    string
 }
 
 // corpusCall is one loaded call on its way to selection: the params, the file
@@ -52,12 +83,16 @@ type CorpusSkip struct {
 // method appears here with its entries counted as Unnamed, *and* in Skips with
 // the reason — the two answer different questions, and an entry that was read
 // has to be counted whatever the file turned out to be.
+//
+// A scenario line counts once per step in Entries, Excluded and Loaded, because
+// every step is a call the run has to account for; Scenarios counts the lines.
 type CorpusFileReport struct {
-	Path     string `json:"path"`
-	Entries  int    `json:"entries"`
-	Unnamed  int    `json:"unnamed"`
-	Excluded int    `json:"excluded"`
-	Loaded   int    `json:"loaded"`
+	Path      string `json:"path"`
+	Entries   int    `json:"entries"`
+	Unnamed   int    `json:"unnamed"`
+	Excluded  int    `json:"excluded"`
+	Loaded    int    `json:"loaded"`
+	Scenarios int    `json:"scenarios,omitempty"`
 }
 
 // CorpusRequest names one request by its identity (see RequestID) rather than
@@ -67,12 +102,18 @@ type CorpusFileReport struct {
 // IdentityError is set, and RequestID empty, only when the params could not be
 // canonicalized at all. It is recorded rather than swallowed: an unidentifiable
 // request must be visible to whatever is reconciling the run.
+//
+// A scenario step also carries its scenario's label and identity and its
+// position in it; RequestID is then the step identity (ScenarioStepID).
 type CorpusRequest struct {
 	RequestID     string `json:"request_id"`
 	Method        string `json:"method"`
 	CallID        string `json:"call_id,omitempty"`
 	Path          string `json:"path"`
 	IdentityError string `json:"identity_error,omitempty"`
+	Scenario      string `json:"scenario,omitempty"`
+	ScenarioID    string `json:"scenario_id,omitempty"`
+	Step          *int   `json:"step,omitempty"`
 }
 
 // CorpusReport describes what a corpus load actually ingested. Excluded counts
@@ -162,15 +203,36 @@ func LoadCorpusConfigWithExclusions(dir string, sample int, seed int64, blockOve
 	}
 	byMethod := make(map[string][]corpusCall)
 	order := make([]string, 0)
+	byLabel := make(map[string][]corpusScenario)
+	labels := make([]string, 0)
 	for _, file := range files {
 		entries, err := readCorpusFile(walkRoot, file)
 		if err != nil {
 			report.Skips = append(report.Skips, CorpusSkip{Path: file, Reason: err.Error()})
 			continue
 		}
-		fileReport := CorpusFileReport{Path: file, Entries: len(entries)}
+		fileReport := CorpusFileReport{Path: file}
+		for _, entry := range entries {
+			fileReport.Entries += entry.calls()
+		}
 		used, named := 0, 0
 		for _, entry := range entries {
+			if entry.isScenario() {
+				named++
+				fileReport.Scenarios++
+				scenario := loadScenario(file, entry)
+				if scenarioExcluded(exclusions, entry.Steps, keepPinnable) {
+					fileReport.Excluded += len(entry.Steps)
+					report.ExcludedRequests = append(report.ExcludedRequests, scenario.requests("")...)
+					continue
+				}
+				if _, seen := byLabel[entry.Scenario]; !seen {
+					labels = append(labels, entry.Scenario)
+				}
+				byLabel[entry.Scenario] = append(byLabel[entry.Scenario], scenario)
+				used += len(entry.Steps)
+				continue
+			}
 			if entry.Method == "" {
 				fileReport.Unnamed++
 				continue
@@ -220,10 +282,11 @@ func LoadCorpusConfigWithExclusions(dir string, sample int, seed int64, blockOve
 		report.Entries += used
 	}
 
-	if len(order) == 0 {
+	if len(order) == 0 && len(labels) == 0 {
 		return nil, report, fmt.Errorf("corpus in %s contained no usable calls after exclusions (%d of %d files skipped)", dir, len(report.Skips), len(files))
 	}
 	sort.Strings(order)
+	sort.Strings(labels)
 
 	rng := rand.New(rand.NewSource(seed))
 	cfg := &ComparisonConfig{
@@ -259,7 +322,92 @@ func LoadCorpusConfigWithExclusions(dir string, sample int, seed int64, blockOve
 		}
 	}
 
+	// Scenarios are sampled after every method, as whole units per label, so
+	// a corpus without them draws exactly the selection it always did.
+	for _, label := range labels {
+		chosen, dropped := sampleScenarios(byLabel[label], sample, rng)
+		for i, scenario := range chosen {
+			callPrefix := fmt.Sprintf("scenario:%s_variant%d", label, i+1)
+			call := ScenarioCall{
+				Label:      label,
+				ScenarioID: scenario.ScenarioID,
+				Steps:      scenario.Steps,
+				StepIDs:    scenario.StepIDs,
+				Opaque:     scenario.Opaque,
+			}
+			for step := range scenario.Steps {
+				call.CallIDs = append(call.CallIDs, fmt.Sprintf("%s#%d", callPrefix, step))
+			}
+			cfg.Scenarios = append(cfg.Scenarios, call)
+			report.Selected = append(report.Selected, scenario.requests(callPrefix)...)
+		}
+		for _, scenario := range dropped {
+			report.SampleDropped = append(report.SampleDropped, scenario.requests("")...)
+		}
+	}
+
 	return cfg, report, nil
+}
+
+// loadScenario computes a scenario line's identities. An identity that cannot
+// be computed is recorded on every step, as it is for a call.
+func loadScenario(path string, entry corpusEntry) corpusScenario {
+	scenario := corpusScenario{
+		Label:  entry.Scenario,
+		Steps:  entry.Steps,
+		Opaque: entry.opaque,
+		Path:   path,
+	}
+	id, err := ScenarioID(entry.Steps)
+	if err != nil {
+		scenario.IDError = err.Error()
+		scenario.StepIDs = make([]string, len(entry.Steps))
+		return scenario
+	}
+	scenario.ScenarioID = id
+	for i, step := range entry.Steps {
+		stepID, err := ScenarioStepID(id, i, step)
+		if err != nil && scenario.IDError == "" {
+			scenario.IDError = err.Error()
+		}
+		scenario.StepIDs = append(scenario.StepIDs, stepID)
+	}
+	return scenario
+}
+
+// requests names every step of the scenario for the load report. callPrefix is
+// set for a selected scenario, whose steps are handed to the comparator under
+// "<callPrefix>#<step>".
+func (s corpusScenario) requests(callPrefix string) []CorpusRequest {
+	out := make([]CorpusRequest, len(s.Steps))
+	for i, step := range s.Steps {
+		index := i
+		out[i] = CorpusRequest{
+			RequestID:     s.StepIDs[i],
+			Method:        step.Method,
+			Path:          s.Path,
+			IdentityError: s.IDError,
+			Scenario:      s.Label,
+			ScenarioID:    s.ScenarioID,
+			Step:          &index,
+		}
+		if callPrefix != "" {
+			out[i].CallID = fmt.Sprintf("%s#%d", callPrefix, i)
+		}
+	}
+	return out
+}
+
+// scenarioExcluded reports whether the exclusions drop a scenario: they do
+// when they name any of its steps, because a scenario with a step missing is a
+// different scenario.
+func scenarioExcluded(exclusions CorpusExclusions, steps []ScenarioStep, keepPinnable bool) bool {
+	for _, step := range steps {
+		if exclusions.Excludes(step.Method, keepPinnable) {
+			return true
+		}
+	}
+	return false
 }
 
 // requestIDOf returns the request identity, or an empty identity and the reason
@@ -302,6 +450,9 @@ func readCorpusFile(root, path string) ([]corpusEntry, error) {
 		if dec.More() {
 			return nil, fmt.Errorf("failed to parse %s: trailing data after the top-level array", path)
 		}
+		if err := checkScenarioEntries(entries); err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+		}
 		return entries, nil
 	}
 
@@ -324,7 +475,62 @@ func readCorpusFile(root, path string) ([]corpusEntry, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", path, err)
 	}
+	if err := checkScenarioEntries(entries); err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+	}
 	return entries, nil
+}
+
+// checkScenarioEntries validates every scenario line in a parsed file and
+// records which of its steps are referenced. A line that is both a call and a
+// scenario is malformed: which of the two it meant cannot be known.
+func checkScenarioEntries(entries []corpusEntry) error {
+	for i := range entries {
+		entry := &entries[i]
+		if !entry.isScenario() {
+			continue
+		}
+		if entry.Method != "" || entry.Params != nil {
+			return fmt.Errorf("entry %d carries both a call and a scenario", i+1)
+		}
+		opaque, err := validateScenario(entry.Scenario, entry.Steps)
+		if err != nil {
+			return err
+		}
+		entry.opaque = opaque
+	}
+	return nil
+}
+
+// sampleScenarios is sampleCalls for scenarios: at most n per label, chosen
+// with the same seeded shuffle, the rest returned as dropped.
+func sampleScenarios(scenarios []corpusScenario, n int, rng *rand.Rand) (chosen, dropped []corpusScenario) {
+	if n <= 0 || len(scenarios) <= n {
+		return scenarios, nil
+	}
+	keep := sampleKeep(len(scenarios), n, rng)
+	for i, scenario := range scenarios {
+		if _, ok := keep[i]; ok {
+			chosen = append(chosen, scenario)
+			continue
+		}
+		dropped = append(dropped, scenario)
+	}
+	return chosen, dropped
+}
+
+// sampleKeep draws n of count indices with a seeded shuffle.
+func sampleKeep(count, n int, rng *rand.Rand) map[int]struct{} {
+	idx := make([]int, count)
+	for i := range idx {
+		idx[i] = i
+	}
+	rng.Shuffle(len(idx), func(i, j int) { idx[i], idx[j] = idx[j], idx[i] })
+	keep := make(map[int]struct{}, n)
+	for _, i := range idx[:n] {
+		keep[i] = struct{}{}
+	}
+	return keep
 }
 
 // sampleCalls returns at most n calls, chosen with a seeded shuffle so the
@@ -335,15 +541,7 @@ func sampleCalls(calls []corpusCall, n int, rng *rand.Rand) (chosen, dropped []c
 	if n <= 0 || len(calls) <= n {
 		return calls, nil
 	}
-	idx := make([]int, len(calls))
-	for i := range idx {
-		idx[i] = i
-	}
-	rng.Shuffle(len(idx), func(i, j int) { idx[i], idx[j] = idx[j], idx[i] })
-	keep := make(map[int]struct{}, n)
-	for _, i := range idx[:n] {
-		keep[i] = struct{}{}
-	}
+	keep := sampleKeep(len(calls), n, rng)
 	chosen = make([]corpusCall, 0, n)
 	dropped = make([]corpusCall, 0, len(calls)-n)
 	for i, call := range calls {
