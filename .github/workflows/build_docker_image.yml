@@ -66,12 +66,15 @@ jobs:
 
       - name: Run Trivy vulnerability scan
         uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          TRIVY_VEX: runner/k6.openvex.json
+          TRIVY_SHOW_SUPPRESSED: "true"
         with:
           image-ref: local/runner:scan-${{ github.sha }}
           format: table
-          severity: CRITICAL,HIGH
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           exit-code: "1"
-          ignore-unfixed: true
+          ignore-unfixed: false
           trivyignores: .trivyignore.yaml
 
       - name: Push image to GHCR

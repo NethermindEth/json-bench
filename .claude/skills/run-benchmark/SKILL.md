@@ -1,6 +1,6 @@
 ---
 name: run-benchmark
-description: Run an Ethereum JSON-RPC benchmark with this repository's Go runner (k6-based load testing against RPC endpoints, with reports and cross-client analysis). Use this skill whenever the user asks to run a benchmark, load-test or stress-test an RPC endpoint, measure JSON-RPC latency or throughput, or compare the performance of Ethereum clients (Nethermind, Geth, Reth, Erigon, etc.) — even if they don't use the word "benchmark".
+description: Run an Ethereum JSON-RPC benchmark with this repository's Go runner (k6-based load testing against RPC endpoints, with reports and cross-client analysis). Use this skill whenever the user asks to run a benchmark, load-test or stress-test an RPC endpoint, measure JSON-RPC latency or throughput, or compare the performance of Ethereum clients (Nethermind, Geth, Reth, Erigon, etc.) — even if they don't use the word "benchmark". For how soon a NEW block's data becomes readable on each node pair, use measure-freshness instead.
 ---
 
 # Run a JSON-RPC Benchmark
