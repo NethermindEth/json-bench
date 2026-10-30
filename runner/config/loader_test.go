@@ -1,13 +1,43 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jsonrpc-bench/runner/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadCallsFromJSONLLargeRequests(t *testing.T) {
+	for _, size := range []int{1 << 20, 17 << 20} {
+		t.Run(fmt.Sprintf("%d_bytes", size), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "calls.jsonl")
+			data := "0x" + strings.Repeat("ab", size/2)
+			request := RPCCall{Method: "eth_call", Params: []interface{}{map[string]interface{}{"data": data}, "latest"}}
+			encoded, err := json.Marshal(request)
+			require.NoError(t, err)
+			// Include a second request without a trailing newline.
+			encoded = append(encoded, []byte("\n\n{\"method\":\"eth_blockNumber\",\"params\":[]}")...)
+			require.NoError(t, os.WriteFile(path, encoded, 0600))
+			calls, err := loadCallsFromJSONL(path)
+			if size > 16<<20 {
+				require.Error(t, err)
+				require.Nil(t, calls)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, calls, 2)
+			assert.Equal(t, "eth_call", calls[0].Method)
+			assert.Equal(t, data, calls[0].Params[0].(map[string]interface{})["data"])
+			assert.Equal(t, "eth_blockNumber", calls[1].Method)
+		})
+	}
+}
 
 func TestConfigLoader(t *testing.T) {
 	// Create a test client registry

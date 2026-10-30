@@ -109,3 +109,8 @@ regenerating a corpus — the mainnet fixtures need a mainnet archive, the
   whole-block control the block hash.
 - Output: `rpc-calls/trace-historical/<range>/<method-tracer>.jsonl`, consumed
   by `config/benchmark/trace-transaction-historical.yaml`.
+- Generator: `scripts/generate-trace-historical/` mints the same five families
+  from any node, over a range that node can answer. The ranges above need an
+  archive carrying that history; a node that keeps history only from its sync
+  point on has to mint its own, which is what the generator's floor discovery
+  is for.
