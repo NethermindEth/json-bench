@@ -22,7 +22,7 @@ RUN apk add --no-cache git ca-certificates
 RUN git clone --depth 1 --branch v2.3.0 https://github.com/grafana/k6.git /k6 && \
     test "$(git -C /k6 rev-parse HEAD)" = "e0887846143ab176d4b5483c9d52cf3b3e009f1a"
 WORKDIR /k6
-RUN go get golang.org/x/net@v0.60.0 && \
+RUN go get golang.org/x/net@v0.62.0 golang.org/x/crypto@v0.58.0 && \
     CGO_ENABLED=0 GOOS=linux go build -mod=mod -trimpath -o /out/k6 . && \
     CGO_ENABLED=0 GOOS=linux go list -mod=readonly -deps . > /out/k6-packages.txt && \
     ! grep -Eq '^golang.org/x/crypto/openpgp(/|$)' /out/k6-packages.txt
