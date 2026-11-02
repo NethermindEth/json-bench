@@ -1,0 +1,25 @@
+{
+  "test_name": "Large log responses",
+  "description": "Responses of 4k-18k logs inside the retained log index range: USDT Transfer over 96 blocks (indexed path) and all logs over 10 blocks (unfiltered). Every query stays below MaxLogsPerResponse 20000. Correctness requires full-response parity.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "60s",
+  "rps": 1,
+  "vus": 128,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs log-data-huge-indexed",
+      "file": "./rpc-calls/log-data-huge-indexed.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs log-data-huge-unfiltered",
+      "file": "./rpc-calls/log-data-huge-unfiltered.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}

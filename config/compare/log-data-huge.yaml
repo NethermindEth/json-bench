@@ -1,0 +1,360 @@
+{
+  "name": "Large log responses full-response parity",
+  "description": "Same large log queries on baseline and candidate; no expected-difference rules.",
+  "calls": {
+    "eth_getLogs": [
+      {
+        "id": "log-data-huge-indexed-0",
+        "params": [
+          {
+            "fromBlock": "0x1836bb1",
+            "toBlock": "0x1836c10",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-1",
+        "params": [
+          {
+            "fromBlock": "0x1836f99",
+            "toBlock": "0x1836ff8",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-2",
+        "params": [
+          {
+            "fromBlock": "0x1837381",
+            "toBlock": "0x18373e0",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-3",
+        "params": [
+          {
+            "fromBlock": "0x1837769",
+            "toBlock": "0x18377c8",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-4",
+        "params": [
+          {
+            "fromBlock": "0x1837b51",
+            "toBlock": "0x1837bb0",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-5",
+        "params": [
+          {
+            "fromBlock": "0x1837f39",
+            "toBlock": "0x1837f98",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-6",
+        "params": [
+          {
+            "fromBlock": "0x1838321",
+            "toBlock": "0x1838380",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-7",
+        "params": [
+          {
+            "fromBlock": "0x1838709",
+            "toBlock": "0x1838768",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-8",
+        "params": [
+          {
+            "fromBlock": "0x1838af1",
+            "toBlock": "0x1838b50",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-9",
+        "params": [
+          {
+            "fromBlock": "0x1838ed9",
+            "toBlock": "0x1838f38",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-10",
+        "params": [
+          {
+            "fromBlock": "0x18392c1",
+            "toBlock": "0x1839320",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-11",
+        "params": [
+          {
+            "fromBlock": "0x18396a9",
+            "toBlock": "0x1839708",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-12",
+        "params": [
+          {
+            "fromBlock": "0x1839a91",
+            "toBlock": "0x1839af0",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-13",
+        "params": [
+          {
+            "fromBlock": "0x1839e79",
+            "toBlock": "0x1839ed8",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-14",
+        "params": [
+          {
+            "fromBlock": "0x183a261",
+            "toBlock": "0x183a2c0",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-indexed-15",
+        "params": [
+          {
+            "fromBlock": "0x183a649",
+            "toBlock": "0x183a6a8",
+            "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+            "topics": [
+              "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-0",
+        "params": [
+          {
+            "fromBlock": "0x1836bb1",
+            "toBlock": "0x1836bba"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-1",
+        "params": [
+          {
+            "fromBlock": "0x1836f99",
+            "toBlock": "0x1836fa2"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-2",
+        "params": [
+          {
+            "fromBlock": "0x1837381",
+            "toBlock": "0x183738a"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-3",
+        "params": [
+          {
+            "fromBlock": "0x1837769",
+            "toBlock": "0x1837772"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-4",
+        "params": [
+          {
+            "fromBlock": "0x1837b51",
+            "toBlock": "0x1837b5a"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-5",
+        "params": [
+          {
+            "fromBlock": "0x1837f39",
+            "toBlock": "0x1837f42"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-6",
+        "params": [
+          {
+            "fromBlock": "0x1838321",
+            "toBlock": "0x183832a"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-7",
+        "params": [
+          {
+            "fromBlock": "0x1838709",
+            "toBlock": "0x1838712"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-8",
+        "params": [
+          {
+            "fromBlock": "0x1838af1",
+            "toBlock": "0x1838afa"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-9",
+        "params": [
+          {
+            "fromBlock": "0x1838ed9",
+            "toBlock": "0x1838ee2"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-10",
+        "params": [
+          {
+            "fromBlock": "0x18392c1",
+            "toBlock": "0x18392ca"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-11",
+        "params": [
+          {
+            "fromBlock": "0x18396a9",
+            "toBlock": "0x18396b2"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-12",
+        "params": [
+          {
+            "fromBlock": "0x1839a91",
+            "toBlock": "0x1839a9a"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-13",
+        "params": [
+          {
+            "fromBlock": "0x1839e79",
+            "toBlock": "0x1839e82"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-14",
+        "params": [
+          {
+            "fromBlock": "0x183a261",
+            "toBlock": "0x183a26a"
+          }
+        ]
+      },
+      {
+        "id": "log-data-huge-unfiltered-15",
+        "params": [
+          {
+            "fromBlock": "0x183a649",
+            "toBlock": "0x183a652"
+          }
+        ]
+      }
+    ]
+  }
+}

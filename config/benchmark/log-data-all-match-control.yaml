@@ -1,0 +1,19 @@
+{
+  "test_name": "Compact log-data all-match regression control",
+  "description": "Same 64 retained all-match blocks as the completed full-response parity run. Isolated control for accepted log data and serialization; validates repeated tails with more samples. No changes to filters, production limits or endpoint defaults. No separate warmup; compare A/B/A variation before accepting a tail claim.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "120s",
+  "rps": 100,
+  "vus": 128,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs log-data-all-match-block",
+      "file": "./rpc-calls/log-data-all-match-block.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}
