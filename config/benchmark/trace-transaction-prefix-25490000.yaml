@@ -1,0 +1,174 @@
+{
+  "test_name": "Single-transaction tracing at block 25490000",
+  "description": "Fixed mainnet block 0x1bcc8cd8ce5471e5c25f9a4b5c711ce11d37445eb24be3e0b7ee57b048000933. Transaction indexes 0, 159 and 318 of 319, verified against trace_block and trace_replayBlockTransactions outputs from run 34657499774. Requires parent state and transaction lookup for snapshot 25490000. Reports each position and tracer separately.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "600s",
+  "rps": 1,
+  "vus": 16,
+  "calls": [
+    {
+      "name": "debug_traceTransaction callTracer first",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d",
+        {
+          "tracer": "callTracer"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "debug_traceTransaction prestateTracer first",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d",
+        {
+          "tracer": "prestateTracer"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "trace_transaction first",
+      "method": "trace_transaction",
+      "params": [
+        "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d"
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "trace_replayTransaction first",
+      "method": "trace_replayTransaction",
+      "params": [
+        "0x1fe95e22b4e29b9f68c359519bd723be82de6e02f20ddcdba97369975b9c1d5d",
+        [
+          "trace",
+          "stateDiff"
+        ]
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "debug_traceTransaction callTracer middle",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0x4ed6d2f83fa4eb91da0db3061ac5e239ca8fdb5e95d4b3e650f2bb96bb8f7bc7",
+        {
+          "tracer": "callTracer"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "debug_traceTransaction prestateTracer middle",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0x4ed6d2f83fa4eb91da0db3061ac5e239ca8fdb5e95d4b3e650f2bb96bb8f7bc7",
+        {
+          "tracer": "prestateTracer"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "trace_transaction middle",
+      "method": "trace_transaction",
+      "params": [
+        "0x4ed6d2f83fa4eb91da0db3061ac5e239ca8fdb5e95d4b3e650f2bb96bb8f7bc7"
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "trace_replayTransaction middle",
+      "method": "trace_replayTransaction",
+      "params": [
+        "0x4ed6d2f83fa4eb91da0db3061ac5e239ca8fdb5e95d4b3e650f2bb96bb8f7bc7",
+        [
+          "trace",
+          "stateDiff"
+        ]
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "debug_traceTransaction callTracer last",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0xb2f149dbfbf48d45fac57eacd34b4b4504f7d2988679c6aa99162b527dfd5128",
+        {
+          "tracer": "callTracer"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "debug_traceTransaction prestateTracer last",
+      "method": "debug_traceTransaction",
+      "params": [
+        "0xb2f149dbfbf48d45fac57eacd34b4b4504f7d2988679c6aa99162b527dfd5128",
+        {
+          "tracer": "prestateTracer"
+        }
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "trace_transaction last",
+      "method": "trace_transaction",
+      "params": [
+        "0xb2f149dbfbf48d45fac57eacd34b4b4504f7d2988679c6aa99162b527dfd5128"
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    },
+    {
+      "name": "trace_replayTransaction last",
+      "method": "trace_replayTransaction",
+      "params": [
+        "0xb2f149dbfbf48d45fac57eacd34b4b4504f7d2988679c6aa99162b527dfd5128",
+        [
+          "trace",
+          "stateDiff"
+        ]
+      ],
+      "weight": 1,
+      "thresholds": [
+        "p(99)<600000"
+      ]
+    }
+  ]
+}
