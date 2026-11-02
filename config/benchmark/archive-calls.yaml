@@ -1,0 +1,13 @@
+test_name: "Archive eth_call"
+description: "Historical eth_call of balanceOf(holder) and totalSupply() on WETH, USDC and USDT, from the zero address, at 120 seeded heights in 6,500,000-25,900,000 on a mainnet archive."
+clients:
+  - nethermind
+duration: "300s"
+rps: 50
+vus: 8
+calls:
+  - name: "eth_call balanceOf and totalSupply"
+    file: "./rpc-calls/archive/calls.jsonl"
+    file_type: "jsonl"
+    weight: 1
+    thresholds: ["p(99)<600000"]
