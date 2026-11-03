@@ -1,0 +1,49 @@
+{
+  "test_name": "Log index filter shapes",
+  "description": "Selective sparse-AND-dense approval scans (1000/10000 blocks), all-match single-block control, OR of 16 token addresses AND Approval AND one owner (10000 blocks), WETH Approval with an OR of 24 topic1 owners (1000 blocks), and USDT Approval dense-AND-dense (1000 blocks). All ranges are inside 25390001..25406300. Correctness requires full-response parity.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "60s",
+  "rps": 1,
+  "vus": 128,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs log-data-selective-1000",
+      "file": "./rpc-calls/log-data-selective-1000.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs log-data-selective-10000",
+      "file": "./rpc-calls/log-data-selective-10000.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs log-data-all-match-block",
+      "file": "./rpc-calls/log-data-all-match-block.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs log-data-or-addresses-10000",
+      "file": "./rpc-calls/log-data-or-addresses-10000.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs log-data-or-topics-1000",
+      "file": "./rpc-calls/log-data-or-topics-1000.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs log-data-dense-dense-1000",
+      "file": "./rpc-calls/log-data-dense-dense-1000.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}
