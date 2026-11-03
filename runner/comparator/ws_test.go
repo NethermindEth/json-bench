@@ -156,6 +156,7 @@ func TestScenarioTransportValidation(t *testing.T) {
 		"unknown transport": `{"scenario":"s","transport":"ipc","steps":[{"method":"eth_subscribe","params":["newHeads"]}]}`,
 		"negative wait":     `{"scenario":"s","transport":"ws","steps":[{"method":"eth_subscribe","params":[],"wait_ms":-1}]}`,
 		"wait too long":     `{"scenario":"s","transport":"ws","steps":[{"method":"eth_subscribe","params":[],"wait_ms":60001}]}`,
+		"wait overflows":    `{"scenario":"s","transport":"ws","steps":[{"method":"eth_subscribe","params":[],"wait_ms":9300000000000}]}`,
 		"transport on call": `{"method":"eth_blockNumber","params":[],"transport":"ws"}`,
 	} {
 		dir := writeCorpus(t, map[string]string{"s.jsonl": line + "\n"})
@@ -285,5 +286,36 @@ func TestWSScenarioDialFailureIsATransportFailure(t *testing.T) {
 	}
 	if !comp.HasTransportErrors() {
 		t.Fatal("--fail-on-transport-error would not trip")
+	}
+}
+
+// A client that did not answer the previous step has a count spanning two
+// steps' windows; it is recorded, never compared, so it cannot pose as a
+// node that pushed a notification.
+func TestNotificationCountAfterAMissedStepIsNotCompared(t *testing.T) {
+	newResult := func() *ComparisonResult {
+		return &ComparisonResult{Metadata: map[string]interface{}{}, Differences: map[string]interface{}{}}
+	}
+	counts := map[string]int{"node0": 0, "node1": 2}
+
+	r := newResult()
+	noteNotifications(r, "node0", counts, map[string]bool{"node1": true})
+	if len(r.Differences) != 0 {
+		t.Fatalf("an uneven client was compared: %v", r.Differences)
+	}
+	if r.Metadata["notifications"].(map[string]interface{})["node1"] != 2 {
+		t.Fatalf("its count was not recorded: %v", r.Metadata)
+	}
+
+	r = newResult()
+	noteNotifications(r, "node0", counts, map[string]bool{"node0": true})
+	if len(r.Differences) != 0 {
+		t.Fatalf("compared against an uneven reference: %v", r.Differences)
+	}
+
+	r = newResult()
+	noteNotifications(r, "node0", counts, nil)
+	if r.Differences["node1"] == nil {
+		t.Fatal("an even client with another count did not differ")
 	}
 }

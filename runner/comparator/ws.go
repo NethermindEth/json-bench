@@ -147,10 +147,10 @@ func (c *wsConn) read() {
 		}
 		ch, ok := c.waiting[id]
 		delete(c.waiting, id)
+		// Every answer closes a window, also one that arrives after its call
+		// timed out, so the next answer counts only what came after it.
 		notes := c.notes
-		if ok {
-			c.notes = 0
-		}
+		c.notes = 0
 		c.mu.Unlock()
 		if ok {
 			ch <- wsAnswer{response: msg, notifications: notes}
@@ -273,8 +273,11 @@ func (c *Comparator) openScenarioConns() (map[string]*wsConn, map[string]error) 
 // noteNotifications records on a WebSocket step's result how many
 // notifications each client received before answering it, and marks a
 // difference for a client whose count is not the reference's. A step that is
-// not compared — some client never answered — is left as it is.
-func noteNotifications(result *ComparisonResult, reference string, counts map[string]int) {
+// not compared — some client never answered — is left as it is. A client in
+// uneven did not answer the previous step, so its count spans two steps'
+// windows and is recorded but not compared; when the reference is uneven,
+// nothing is.
+func noteNotifications(result *ComparisonResult, reference string, counts map[string]int, uneven map[string]bool) {
 	recorded := make(map[string]interface{}, len(counts))
 	for name, n := range counts {
 		recorded[name] = n
@@ -284,11 +287,11 @@ func noteNotifications(result *ComparisonResult, reference string, counts map[st
 		return
 	}
 	want, ok := counts[reference]
-	if !ok {
+	if !ok || uneven[reference] {
 		return
 	}
 	for name, n := range counts {
-		if name == reference || n == want {
+		if name == reference || n == want || uneven[name] {
 			continue
 		}
 		diff, _ := result.Differences[name].(map[string]interface{})
@@ -313,7 +316,7 @@ func validateTransport(label, transport string, steps []ScenarioStep) error {
 		return fmt.Errorf("scenario %q: unknown transport %q (want %q, or none for HTTP)", label, transport, ScenarioTransportWS)
 	}
 	for i, step := range steps {
-		if step.WaitMs < 0 || time.Duration(step.WaitMs)*time.Millisecond > maxScenarioWait {
+		if step.WaitMs < 0 || int64(step.WaitMs) > maxScenarioWait.Milliseconds() {
 			return fmt.Errorf("scenario %q step %d: wait_ms %d is outside 0..%d", label, i, step.WaitMs, maxScenarioWait.Milliseconds())
 		}
 	}

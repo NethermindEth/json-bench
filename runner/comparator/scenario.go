@@ -363,6 +363,14 @@ func (c *Comparator) runScenario(scenario ScenarioCall) error {
 		}()
 	}
 
+	// answered[client] is whether the client answered the previous step, so
+	// its next notification count covers one step's window, as the
+	// reference's does. A fresh connection is a clean window.
+	answered := make(map[string]bool, len(c.config.Clients))
+	for _, client := range c.config.Clients {
+		answered[client.Name] = true
+	}
+
 	for i, step := range scenario.Steps {
 		index := i
 		if step.WaitMs > 0 {
@@ -430,7 +438,17 @@ func (c *Comparator) runScenario(scenario ScenarioCall) error {
 			return err
 		}
 		if ws {
-			noteNotifications(result, c.config.Clients[0].Name, counts)
+			uneven := map[string]bool{}
+			for name, ok := range answered {
+				if !ok {
+					uneven[name] = true
+				}
+			}
+			noteNotifications(result, c.config.Clients[0].Name, counts, uneven)
+			for name := range answered {
+				_, ok := counts[name]
+				answered[name] = ok
+			}
 		}
 		c.saveResult(result)
 	}
