@@ -6,9 +6,12 @@ import (
 
 // ClientConfig represents a client configuration with all necessary settings
 type ClientConfig struct {
-	Name       string            `yaml:"name" json:"name"`
-	Type       string            `yaml:"type,omitempty" json:"type,omitempty"`
-	URL        string            `yaml:"url" json:"url"`
+	Name string `yaml:"name" json:"name"`
+	Type string `yaml:"type,omitempty" json:"type,omitempty"`
+	URL  string `yaml:"url" json:"url"`
+	// WSURL is the client's WebSocket endpoint, used by scenarios that run
+	// over WebSocket. Unset, it is URL with the http scheme replaced by ws.
+	WSURL      string            `yaml:"ws_url,omitempty" json:"ws_url,omitempty"`
 	Headers    map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
 	Timeout    string            `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	MaxRetries int               `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`

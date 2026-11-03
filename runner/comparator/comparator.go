@@ -271,6 +271,9 @@ type callSpec struct {
 	paramsFor func(*types.ClientConfig) ([]interface{}, error)
 	// opaque compares the result as a handle (opaqueResponse), not a value.
 	opaque bool
+	// send, when set, sends the call to a client instead of the client's HTTP
+	// transport: a WebSocket scenario's connection.
+	send func(client *types.ClientConfig, method string, params []interface{}) (map[string]interface{}, error)
 	// onAnswer, when set, is told each client's response as it arrives.
 	onAnswer func(client *types.ClientConfig, response map[string]interface{})
 	metadata map[string]interface{}
@@ -298,7 +301,12 @@ func (c *Comparator) compareCall(spec callSpec) (*ComparisonResult, error) {
 			transportErrorClass[client.Name] = TransportScenarioRef
 			continue
 		}
-		response, err := c.transport(client).call(rpcMethod, callParams)
+		var response map[string]interface{}
+		if spec.send != nil {
+			response, err = spec.send(client, rpcMethod, callParams)
+		} else {
+			response, err = c.transport(client).call(rpcMethod, callParams)
+		}
 		if err != nil {
 			transportErrors[client.Name] = err.Error()
 			transportErrorClass[client.Name] = classifyTransportError(err)

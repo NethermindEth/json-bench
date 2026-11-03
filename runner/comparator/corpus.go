@@ -30,9 +30,10 @@ type corpusEntry struct {
 
 	// Scenario and Steps are set instead of Method and Params on a scenario
 	// line (scenario.go). opaque is filled in by readCorpusFile.
-	Scenario string         `json:"scenario"`
-	Steps    []ScenarioStep `json:"steps"`
-	opaque   []bool
+	Scenario  string         `json:"scenario"`
+	Transport string         `json:"transport"`
+	Steps     []ScenarioStep `json:"steps"`
+	opaque    []bool
 }
 
 // isScenario reports whether the entry is a scenario line.
@@ -52,6 +53,7 @@ func (e corpusEntry) calls() int {
 // counterpart of corpusCall.
 type corpusScenario struct {
 	Label      string
+	Transport  string
 	Steps      []ScenarioStep
 	Opaque     []bool
 	Path       string
@@ -331,6 +333,7 @@ func LoadCorpusConfigWithExclusions(dir string, sample int, seed int64, blockOve
 			call := ScenarioCall{
 				Label:      label,
 				ScenarioID: scenario.ScenarioID,
+				Transport:  scenario.Transport,
 				Steps:      scenario.Steps,
 				StepIDs:    scenario.StepIDs,
 				Opaque:     scenario.Opaque,
@@ -353,12 +356,13 @@ func LoadCorpusConfigWithExclusions(dir string, sample int, seed int64, blockOve
 // be computed is recorded on every step, as it is for a call.
 func loadScenario(path string, entry corpusEntry) corpusScenario {
 	scenario := corpusScenario{
-		Label:  entry.Scenario,
-		Steps:  entry.Steps,
-		Opaque: entry.opaque,
-		Path:   path,
+		Label:     entry.Scenario,
+		Transport: entry.Transport,
+		Steps:     entry.Steps,
+		Opaque:    entry.opaque,
+		Path:      path,
 	}
-	id, err := ScenarioID(entry.Steps)
+	id, err := ScenarioIdentity(entry.Transport, entry.Steps)
 	if err != nil {
 		scenario.IDError = err.Error()
 		scenario.StepIDs = make([]string, len(entry.Steps))
@@ -488,10 +492,16 @@ func checkScenarioEntries(entries []corpusEntry) error {
 	for i := range entries {
 		entry := &entries[i]
 		if !entry.isScenario() {
+			if entry.Transport != "" {
+				return fmt.Errorf("entry %d names a transport but is not a scenario", i+1)
+			}
 			continue
 		}
 		if entry.Method != "" || entry.Params != nil {
 			return fmt.Errorf("entry %d carries both a call and a scenario", i+1)
+		}
+		if err := validateTransport(entry.Scenario, entry.Transport, entry.Steps); err != nil {
+			return err
 		}
 		opaque, err := validateScenario(entry.Scenario, entry.Steps)
 		if err != nil {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/jsonrpc-bench/runner/types"
 )
@@ -31,6 +32,16 @@ import (
 // an opaque value: two nodes agree on it when both answered a result of the
 // same JSON kind, whatever its value, because a filter id is a handle the node
 // chose rather than an answer about the chain.
+//
+// A line may also say "transport":"ws": then each client runs the scenario on
+// one WebSocket connection of its own (ws.go), which is what a subscription's
+// lifecycle needs. A step's "wait_ms" holds the scenario for that long before
+// the step is sent, which is how a scenario asserts that nothing arrives in a
+// given time:
+//
+//	{"scenario":"subscription","transport":"ws","steps":[
+//	  {"method":"eth_subscribe","params":["newHeads"]},
+//	  {"method":"eth_unsubscribe","params":[{"$ref":0}],"wait_ms":5000}]}
 
 // ScenarioRefKey is the key of a $ref token.
 const ScenarioRefKey = "$ref"
@@ -43,6 +54,8 @@ const scenarioIdentityMethod = "scenario"
 type ScenarioStep struct {
 	Method string        `json:"method"`
 	Params []interface{} `json:"params"`
+	// WaitMs is how long the scenario waits before this step is sent.
+	WaitMs int `json:"wait_ms,omitempty"`
 }
 
 // ScenarioCall is one loaded scenario on its way to the comparator: its label,
@@ -50,19 +63,34 @@ type ScenarioStep struct {
 type ScenarioCall struct {
 	Label      string
 	ScenarioID string
-	Steps      []ScenarioStep
-	StepIDs    []string
-	CallIDs    []string
+	// Transport is "" for HTTP or ScenarioTransportWS.
+	Transport string
+	Steps     []ScenarioStep
+	StepIDs   []string
+	CallIDs   []string
 	// Opaque[i] is true when a later step references step i's result.
 	Opaque []bool
 }
 
-// ScenarioID is the identity of a whole scenario: RequestID of the method
-// "scenario" with the steps, as {method, params} objects, for params. Two
-// lines with the same steps are one scenario whatever their labels say, the
-// same way two lines with the same call are one request.
+// ScenarioID is the identity of a whole HTTP scenario: RequestID of the
+// method "scenario" with the steps, as {method, params} objects, for params.
+// Two lines with the same steps are one scenario whatever their labels say,
+// the same way two lines with the same call are one request.
 func ScenarioID(steps []ScenarioStep) (string, error) {
-	return RequestID(scenarioIdentityMethod, scenarioStepsParam(steps))
+	return ScenarioIdentity("", steps)
+}
+
+// ScenarioIdentity is ScenarioID for a scenario on any transport. A scenario
+// with a transport hashes under "scenario/<transport>", and a step with a wait
+// carries "wait_ms" in its object, so neither changes the identity of an HTTP
+// scenario without waits: the same steps over another transport, or with
+// another wait, are another scenario.
+func ScenarioIdentity(transport string, steps []ScenarioStep) (string, error) {
+	method := scenarioIdentityMethod
+	if transport != "" {
+		method += "/" + transport
+	}
+	return RequestID(method, scenarioStepsParam(steps))
 }
 
 // ScenarioStepID is the identity of step i of the scenario with identity
@@ -85,7 +113,11 @@ func scenarioStepsParam(steps []ScenarioStep) []interface{} {
 		if params == nil {
 			params = []interface{}{}
 		}
-		out[i] = map[string]interface{}{"method": step.Method, "params": params}
+		object := map[string]interface{}{"method": step.Method, "params": params}
+		if step.WaitMs != 0 {
+			object["wait_ms"] = step.WaitMs
+		}
+		out[i] = object
 	}
 	return out
 }
@@ -289,6 +321,14 @@ func jsonKind(v interface{}) string {
 	return fmt.Sprintf("%T", v)
 }
 
+// transportLabel names a scenario's transport in a result's metadata.
+func transportLabel(transport string) string {
+	if transport == "" {
+		return "http"
+	}
+	return transport
+}
+
 // scenarioStepCount is the number of steps over scenarios, which is how many
 // calls they add to a run.
 func scenarioStepCount(scenarios []ScenarioCall) int {
@@ -311,8 +351,31 @@ func (c *Comparator) runScenario(scenario ScenarioCall) error {
 	}
 	var mu sync.Mutex
 
+	ws := scenario.Transport == ScenarioTransportWS
+	var conns map[string]*wsConn
+	var dialFailed map[string]error
+	if ws {
+		conns, dialFailed = c.openScenarioConns()
+		defer func() {
+			for _, conn := range conns {
+				conn.close()
+			}
+		}()
+	}
+
+	// answered[client] is whether the client answered the previous step, so
+	// its next notification count covers one step's window, as the
+	// reference's does. A fresh connection is a clean window.
+	answered := make(map[string]bool, len(c.config.Clients))
+	for _, client := range c.config.Clients {
+		answered[client.Name] = true
+	}
+
 	for i, step := range scenario.Steps {
 		index := i
+		if step.WaitMs > 0 {
+			time.Sleep(time.Duration(step.WaitMs) * time.Millisecond)
+		}
 		effective := make(map[string]interface{}, len(c.config.Clients))
 		spec := callSpec{
 			method:    scenario.CallIDs[i],
@@ -343,6 +406,7 @@ func (c *Comparator) runScenario(scenario ScenarioCall) error {
 			},
 			metadata: map[string]interface{}{
 				"scenario":    scenario.Label,
+				"transport":   transportLabel(scenario.Transport),
 				"scenario_id": scenario.ScenarioID,
 				"step":        index,
 				// What each client was actually sent: the $ref tokens resolved
@@ -353,9 +417,38 @@ func (c *Comparator) runScenario(scenario ScenarioCall) error {
 		if spec.requestID == "" {
 			log.Printf("warning: no request identity for %s", spec.method)
 		}
+		counts := map[string]int{}
+		if ws {
+			spec.send = func(client *types.ClientConfig, method string, params []interface{}) (map[string]interface{}, error) {
+				conn, ok := conns[client.Name]
+				if !ok {
+					return nil, dialFailed[client.Name]
+				}
+				response, notifications, err := conn.call(method, params)
+				if err == nil {
+					mu.Lock()
+					counts[client.Name] = notifications
+					mu.Unlock()
+				}
+				return response, err
+			}
+		}
 		result, err := c.compareCall(spec)
 		if err != nil {
 			return err
+		}
+		if ws {
+			uneven := map[string]bool{}
+			for name, ok := range answered {
+				if !ok {
+					uneven[name] = true
+				}
+			}
+			noteNotifications(result, c.config.Clients[0].Name, counts, uneven)
+			for name := range answered {
+				_, ok := counts[name]
+				answered[name] = ok
+			}
 		}
 		c.saveResult(result)
 	}

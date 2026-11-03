@@ -374,6 +374,34 @@ each with `scenario`, `scenario_id` and `step`; a file report gains a
 `scenarios` count. A corpus without scenarios loads, and reports, exactly as
 before.
 
+A scenario line may say `"transport":"ws"`. Each node then runs the whole
+scenario on one WebSocket connection of its own, opened when the scenario
+starts and closed when it ends — a subscription belongs to the connection that
+made it, so `eth_subscribe` and its `eth_unsubscribe` must share one. The
+endpoint is the client's `ws_url` in the clients file, or its `url` with
+`http`/`https` replaced by `ws`/`wss`. A step's `"wait_ms"` (at most 60000)
+holds the scenario that long before the step is sent:
+
+```json
+{"scenario":"subscription","transport":"ws","steps":[
+  {"method":"eth_subscribe","params":["newHeads"]},
+  {"method":"eth_unsubscribe","params":[{"$ref":0}],"wait_ms":5000},
+  {"method":"eth_unsubscribe","params":[{"$ref":0}]}]}
+```
+
+Notifications a node pushes on the connection are counted, not compared:
+their payloads carry the node's own subscription id. Each step records in
+`metadata.notifications` how many arrived on each node's connection after its
+previous answer and before this one, and a node whose count differs from the
+reference's differs at that step (`notification_differences`), whatever the
+answers were. So the example asserts that neither node of a parked pair sees a
+new head in five seconds. Steps are never retried over WebSocket — a repeated
+`eth_subscribe` would subscribe twice. A node whose endpoint cannot be opened
+fails every step as `ws_dial`, a connection that drops as `ws_closed`. The
+transport and the waits are part of the scenario identity only when present:
+`RequestID("scenario/ws", [{method, params[, wait_ms]}, …])`, so an HTTP
+scenario without waits keeps the identity it always had.
+
 A corpus tree usually holds files that are not corpora — generator inputs,
 benchmark scenarios. Those are skipped with a warning naming each file and its
 reason, and the run continues; the load ends with a line stating how many calls
