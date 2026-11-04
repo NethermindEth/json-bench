@@ -1,0 +1,19 @@
+{
+  "test_name": "log-data-long-sparse-dense-100k-iso",
+  "description": "Closed loop, one request at a time, 40 requests of long-sparse-dense-100k.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "1800s",
+  "iterations": 40,
+  "vus": 1,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs long-sparse-dense-100k",
+      "file": "./rpc-calls/log-data-long-sparse-dense-100k.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}
