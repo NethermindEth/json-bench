@@ -1,0 +1,67 @@
+{
+  "test_name": "Long-range log index shapes, weighted",
+  "description": "Light shapes weight 10, COMP Approval 100k and USDT Deposit 50k weight 1 (each scans thousands of candidate blocks). USDT Deposit 100k is parity-only: it scans about 100k candidate blocks per request.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "60s",
+  "rps": 1,
+  "vus": 128,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs long-sparse-dense-50k",
+      "file": "./rpc-calls/log-data-long-sparse-dense-50k.json",
+      "file_type": "json",
+      "weight": 10
+    },
+    {
+      "name": "eth_getLogs long-sparse-dense-100k",
+      "file": "./rpc-calls/log-data-long-sparse-dense-100k.json",
+      "file_type": "json",
+      "weight": 10
+    },
+    {
+      "name": "eth_getLogs long-medium-dense-50k",
+      "file": "./rpc-calls/log-data-long-medium-dense-50k.json",
+      "file_type": "json",
+      "weight": 10
+    },
+    {
+      "name": "eth_getLogs selective-1000",
+      "file": "./rpc-calls/log-data-selective-1000.json",
+      "file_type": "json",
+      "weight": 10
+    },
+    {
+      "name": "eth_getLogs selective-10000",
+      "file": "./rpc-calls/log-data-selective-10000.json",
+      "file_type": "json",
+      "weight": 10
+    },
+    {
+      "name": "eth_getLogs all-match-block",
+      "file": "./rpc-calls/log-data-all-match-block.json",
+      "file_type": "json",
+      "weight": 10
+    },
+    {
+      "name": "eth_getLogs dense-dense-1000",
+      "file": "./rpc-calls/log-data-dense-dense-1000.json",
+      "file_type": "json",
+      "weight": 10
+    },
+    {
+      "name": "eth_getLogs long-medium-dense-100k",
+      "file": "./rpc-calls/log-data-long-medium-dense-100k.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs long-dense-dense-50k",
+      "file": "./rpc-calls/log-data-long-dense-dense-50k.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}
