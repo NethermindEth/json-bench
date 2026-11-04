@@ -45,6 +45,7 @@ export default async function () {
       const response = http.post(rpcEndpoint, payload, {
         headers: headers,
         tags: tags,
+        timeout: '300s',
       });
       // Checks
       check(response, {

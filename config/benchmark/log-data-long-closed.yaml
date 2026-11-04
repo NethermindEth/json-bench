@@ -1,0 +1,25 @@
+{
+  "test_name": "log-data-long-closed",
+  "description": "Closed-loop control mix: selective 1k and 10k, one request at a time.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "1800s",
+  "iterations": 80,
+  "vus": 1,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs selective-1000",
+      "file": "./rpc-calls/log-data-selective-1000.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs selective-10000",
+      "file": "./rpc-calls/log-data-selective-10000.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}

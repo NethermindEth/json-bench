@@ -1,0 +1,49 @@
+{
+  "test_name": "log-data-long-probe",
+  "description": "Closed-loop latency probe: one request at a time over the six long shapes.",
+  "clients": [
+    "nethermind"
+  ],
+  "duration": "1800s",
+  "iterations": 24,
+  "vus": 1,
+  "seed": 7,
+  "calls": [
+    {
+      "name": "eth_getLogs long-sparse-dense-50k",
+      "file": "./rpc-calls/log-data-long-sparse-dense-50k.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs long-sparse-dense-100k",
+      "file": "./rpc-calls/log-data-long-sparse-dense-100k.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs long-medium-dense-50k",
+      "file": "./rpc-calls/log-data-long-medium-dense-50k.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs long-medium-dense-100k",
+      "file": "./rpc-calls/log-data-long-medium-dense-100k.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs long-dense-dense-50k",
+      "file": "./rpc-calls/log-data-long-dense-dense-50k.json",
+      "file_type": "json",
+      "weight": 1
+    },
+    {
+      "name": "eth_getLogs long-dense-dense-100k",
+      "file": "./rpc-calls/log-data-long-dense-dense-100k.json",
+      "file_type": "json",
+      "weight": 1
+    }
+  ]
+}
