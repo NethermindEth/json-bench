@@ -330,10 +330,77 @@ recurses and reads both line-delimited `*.jsonl` files and `*.json` files
 holding a JSON array of `{method, params}` objects. `--sample N` keeps at
 most N calls per method (deterministic; control the seed with
 `--sample-seed`). The directory may be anywhere on disk — an absolute path is
-fine. Head-dependent and unstorable methods (`eth_getProof`, `eth_gasPrice`,
-`eth_syncing`, `eth_blockNumber`, `eth_maxPriorityFeePerGas`, the `debug_`
-namespace) are excluded; `eth_feeHistory` is kept only when a block override
-pins its `newestBlock`.
+fine. By default, head-dependent and unstorable methods (`eth_getProof`,
+`eth_gasPrice`, `eth_syncing`, `eth_blockNumber`, `eth_maxPriorityFeePerGas`,
+the `debug_` namespace) are excluded at load. `--corpus-exclude` replaces that
+list: comma-separated, an entry ending in `_` excludes a namespace by prefix,
+any other entry excludes that method, and `none` disables exclusions — a lane
+that compares two nodes parked at the same block can keep methods an
+archive-vs-archive run cannot. `eth_feeHistory` is governed by the block
+override, not by the list: it is kept only when `--block-override` (or the
+rules file) pins its `newestBlock`. The effective policy is recorded in
+`corpus-load-report.json` under `policy`.
+
+A line may also hold a **scenario**: calls that only mean something in order
+on one node, such as a filter's lifecycle.
+
+```json
+{"scenario":"log_filter","steps":[
+  {"method":"eth_newFilter","params":[{"fromBlock":"0x10","toBlock":"0x1f"}]},
+  {"method":"eth_getFilterLogs","params":[{"$ref":0}]},
+  {"method":"eth_uninstallFilter","params":[{"$ref":0}]}]}
+```
+
+Each node runs the steps in order, and `{"$ref": N}` anywhere in a later
+step's params is replaced by *that node's* result of step N, so one node is
+never asked about a filter id the other handed out. A step whose result is
+referenced is compared as an opaque handle: the nodes agree when both answered
+a result of the same JSON kind, whatever its value. Every step is compared and
+reported as a call of its own (`scenario:<label>_variant<k>#<step>`), carrying
+its scenario and position in `metadata` and each node's resolved params in
+`metadata.effective_params`; the block override applies to each step's
+resolved params. A step a node cannot be sent because the step it references
+answered no result there is a transport error of class
+`scenario_ref_unresolved` — never a difference, and never skipped. Exclusions
+drop a whole scenario when they name any of its steps, and `--sample N` keeps
+at most N scenarios per label. Different scenarios run as concurrently as
+single calls; one scenario's steps never interleave.
+
+A scenario step's `request_id` is `RequestID(method, [scenario_id, index,
+params])`, where `scenario_id` is `RequestID("scenario", [{method, params}, …])`
+over the steps as written — the step's params alone would collide across
+scenarios. The load report counts every step as an entry and a call, and names
+each with `scenario`, `scenario_id` and `step`; a file report gains a
+`scenarios` count. A corpus without scenarios loads, and reports, exactly as
+before.
+
+A scenario line may say `"transport":"ws"`. Each node then runs the whole
+scenario on one WebSocket connection of its own, opened when the scenario
+starts and closed when it ends — a subscription belongs to the connection that
+made it, so `eth_subscribe` and its `eth_unsubscribe` must share one. The
+endpoint is the client's `ws_url` in the clients file, or its `url` with
+`http`/`https` replaced by `ws`/`wss`. A step's `"wait_ms"` (at most 60000)
+holds the scenario that long before the step is sent:
+
+```json
+{"scenario":"subscription","transport":"ws","steps":[
+  {"method":"eth_subscribe","params":["newHeads"]},
+  {"method":"eth_unsubscribe","params":[{"$ref":0}],"wait_ms":5000},
+  {"method":"eth_unsubscribe","params":[{"$ref":0}]}]}
+```
+
+Notifications a node pushes on the connection are counted, not compared:
+their payloads carry the node's own subscription id. Each step records in
+`metadata.notifications` how many arrived on each node's connection after its
+previous answer and before this one, and a node whose count differs from the
+reference's differs at that step (`notification_differences`), whatever the
+answers were. So the example asserts that neither node of a parked pair sees a
+new head in five seconds. Steps are never retried over WebSocket — a repeated
+`eth_subscribe` would subscribe twice. A node whose endpoint cannot be opened
+fails every step as `ws_dial`, a connection that drops as `ws_closed`. The
+transport and the waits are part of the scenario identity only when present:
+`RequestID("scenario/ws", [{method, params[, wait_ms]}, …])`, so an HTTP
+scenario without waits keeps the identity it always had.
 
 A corpus tree usually holds files that are not corpora — generator inputs,
 benchmark scenarios. Those are skipped with a warning naming each file and its

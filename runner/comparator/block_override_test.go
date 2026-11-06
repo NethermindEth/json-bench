@@ -2,6 +2,7 @@ package comparator
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -52,7 +53,7 @@ func TestApplyBlockOverride(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := applyBlockOverride(tc.method, tc.params, block)
+			got := applyBlockOverride(tc.method, tc.params, block, false)
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %v, want %v", got, tc.want)
 			}
@@ -63,7 +64,7 @@ func TestApplyBlockOverride(t *testing.T) {
 func TestApplyBlockOverrideGetLogs(t *testing.T) {
 	block := "0x1406f40"
 	params := []interface{}{map[string]interface{}{"fromBlock": "latest", "address": "0xabc"}}
-	got := applyBlockOverride("eth_getLogs", params, block)
+	got := applyBlockOverride("eth_getLogs", params, block, false)
 	filter := got[0].(map[string]interface{})
 	if filter["fromBlock"] != block || filter["toBlock"] != block {
 		t.Errorf("expected fromBlock/toBlock pinned to %s, got %v", block, filter)
@@ -75,6 +76,63 @@ func TestApplyBlockOverrideGetLogs(t *testing.T) {
 	if params[0].(map[string]interface{})["fromBlock"] != "latest" {
 		t.Error("input params were mutated")
 	}
+}
+
+// TestApplyBlockOverrideGetLogsBlockHash pins the strict-mode guard: a filter
+// that already addresses one block by hash must reach the wire as itself,
+// because blockHash and a fromBlock/toBlock range are mutually exclusive and
+// adding the range asks a different question.
+func TestApplyBlockOverrideGetLogsBlockHash(t *testing.T) {
+	block := "0x1406f40"
+	hash := "0x" + strings.Repeat("aa", 32)
+
+	t.Run("strict leaves a blockHash-only filter alone", func(t *testing.T) {
+		params := []interface{}{map[string]interface{}{"blockHash": hash}}
+		got := applyBlockOverride("eth_getLogs", params, block, true)
+		want := []interface{}{map[string]interface{}{"blockHash": hash}}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("strict leaves a blockHash filter with other keys alone", func(t *testing.T) {
+		params := []interface{}{map[string]interface{}{"blockHash": hash, "address": "0xabc"}}
+		got := applyBlockOverride("eth_getLogs", params, block, true)
+		filter := got[0].(map[string]interface{})
+		if _, ok := filter["fromBlock"]; ok {
+			t.Errorf("fromBlock was injected over a blockHash filter: %v", filter)
+		}
+		if _, ok := filter["toBlock"]; ok {
+			t.Errorf("toBlock was injected over a blockHash filter: %v", filter)
+		}
+	})
+
+	t.Run("the default still injects the range", func(t *testing.T) {
+		params := []interface{}{map[string]interface{}{"blockHash": hash}}
+		got := applyBlockOverride("eth_getLogs", params, block, false)
+		filter := got[0].(map[string]interface{})
+		if filter["fromBlock"] != block || filter["toBlock"] != block {
+			t.Errorf("expected the unchanged default behaviour, got %v", filter)
+		}
+	})
+
+	t.Run("strict still pins a filter without blockHash", func(t *testing.T) {
+		params := []interface{}{map[string]interface{}{"address": "0xabc"}}
+		got := applyBlockOverride("eth_getLogs", params, block, true)
+		filter := got[0].(map[string]interface{})
+		if filter["fromBlock"] != block || filter["toBlock"] != block {
+			t.Errorf("expected fromBlock/toBlock pinned to %s, got %v", block, filter)
+		}
+	})
+
+	t.Run("strict changes nothing for other methods", func(t *testing.T) {
+		params := []interface{}{map[string]interface{}{"to": "0xabc"}}
+		strict := applyBlockOverride("eth_call", params, block, true)
+		loose := applyBlockOverride("eth_call", params, block, false)
+		if !reflect.DeepEqual(strict, loose) {
+			t.Errorf("strict %v, default %v", strict, loose)
+		}
+	})
 }
 
 func TestPinnedBlock(t *testing.T) {
