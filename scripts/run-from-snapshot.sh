@@ -360,7 +360,12 @@ run_docker_command() {
     # space-separated flag becomes a distinct argv entry to the client; if
     # callers need a single arg containing spaces they should pass it through
     # the client's own config file rather than -a.
-    docker run --rm -it \
+    local java_env=()
+    if [[ "$CLIENT" == "besu" ]]; then
+        # Mitigate CVE-2026-114938 until the bundled JVM is patched.
+        java_env=(-e "JAVA_TOOL_OPTIONS=-XX:+UnlockDiagnosticVMOptions -XX:-UseBASE64Intrinsics")
+    fi
+    docker run --rm -it "${java_env[@]}" \
         -v "$MERGED_DIR:/execution-data" \
         -p "$RPC_PORT:$RPC_PORT" \
         "$FINAL_IMAGE" \
